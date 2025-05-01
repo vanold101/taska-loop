@@ -1,10 +1,11 @@
 
 import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import NavBar from "@/components/NavBar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TripCard from "@/components/TripCard";
+import { useToast } from "@/components/ui/use-toast";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import CreateTripModal from "@/components/CreateTripModal";
-import NavBar from "@/components/NavBar";
 
 // Mock data for demo purposes
 const mockActiveTrips = [
@@ -54,10 +55,22 @@ const mockPastTrips = [
     eta: "2 days ago",
     itemCount: 3,
     status: 'completed' as const,
+  },
+  {
+    id: '5',
+    store: "Whole Foods",
+    shopper: {
+      name: "Rachel",
+      avatar: ""
+    },
+    eta: "Last week",
+    itemCount: 9,
+    status: 'completed' as const,
   }
 ];
 
-const HomePage = () => {
+const TripsPage = () => {
+  const [activeTab, setActiveTab] = useState("active");
   const [isTripModalOpen, setTripModalOpen] = useState(false);
   const [trips, setTrips] = useState(mockActiveTrips);
   const [pastTrips, setPastTrips] = useState(mockPastTrips);
@@ -100,17 +113,40 @@ const HomePage = () => {
   return (
     <div className="pb-20 pt-6 px-4 max-w-md mx-auto">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Grab&Go Loop</h1>
-        <p className="text-gloop-text-muted">Your Circle's Errands</p>
+        <h1 className="text-2xl font-bold">Trips</h1>
       </header>
 
-      <section className="mb-8">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold">Active Trips</h2>
-        </div>
-        <div className="space-y-3">
-          {trips.length > 0 ? (
-            trips.map((trip) => (
+      <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList className="grid grid-cols-2 mb-4">
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="past">Past</TabsTrigger>
+        </TabsList>
+        <TabsContent value="active">
+          <div className="space-y-3">
+            {trips.length > 0 ? (
+              trips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  store={trip.store}
+                  shopper={trip.shopper}
+                  eta={trip.eta}
+                  itemCount={trip.itemCount}
+                  status={trip.status}
+                  onAddItem={() => handleAddItem(trip.id)}
+                  onClick={() => handleTripClick(trip.id)}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 border rounded-lg bg-white">
+                <p className="text-gloop-text-muted">No active trips</p>
+                <p className="text-sm mt-2">Announce a trip to start shopping!</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+        <TabsContent value="past">
+          <div className="space-y-3">
+            {pastTrips.map((trip) => (
               <TripCard
                 key={trip.id}
                 store={trip.store}
@@ -118,37 +154,12 @@ const HomePage = () => {
                 eta={trip.eta}
                 itemCount={trip.itemCount}
                 status={trip.status}
-                onAddItem={() => handleAddItem(trip.id)}
                 onClick={() => handleTripClick(trip.id)}
               />
-            ))
-          ) : (
-            <div className="text-center py-8 border rounded-lg bg-white">
-              <p className="text-gloop-text-muted">No active trips</p>
-              <p className="text-sm mt-2">Announce a trip to start shopping!</p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold">Recent Trips</h2>
-        </div>
-        <div className="space-y-3 opacity-80">
-          {pastTrips.map((trip) => (
-            <TripCard
-              key={trip.id}
-              store={trip.store}
-              shopper={trip.shopper}
-              eta={trip.eta}
-              itemCount={trip.itemCount}
-              status={trip.status}
-              onClick={() => handleTripClick(trip.id)}
-            />
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <FloatingActionButton onClick={() => setTripModalOpen(true)} />
       
@@ -163,4 +174,4 @@ const HomePage = () => {
   );
 };
 
-export default HomePage;
+export default TripsPage;
