@@ -5,7 +5,7 @@ import FloatingActionButton from "@/components/FloatingActionButton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon, List, Navigation } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import CreateTaskModal from "@/components/CreateTaskModal";
 
 // Mock tasks with location data
@@ -36,18 +36,33 @@ const mockLocationTasks = [
 const MapPage = () => {
   const [isCreateTaskModalOpen, setCreateTaskModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const [locationTasks, setLocationTasks] = useState(mockLocationTasks);
   const { toast } = useToast();
 
   const handleCreateTask = (data: { title: string; dueDate: string }) => {
+    const newTask = {
+      id: Date.now().toString(),
+      title: data.title,
+      dueDate: data.dueDate,
+      location: 'New Location',
+      priority: 'medium' as 'low' | 'medium' | 'high',
+    };
+    
+    setLocationTasks([newTask, ...locationTasks]);
+    
     toast({
       title: "Task created!",
       description: `Your task "${data.title}" has been created.`,
     });
-    setCreateTaskModalOpen(false);
   };
 
   const toggleViewMode = () => {
     setViewMode(viewMode === 'map' ? 'list' : 'map');
+    
+    toast({
+      title: `Switched to ${viewMode === 'map' ? 'list' : 'map'} view`,
+      description: `Now showing tasks in ${viewMode === 'map' ? 'list' : 'map'} view.`,
+    });
   };
 
   const handleShowRoute = () => {
@@ -55,6 +70,16 @@ const MapPage = () => {
       title: "Generating optimal route",
       description: "Finding the best path for your tasks",
     });
+  };
+  
+  const handleTaskClick = (taskId: string) => {
+    const task = locationTasks.find(t => t.id === taskId);
+    if (task) {
+      toast({
+        title: "Task selected",
+        description: `Viewing details for "${task.title}"`,
+      });
+    }
   };
 
   return (
@@ -84,7 +109,7 @@ const MapPage = () => {
       <div className="mb-4">
         <Button 
           variant="outline" 
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 w-full"
           onClick={handleShowRoute}
         >
           <Navigation className="h-4 w-4" />
@@ -93,14 +118,35 @@ const MapPage = () => {
       </div>
 
       {viewMode === 'map' ? (
-        <div className="bg-slate-200 rounded-lg h-96 flex items-center justify-center mb-4">
+        <div className="bg-slate-200 rounded-lg h-96 flex items-center justify-center mb-4 relative">
           <p className="text-slate-500">Map will be displayed here</p>
+          {/* Sample markers to show positions */}
+          {locationTasks.map((task, index) => (
+            <div 
+              key={task.id}
+              className={`absolute h-6 w-6 rounded-full flex items-center justify-center 
+                ${task.priority === 'high' ? 'bg-red-500' : 
+                task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'}
+              `}
+              style={{ 
+                top: `${20 + (index * 15)}%`, 
+                left: `${30 + (index * 20)}%` 
+              }}
+              onClick={() => handleTaskClick(task.id)}
+            >
+              <span className="text-white text-xs font-bold">{index + 1}</span>
+            </div>
+          ))}
         </div>
       ) : null}
 
       <div className="space-y-3">
-        {mockLocationTasks.map((task) => (
-          <Card key={task.id}>
+        {locationTasks.map((task) => (
+          <Card 
+            key={task.id} 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => handleTaskClick(task.id)}
+          >
             <CardContent className="p-4">
               <div className="flex justify-between items-start">
                 <div>

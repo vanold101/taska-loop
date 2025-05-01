@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { Calendar as CalendarIcon, Flag, Map, RotateCw } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 type CreateTaskModalProps = {
   isOpen: boolean;
@@ -18,6 +19,7 @@ type CreateTaskModalProps = {
 };
 
 const CreateTaskModal = ({ isOpen, onClose, onSubmit }: CreateTaskModalProps) => {
+  const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isRotating, setIsRotating] = useState(false);
@@ -26,15 +28,40 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit }: CreateTaskModalProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date) return;
+    if (!date) {
+      toast({
+        title: "Error",
+        description: "Please select a due date",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    onSubmit({
+    if (!title.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a task title",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const taskData = {
       title,
       dueDate: date.toISOString(),
-    });
+    };
     
+    onSubmit(taskData);
+    
+    // Reset form
     setTitle("");
     setDate(new Date());
+    setIsRotating(false);
+    setIsLocationEnabled(false);
+    setPriority("medium");
+    
+    // Close modal
+    onClose();
   };
 
   return (
@@ -44,6 +71,9 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit }: CreateTaskModalProps) =>
           <DialogTitle className="flex items-center gap-2">
             Create New Task
           </DialogTitle>
+          <DialogDescription>
+            Add a new task to your list. Tasks can be assigned to people and can have location reminders.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
@@ -75,12 +105,13 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit }: CreateTaskModalProps) =>
                   {date ? format(date, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
                   selected={date}
                   onSelect={setDate}
                   initialFocus
+                  className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -150,7 +181,7 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit }: CreateTaskModalProps) =>
             </Button>
             <Button 
               type="submit" 
-              disabled={!title.trim() || !date}
+              className="bg-gloop-primary hover:bg-gloop-primary-dark"
             >
               Create Task
             </Button>

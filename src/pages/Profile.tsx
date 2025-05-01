@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavBar from "@/components/NavBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,11 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { BadgeCheck, Bell, Moon, User, Shield, LogOut, Trophy, TreeDeciduous } from "lucide-react";
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const [name, setName] = useState("Alex Smith");
+  const [paymentHandle, setPaymentHandle] = useState("@alexsmith");
   const [user] = useState({
     name: "Alex Smith",
     phone: "+1 (555) 123-4567",
@@ -36,6 +40,11 @@ const ProfilePage = () => {
       ...preferences,
       [setting]: !preferences[setting],
     });
+    
+    toast({
+      title: `${setting} ${!preferences[setting] ? 'enabled' : 'disabled'}`,
+      description: `Your ${setting} setting has been updated.`,
+    });
   };
 
   const handleSaveProfile = () => {
@@ -43,6 +52,18 @@ const ProfilePage = () => {
       title: "Profile saved",
       description: "Your profile changes have been saved.",
     });
+  };
+  
+  const handleSignOut = () => {
+    toast({
+      title: "Signed out",
+      description: "You have been signed out successfully.",
+    });
+    
+    // Redirect to the landing page after a short delay
+    setTimeout(() => {
+      navigate("/");
+    }, 1500);
   };
 
   return (
@@ -68,7 +89,11 @@ const ProfilePage = () => {
 
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" defaultValue={user.name} />
+              <Input 
+                id="name" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -79,7 +104,11 @@ const ProfilePage = () => {
 
             <div className="space-y-2">
               <Label htmlFor="payment">Payment Handle</Label>
-              <Input id="payment" defaultValue={user.paymentHandle} />
+              <Input 
+                id="payment" 
+                value={paymentHandle}
+                onChange={(e) => setPaymentHandle(e.target.value)}
+              />
             </div>
 
             <Button onClick={handleSaveProfile} className="w-full bg-gloop-primary hover:bg-gloop-primary-dark">
@@ -180,6 +209,7 @@ const ProfilePage = () => {
             <Button 
               variant="outline"
               className="w-full mt-4 flex items-center justify-center gap-2 text-red-500 border-red-200 hover:bg-red-50"
+              onClick={handleSignOut}
             >
               <LogOut className="h-4 w-4" />
               Sign Out

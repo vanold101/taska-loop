@@ -1,10 +1,11 @@
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShoppingCart } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type CreateTripModalProps = {
   isOpen: boolean;
@@ -13,15 +14,36 @@ type CreateTripModalProps = {
 };
 
 const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) => {
+  const { toast } = useToast();
   const [store, setStore] = useState("");
   const [eta, setEta] = useState("20"); // Default 20 minutes
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!store.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a store name",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate ETA
+    const etaNum = parseInt(eta);
+    if (isNaN(etaNum) || etaNum < 5 || etaNum > 120) {
+      toast({
+        title: "Error",
+        description: "ETA must be between 5 and 120 minutes",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     onSubmit({ store, eta });
     setStore("");
     setEta("20");
-    onClose();
   };
 
   return (
@@ -32,6 +54,9 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
             <ShoppingCart className="h-5 w-5 text-gloop-primary" />
             I'm heading to...
           </DialogTitle>
+          <DialogDescription>
+            Let others know you're making a shopping trip and they can request items.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
@@ -67,8 +92,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
             </Button>
             <Button 
               type="submit" 
-              disabled={!store.trim()}
-              style={{backgroundColor: '#4C6EF5'}}
+              className="bg-gloop-primary hover:bg-gloop-primary-dark"
             >
               Broadcast Trip
             </Button>

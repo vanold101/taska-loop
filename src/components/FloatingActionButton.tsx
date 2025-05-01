@@ -2,24 +2,37 @@
 import { Megaphone, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 type FloatingActionButtonProps = {
   onClick: () => void;
   className?: string;
+  tripMode?: boolean;
 };
 
 const FloatingActionButton = ({ 
   onClick,
-  className 
+  className,
+  tripMode 
 }: FloatingActionButtonProps) => {
   const location = useLocation();
+  const { toast } = useToast();
   
   // Context-aware FAB - show different icon based on the current route
-  const isTripsPage = location.pathname === "/trips";
+  const isTripsPage = location.pathname === "/trips" || tripMode;
+  
+  const handleClick = () => {
+    // Log interaction for debugging
+    console.log(`FAB clicked on route: ${location.pathname}`);
+    
+    // Call the provided onClick handler
+    onClick();
+  };
   
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
+      aria-label={isTripsPage ? "Broadcast Trip" : "Create New Task"}
       className={cn(
         "fixed z-20 bottom-20 right-6 w-14 h-14 bg-gloop-accent text-gloop-text-main",
         "rounded-full flex items-center justify-center shadow-lg hover:bg-yellow-400",
