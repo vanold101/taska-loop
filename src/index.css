@@ -75,7 +75,7 @@
   }
 
   body {
-    @apply bg-gloop-bg text-gloop-text-main font-inter;
+    @apply bg-gradient-to-b from-blue-50 to-slate-100 text-gloop-text-main font-inter min-h-screen;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -94,3 +94,37 @@
     @apply text-xl font-medium leading-7;
   }
 }
+
+/* Premium Card Styling */
+.premium-card {
+  @apply bg-white/80 backdrop-blur-sm border border-slate-200 shadow-md;
+}
+
+/* Interactive Elements */
+.interactive-element {
+  @apply transition-all duration-200 transform hover:scale-102 active:scale-98;
+}
+
+/* Animations */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Task Priority Colors */
+.priority-high {
+  @apply border-l-red-500;
+}
+
+.priority-medium {
+  @apply border-l-yellow-500;
+}
+
+.priority-low {
+  @apply border-l-green-500;
+}
+
