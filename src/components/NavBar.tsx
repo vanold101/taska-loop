@@ -1,19 +1,19 @@
 
 import { useState } from 'react';
 import { Link, useLocation } from "react-router-dom";
-import { ShoppingCart, Home, Airplay, Settings } from "lucide-react";
+import { ShoppingCart, Home, Map, Airplay, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 const NavBar = () => {
   const location = useLocation();
   const [activeItem, setActiveItem] = useState(location.pathname);
 
   const navItems = [
-    { name: 'Home', path: '/', icon: <Home className="w-5 h-5" /> },
+    { name: 'Home', path: '/home', icon: <Home className="w-5 h-5" /> },
+    { name: 'Map', path: '/map', icon: <Map className="w-5 h-5" /> },
     { name: 'Trips', path: '/trips', icon: <ShoppingCart className="w-5 h-5" /> },
     { name: 'Pantry', path: '/pantry', icon: <Airplay className="w-5 h-5" /> },
-    { name: 'Settings', path: '/settings', icon: <Settings className="w-5 h-5" /> }
+    { name: 'Profile', path: '/profile', icon: <User className="w-5 h-5" /> }
   ];
 
   return (

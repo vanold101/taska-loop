@@ -1,6 +1,7 @@
 
-import { Megaphone } from "lucide-react";
+import { Megaphone, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocation } from "react-router-dom";
 
 type FloatingActionButtonProps = {
   onClick: () => void;
@@ -11,6 +12,11 @@ const FloatingActionButton = ({
   onClick,
   className 
 }: FloatingActionButtonProps) => {
+  const location = useLocation();
+  
+  // Context-aware FAB - show different icon based on the current route
+  const isTripsPage = location.pathname === "/trips";
+  
   return (
     <button
       onClick={onClick}
@@ -21,7 +27,11 @@ const FloatingActionButton = ({
         className
       )}
     >
-      <Megaphone className="h-6 w-6" />
+      {isTripsPage ? (
+        <Megaphone className="h-6 w-6" />
+      ) : (
+        <Plus className="h-6 w-6" />
+      )}
     </button>
   );
 };
