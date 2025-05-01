@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { BadgeCheck, Bell, Moon, User, Shield, LogOut, Trophy, Tree } from "lucide-react";
+import { BadgeCheck, Bell, Moon, User, Shield, LogOut, Trophy, TreeDeciduous } from "lucide-react";
 
 const ProfilePage = () => {
   const { toast } = useToast();
@@ -107,7 +107,7 @@ const ProfilePage = () => {
               </div>
             </div>
             <div className="bg-green-50 p-4 rounded-lg border border-green-100 flex items-center gap-3">
-              <Tree className="text-green-600 h-5 w-5" />
+              <TreeDeciduous className="text-green-600 h-5 w-5" />
               <div>
                 <p className="text-sm text-green-800 font-medium">You've helped plant 2 trees!</p>
                 <p className="text-xs text-green-600">Earn 10 more points for another tree</p>
