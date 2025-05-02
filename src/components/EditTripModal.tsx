@@ -3,14 +3,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShoppingCart, AlertCircle, Clock, Store, Info } from "lucide-react";
+import { ShoppingCart, AlertCircle, Clock, Store, Info, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { TripData } from "./TripDetailModal";
 
-type CreateTripModalProps = {
+type EditTripModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { store: string; eta: string }) => void;
+  onSubmit: (tripId: string, data: { store: string; eta: string }) => void;
+  trip: TripData | null;
 };
 
 // Common store suggestions for convenience
@@ -24,24 +26,26 @@ const storeSuggestions = [
   "Aldi"
 ];
 
-const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) => {
+const EditTripModal = ({ isOpen, onClose, onSubmit, trip }: EditTripModalProps) => {
   const { toast } = useToast();
   const [store, setStore] = useState("");
-  const [eta, setEta] = useState("20"); // Default 20 minutes
+  const [eta, setEta] = useState("");
   const [errors, setErrors] = useState<{store?: string, eta?: string}>({});
   const [isFormValid, setIsFormValid] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState(storeSuggestions);
 
-  // Reset form when dialog is opened
+  // Initialize form values when trip data is available
   useEffect(() => {
-    if (isOpen) {
-      setStore("");
-      setEta("20");
+    if (trip && isOpen) {
+      setStore(trip.store);
+      // Extract numeric value from eta string (e.g., "10 min" -> "10")
+      const etaValue = trip.eta.replace(/\D/g, '');
+      setEta(etaValue || "20");
       setErrors({});
       setShowSuggestions(false);
     }
-  }, [isOpen]);
+  }, [trip, isOpen]);
 
   // Validate form on every change
   useEffect(() => {
@@ -77,16 +81,16 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isFormValid) {
+    if (!isFormValid || !trip) {
       toast({
-        title: "Cannot broadcast trip",
+        title: "Cannot update trip",
         description: "Please fix the errors in the form",
         variant: "destructive",
       });
       return;
     }
     
-    onSubmit({ store, eta });
+    onSubmit(trip.id, { store, eta });
   };
 
   const handleStoreInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,16 +103,18 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
     setShowSuggestions(false);
   };
 
+  if (!trip) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md glass-effect">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">
-            <ShoppingCart className="h-5 w-5 text-gloop-primary" />
-            I'm heading to...
+            <Edit className="h-5 w-5 text-gloop-primary" />
+            Edit Trip
           </DialogTitle>
           <DialogDescription>
-            Let others know you're making a shopping trip and they can request items.
+            Update your trip details.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,17 +195,6 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
               />
               <span className="text-gloop-text-muted">minutes</span>
             </div>
-            <p className="text-xs text-gloop-text-muted flex items-center">
-              <Info className="h-3 w-3 mr-1" />
-              Let others know when you expect to arrive at the store
-            </p>
-          </div>
-
-          <div className="bg-blue-50 p-4 rounded-md mt-4 border border-blue-100">
-            <p className="text-sm text-blue-800 flex items-start">
-              <Info className="h-4 w-4 mr-2 mt-0.5 text-blue-500" />
-              When you broadcast a trip, your circle members will be notified and can add items to your shopping list.
-            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
@@ -211,7 +206,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
               disabled={!isFormValid}
               className={`premium-gradient-btn ${!isFormValid ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              Broadcast Trip
+              Update Trip
             </Button>
           </div>
         </form>
@@ -220,4 +215,4 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
   );
 };
 
-export default CreateTripModal;
+export default EditTripModal;

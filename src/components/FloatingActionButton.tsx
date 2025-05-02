@@ -1,20 +1,23 @@
-
 import { Megaphone, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { ReactNode } from "react";
 
 type FloatingActionButtonProps = {
   onClick: () => void;
   className?: string;
   tripMode?: boolean;
+  icon?: ReactNode;
 };
 
 const FloatingActionButton = ({ 
   onClick,
   className,
-  tripMode 
+  tripMode,
+  icon
 }: FloatingActionButtonProps) => {
   const location = useLocation();
   const { toast } = useToast();
@@ -45,33 +48,53 @@ const FloatingActionButton = ({
   };
   
   return (
-    <button
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={() => setIsPressed(false)}
-      aria-label={isTripsPage ? "Broadcast Trip" : "Create New Task"}
-      className={cn(
-        "fixed z-20 bottom-20 right-6 w-14 h-14 bg-gloop-accent text-gloop-text-main",
-        "rounded-full flex items-center justify-center shadow-lg hover:bg-yellow-400",
-        "transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gloop-accent",
-        isPressed && "scale-95 bg-yellow-500",
-        className
-      )}
+    <motion.div
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ 
+        type: "spring",
+        stiffness: 260,
+        damping: 20,
+        delay: 0.3
+      }}
+      className="fixed z-20 bottom-24 left-6"
     >
-      {isTripsPage ? (
-        <Megaphone className="h-6 w-6" />
-      ) : (
-        <Plus className="h-6 w-6" />
-      )}
+      <motion.button
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => setIsPressed(false)}
+        whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(58, 91, 220, 0.5)" }}
+        whileTap={{ scale: 0.95 }}
+        aria-label={isTripsPage ? "Broadcast Trip" : "Create New Task"}
+        className={cn(
+          "w-14 h-14 rounded-full flex items-center justify-center shadow-lg",
+          "transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gloop-accent",
+          "bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end text-white",
+          className
+        )}
+      >
+        {icon ? (
+          icon
+        ) : isTripsPage ? (
+          <Megaphone className="h-6 w-6" />
+        ) : (
+          <Plus className="h-6 w-6" />
+        )}
+        
+        {/* Subtle glow effect */}
+        <span className="absolute inset-0 rounded-full bg-gloop-premium-gradient-end opacity-0 hover:opacity-30 transition-opacity duration-300" />
+        
+        {/* Ripple effect */}
+        <span className={cn(
+          "absolute inset-0 rounded-full bg-white",
+          isPressed ? "animate-ripple opacity-20" : "opacity-0",
+        )} />
+      </motion.button>
       
-      {/* Subtle ripple effect */}
-      <span className={cn(
-        "absolute inset-0 rounded-full bg-yellow-300 opacity-30",
-        isPressed ? "scale-100" : "scale-0",
-        "transition-transform duration-300"
-      )} />
-    </button>
+      {/* Shadow element */}
+      <div className="absolute -inset-1 bg-gloop-primary/20 rounded-full blur-md -z-10 animate-pulse-subtle" />
+    </motion.div>
   );
 };
 

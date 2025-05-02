@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import PantryPage from "./pages/Pantry";
 import ProfilePage from "./pages/Profile";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import { TaskProvider } from "./context/TaskContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,28 +39,30 @@ const App = () => {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <div className="min-h-screen bg-gradient-to-b from-blue-50 to-slate-100">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/home" element={<HomePage />} />
-              <Route path="/map" element={<MapPage />} />
-              <Route path="/trips" element={<TripsPage />} />
-              <Route path="/pantry" element={<PantryPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              
-              {/* Redirect /index to /home */}
-              <Route path="/index" element={<Navigate to="/home" replace />} />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-        </BrowserRouter>
-      </TooltipProvider>
+      <TaskProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <div className="min-h-screen premium-bg">
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/home" element={<HomePage />} />
+                <Route path="/map" element={<MapPage />} />
+                <Route path="/trips" element={<TripsPage />} />
+                <Route path="/pantry" element={<PantryPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                
+                {/* Redirect /index to /home */}
+                <Route path="/index" element={<Navigate to="/home" replace />} />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+          </BrowserRouter>
+        </TooltipProvider>
+      </TaskProvider>
     </QueryClientProvider>
   );
 };
