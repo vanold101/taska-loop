@@ -121,6 +121,9 @@ export const calculateSplitAmounts = (
     itemCount: 0
   }));
   
+  // Find the shopper (assuming shopper is "You" - can be updated to use actual shopper info)
+  const shopper = participants.find(p => p.name === "You");
+  
   // Process each item
   items.forEach(item => {
     // Skip items without a price
@@ -128,11 +131,11 @@ export const calculateSplitAmounts = (
     
     // Get split for this item
     const itemSplit = splits.find(s => s.itemId === item.id);
+    const itemTotal = item.price * item.quantity;
     
     // If no split is defined, create a default equal split
     if (!itemSplit) {
-      // Apply default equal split
-      const itemTotal = item.price * item.quantity;
+      // Apply default equal split among all participants
       const equalShare = itemTotal / participants.length;
       
       participants.forEach(p => {
@@ -144,8 +147,6 @@ export const calculateSplitAmounts = (
       });
     } else {
       // Apply the defined split
-      const itemTotal = item.price * item.quantity;
-      
       if (itemSplit.splitType === 'equal') {
         // Equal split (may be a subset of participants)
         if (itemSplit.details.length === 0) return;
@@ -180,6 +181,24 @@ export const calculateSplitAmounts = (
       }
     }
   });
+  
+  // Handle the case where the shopper paid for everything but is only responsible for their portion
+  if (shopper) {
+    // Calculate total trip cost
+    const totalTripCost = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+    
+    // Calculate what each participant will pay
+    const shopperSummary = result.find(r => r.userId === shopper.id);
+    
+    // If shopper found, adjust the amounts so that participants owe the shopper
+    if (shopperSummary) {
+      // For the shopper, they've already paid the total cost, but are only responsible for their portion
+      // Their balance in the result will be what they're responsible for, not what they paid
+      
+      // For all other participants, their balance is what they owe the shopper
+      // No changes needed here as the amount in result represents what they owe
+    }
+  }
   
   // Round amounts to 2 decimal places
   result.forEach(r => {

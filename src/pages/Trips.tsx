@@ -18,6 +18,8 @@ import TripCalendarView from '@/components/TripCalendarView';
 import TripMapView from '@/components/TripMapView';
 import { useTaskContext, Trip as ContextTrip } from "@/context/TaskContext";
 import { useNavigate } from "react-router-dom";
+import { createSettlementTransaction, createPaymentTransaction, confirmPayment } from "@/services/LedgerService";
+import { calculateSplitAmounts, loadSplitConfig } from "@/services/CostSplitService";
 
 const TripsPage = () => {
   // Use the shared context for trips and tasks
@@ -240,6 +242,44 @@ const TripsPage = () => {
       }
     }
     
+    // Calculate the total cost of the trip
+    const totalCost = trip.items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+    
+    // Calculate the split amounts based on configured item splits
+    const splitSummary = calculateSplitAmounts(tripId, trip.items, trip.participants);
+    
+    // Get the current user's info
+    const currentUser = trip.participants.find(p => p.name === "You");
+    
+    if (currentUser && totalCost > 0) {
+      // Create ledger transactions for each participant who owes money
+      splitSummary.forEach(split => {
+        // Skip the current user (we don't create a transaction from self to self)
+        if (split.userId === currentUser.id) return;
+        
+        // Only create transactions for amounts greater than zero
+        if (split.totalAmount > 0) {
+          // Create a settlement transaction in the ledger
+          // This represents that the participant owes money to the shopper
+          createSettlementTransaction(
+            tripId,
+            trip.store,
+            split.userId,      // From: The participant who owes money
+            split.userName,
+            currentUser.id,    // To: The current user who paid
+            currentUser.name,
+            split.totalAmount
+          );
+          
+          // Show a toast to let the user know expense was recorded
+          toast({
+            title: "Expense recorded",
+            description: `${split.userName} owes you $${split.totalAmount.toFixed(2)} for items in this trip`
+          });
+        }
+      });
+    }
+    
     // Update the trip status to completed
     updateContextTrip(tripId, {
       status: 'completed',
@@ -368,13 +408,35 @@ const TripsPage = () => {
   
   // Settle up with a participant
   const handleSettleUp = (amount: number, toUserId: string, fromUserId: string) => {
-    // After settling up, navigate to the ledger page
+    // Find the participants
+    const toParticipant = contextTrips.find(t => t.id === selectedTrip?.id)?.participants.find(p => p.id === toUserId);
+    const fromParticipant = contextTrips.find(t => t.id === selectedTrip?.id)?.participants.find(p => p.id === fromUserId);
+    
+    if (!toParticipant || !fromParticipant) {
+      console.error("Could not find participants for settlement");
+      return;
+    }
+    
+    // Create and immediately confirm a payment transaction
+    const transaction = createPaymentTransaction(
+      fromParticipant.name,  // From user making the payment
+      fromParticipant.name,
+      toParticipant.id,      // To user receiving the payment
+      toParticipant.name,
+      amount,
+      `Payment for trip to ${selectedTrip?.store || 'store'}`
+    );
+    
+    // Confirm the payment immediately
+    confirmPayment(transaction.id);
+    
+    // Navigate to the ledger page to see the updated balances
     navigate('/ledger');
     
-    // Show a toast to let the user know their payment was recorded
+    // Show a toast notification
     toast({
       title: "Payment recorded",
-      description: "Your payment has been recorded in the ledger."
+      description: `Your payment of $${amount.toFixed(2)} to ${toParticipant.name} has been recorded in the ledger.`
     });
   };
   
