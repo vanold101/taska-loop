@@ -13,11 +13,10 @@ interface TripMapViewProps {
   onClose: () => void;
 }
 
-// Declare global Google Maps types
+// Declare only the initTripMap without redeclaring google
 declare global {
   interface Window {
     initTripMap: () => void;
-    google: any;
   }
 }
 
@@ -81,12 +80,12 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
     const loadGoogleMapsScript = () => {
       // Check if script is already loaded
       if (window.google && window.google.maps) {
-        initTripMap();
+        window.initTripMap();
         return () => {};
       }
       
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8&libraries=places,geometry&callback=initTripMap&loading=async&v=weekly&csp_nonce=cascade-nonce`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8&libraries=places,geometry&callback=initTripMap`;
       script.async = true;
       script.defer = true;
       document.head.appendChild(script);

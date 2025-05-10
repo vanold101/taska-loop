@@ -57,7 +57,7 @@ const FloatingActionButton = ({
         damping: 20,
         delay: 0.3
       }}
-      className="fixed z-20 bottom-24 left-6"
+      className="fixed z-50 bottom-28 right-6"
     >
       <motion.button
         onClick={handleClick}

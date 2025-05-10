@@ -1,9 +1,11 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "./components/ui/toaster";
+import { Toaster as Sonner } from "./components/ui/sonner";
+import { TooltipProvider } from "./components/ui/tooltip";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
+import { TaskProvider } from "./context/TaskContext";
+
+// Import pages
 import Landing from "./pages/Landing";
 import HomePage from "./pages/Index";
 import TripsPage from "./pages/Trips";
@@ -11,17 +13,9 @@ import MapPage from "./pages/Map";
 import PantryPage from "./pages/Pantry";
 import ProfilePage from "./pages/Profile";
 import SettingsPage from "./pages/Settings";
+import LedgerPage from "./pages/Ledger";
 import NotFound from "./pages/NotFound";
-import { TaskProvider } from "./context/TaskContext";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000, // 1 minute
-      retry: 1,
-    },
-  },
-});
+import DashboardPage from "./pages/Dashboard";
 
 const App = () => {
   // Detect and apply user preferences for dark mode
@@ -38,32 +32,28 @@ const App = () => {
   }, []);
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <TaskProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <div className="min-h-screen premium-bg">
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/home" element={<HomePage />} />
-                <Route path="/map" element={<MapPage />} />
-                <Route path="/trips" element={<TripsPage />} />
-                <Route path="/pantry" element={<PantryPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                
-                {/* Redirect /index to /home */}
-                <Route path="/index" element={<Navigate to="/home" replace />} />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
-          </BrowserRouter>
-        </TooltipProvider>
-      </TaskProvider>
-    </QueryClientProvider>
+    <TaskProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <div className="min-h-screen bg-gloop-bg dark:bg-gloop-dark-bg max-w-md mx-auto pb-20">
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/trips" element={<TripsPage />} />
+              <Route path="/ledger" element={<LedgerPage />} />
+              <Route path="/pantry" element={<PantryPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+        </BrowserRouter>
+      </TooltipProvider>
+    </TaskProvider>
   );
 };
 

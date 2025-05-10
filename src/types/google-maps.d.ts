@@ -1,8 +1,16 @@
 // Google Maps type definitions
 declare global {
   interface Window {
-    google: any; // Using any to avoid type conflicts
+    google: typeof google;
     initMap: () => void;
+  }
+
+  namespace google.maps {
+    interface DirectionsResult {
+      routes: DirectionsRoute[];
+      geocoded_waypoints: DirectionsGeocodedWaypoint[];
+      status: DirectionsStatus;
+    }
   }
 }
 

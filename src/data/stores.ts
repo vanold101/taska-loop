@@ -15,19 +15,19 @@ export const stores: Store[] = [
   {
     id: "1",
     name: "Trader Joe's",
-    address: "555 Market St, San Francisco, CA 94105",
-    lat: 37.789,
-    lng: -122.401,
+    address: "3888 Townsfair Way, Columbus, OH 43219",
+    lat: 39.9789,
+    lng: -82.8677,
     category: "grocery",
-    hours: "8AM - 10PM",
+    hours: "8AM - 9PM",
     rating: 4.7
   },
   {
     id: "2",
     name: "Whole Foods Market",
-    address: "399 4th St, San Francisco, CA 94107",
-    lat: 37.781,
-    lng: -122.396,
+    address: "1555 W Lane Ave, Columbus, OH 43221",
+    lat: 40.0065,
+    lng: -83.0537,
     category: "grocery",
     hours: "7AM - 10PM",
     rating: 4.5
@@ -35,9 +35,9 @@ export const stores: Store[] = [
   {
     id: "3",
     name: "Target",
-    address: "789 Mission St, San Francisco, CA 94103",
-    lat: 37.784,
-    lng: -122.406,
+    address: "1892 N High St, Columbus, OH 43201",
+    lat: 39.9964,
+    lng: -83.0091,
     category: "grocery",
     hours: "8AM - 11PM",
     rating: 4.3
@@ -45,9 +45,9 @@ export const stores: Store[] = [
   {
     id: "4",
     name: "Walgreens",
-    address: "456 Powell St, San Francisco, CA 94102",
-    lat: 37.788,
-    lng: -122.408,
+    address: "1162 N High St, Columbus, OH 43201",
+    lat: 39.9865,
+    lng: -83.0044,
     category: "pharmacy",
     hours: "24 hours",
     rating: 4.0
@@ -55,9 +55,9 @@ export const stores: Store[] = [
   {
     id: "5",
     name: "CVS Pharmacy",
-    address: "731 Market St, San Francisco, CA 94103",
-    lat: 37.787,
-    lng: -122.404,
+    address: "2160 N High St, Columbus, OH 43201",
+    lat: 40.0046,
+    lng: -83.0104,
     category: "pharmacy",
     hours: "24 hours",
     rating: 3.9
@@ -65,19 +65,19 @@ export const stores: Store[] = [
   {
     id: "6",
     name: "Home Depot",
-    address: "2675 Geary Blvd, San Francisco, CA 94118",
-    lat: 37.782,
-    lng: -122.447,
+    address: "2555 Brice Rd, Columbus, OH 43068",
+    lat: 39.9259,
+    lng: -82.8369,
     category: "hardware",
     hours: "6AM - 9PM",
     rating: 4.2
   },
   {
     id: "7",
-    name: "Safeway",
-    address: "2020 Market St, San Francisco, CA 94114",
-    lat: 37.769,
-    lng: -122.428,
+    name: "Kroger",
+    address: "1350 N High St, Columbus, OH 43201",
+    lat: 39.9905,
+    lng: -83.0069,
     category: "grocery",
     hours: "6AM - 12AM",
     rating: 4.1
@@ -85,9 +85,9 @@ export const stores: Store[] = [
   {
     id: "8",
     name: "Costco",
-    address: "450 10th St, San Francisco, CA 94103",
-    lat: 37.771,
-    lng: -122.412,
+    address: "3800 W Dublin Granville Rd, Columbus, OH 43235",
+    lat: 40.0909,
+    lng: -83.0763,
     category: "grocery",
     hours: "10AM - 8:30PM",
     rating: 4.6
@@ -95,9 +95,9 @@ export const stores: Store[] = [
   {
     id: "9",
     name: "Best Buy",
-    address: "1717 Harrison St, San Francisco, CA 94103",
-    lat: 37.769,
-    lng: -122.413,
+    address: "3840 Morse Rd, Columbus, OH 43219",
+    lat: 40.0606,
+    lng: -82.9307,
     category: "electronics",
     hours: "10AM - 9PM",
     rating: 4.3
@@ -105,9 +105,9 @@ export const stores: Store[] = [
   {
     id: "10",
     name: "Apple Store",
-    address: "300 Post St, San Francisco, CA 94108",
-    lat: 37.788,
-    lng: -122.407,
+    address: "4195 The Strand E, Columbus, OH 43219",
+    lat: 40.0529,
+    lng: -82.9146,
     category: "electronics",
     hours: "10AM - 8PM",
     rating: 4.8
@@ -115,29 +115,29 @@ export const stores: Store[] = [
   {
     id: "11",
     name: "Macy's",
-    address: "170 O'Farrell St, San Francisco, CA 94102",
-    lat: 37.786,
-    lng: -122.407,
+    address: "1500 Polaris Pkwy, Columbus, OH 43240",
+    lat: 40.1452,
+    lng: -82.9823,
     category: "clothing",
     hours: "10AM - 9PM",
     rating: 4.0
   },
   {
     id: "12",
-    name: "Nordstrom",
-    address: "865 Market St, San Francisco, CA 94103",
-    lat: 37.784,
-    lng: -122.406,
-    category: "clothing",
-    hours: "10AM - 9PM",
-    rating: 4.4
+    name: "Giant Eagle",
+    address: "280 E Whittier St, Columbus, OH 43206",
+    lat: 39.9447,
+    lng: -82.9913,
+    category: "grocery",
+    hours: "7AM - 10PM",
+    rating: 4.2
   },
   {
     id: "13",
     name: "Ace Hardware",
-    address: "2020 Fillmore St, San Francisco, CA 94115",
-    lat: 37.788,
-    lng: -122.434,
+    address: "1305 W Lane Ave, Columbus, OH 43221",
+    lat: 40.0057,
+    lng: -83.0491,
     category: "hardware",
     hours: "8AM - 8PM",
     rating: 4.5
@@ -145,9 +145,9 @@ export const stores: Store[] = [
   {
     id: "14",
     name: "Lowe's",
-    address: "491 Bayshore Blvd, San Francisco, CA 94124",
-    lat: 37.739,
-    lng: -122.403,
+    address: "2345 Silver Dr, Columbus, OH 43211",
+    lat: 40.0127,
+    lng: -82.9765,
     category: "hardware",
     hours: "6AM - 10PM",
     rating: 4.2
@@ -155,9 +155,9 @@ export const stores: Store[] = [
   {
     id: "15",
     name: "Walmart",
-    address: "1400 Shattuck Ave, Berkeley, CA 94709",
-    lat: 37.881,
-    lng: -122.269,
+    address: "3900 Morse Rd, Columbus, OH 43219",
+    lat: 40.0602,
+    lng: -82.9339,
     category: "grocery",
     hours: "7AM - 11PM",
     rating: 3.8

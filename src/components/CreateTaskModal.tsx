@@ -11,18 +11,8 @@ import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 
-// Add Google Maps type definitions
-declare global {
-  interface Window {
-    google: {
-      maps: {
-        places: {
-          Autocomplete: new (input: HTMLInputElement, options?: google.maps.places.AutocompleteOptions) => google.maps.places.Autocomplete;
-        };
-      };
-    };
-  }
-}
+// Remove the conflicting type declaration
+// The global google namespace is already defined elsewhere
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -92,12 +82,16 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
               console.log('Selected place:', place);
               
               if (place && place.geometry && place.geometry.location) {
-                setLocation(place.formatted_address || place.name);
+                // Explicitly handle type casting
+                const address = place.formatted_address ? String(place.formatted_address) : 
+                               (place.name ? String(place.name) : "");
+                                
+                setLocation(address);
                 setCoordinates({
                   lat: place.geometry.location.lat(),
                   lng: place.geometry.location.lng()
                 });
-                console.log('Location set to:', place.formatted_address || place.name);
+                console.log('Location set to:', address);
               } else {
                 console.warn('No place geometry found');
                 toast({

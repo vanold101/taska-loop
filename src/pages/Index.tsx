@@ -1,13 +1,13 @@
 import { useState } from "react";
-import TripCard from "@/components/TripCard";
-import FloatingActionButton from "@/components/FloatingActionButton";
-import CreateTripModal from "@/components/CreateTripModal";
-import { CreateTaskModal } from "@/components/CreateTaskModal";
-import NavBar from "@/components/NavBar";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TripCard from "../components/TripCard";
+import FloatingActionButton from "../components/FloatingActionButton";
+import CreateTripModal from "../components/CreateTripModal";
+import { CreateTaskModal } from "../components/CreateTaskModal";
+import NavBar from "../components/NavBar";
+import { Card, CardContent } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { 
   Filter, 
   Map, 
@@ -21,10 +21,16 @@ import {
   Plus, 
   Info, 
   ShoppingCart,
-  ChevronRight
+  ChevronRight,
+  ListTodo,
+  CheckCircle,
+  Store,
+  Users,
+  User,
+  Calendar
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Dialog, 
@@ -33,7 +39,11 @@ import {
   DialogFooter, 
   DialogTitle, 
   DialogDescription 
-} from "@/components/ui/dialog";
+} from "../components/ui/dialog";
+import { useToast } from "../hooks/use-toast";
+import { useTaskContext } from "../context/TaskContext";
+import { formatDistanceToNow, isPast, isToday, isTomorrow } from "date-fns";
+import NearbyStores from "../components/NearbyStores";
 
 // Mock data for tasks
 const mockTasks = [
@@ -103,6 +113,9 @@ const HomePage = () => {
   const [tasks, setTasks] = useState(mockTasks);
   const [activeTab, setActiveTab] = useState("all");
   
+  // Get toast utility
+  const { toast } = useToast();
+
   // Function to handle trip creation
   const handleCreateTrip = (data: { store: string; eta: string }) => {
     const newTrip = {
@@ -190,6 +203,28 @@ const HomePage = () => {
     setTrips(trips.filter(trip => trip.id !== tripId));
   };
 
+  // Function to handle reactivate trip
+  const handleReactivateTrip = (tripId: string) => {
+    // In a real app, this would move the trip from completed back to active
+    // For now, we'll just create a new trip with the same data
+    const completedTrip = trips.find(trip => trip.id === tripId);
+    if (completedTrip) {
+      const reactivatedTrip = {
+        ...completedTrip,
+        id: Date.now().toString(),
+        status: 'open' as const,
+        eta: 'Reactivated'
+      };
+      setTrips([reactivatedTrip, ...trips]);
+      
+      // Show confirmation toast
+      toast({
+        title: "Trip reactivated",
+        description: `Your trip to ${completedTrip.store} has been reactivated.`,
+      });
+    }
+  };
+
   // Function to handle delete trip
   const handleDeleteTrip = (tripId: string) => {
     setTrips(trips.filter(trip => trip.id !== tripId));
@@ -237,387 +272,420 @@ const HomePage = () => {
     return true;
   });
 
-  // Determine which modal to open when the FAB is clicked
-  const handleFabClick = () => {
-    setTaskModalOpen(true);
+  // Function to determine due date display
+  const getDueDateDisplay = (date: string) => {
+    const dueDate = new Date(date);
+    
+    if (isToday(dueDate)) {
+      return "Today";
+    } else if (isTomorrow(dueDate)) {
+      return "Tomorrow";
+    } else if (isPast(dueDate)) {
+      return `${formatDistanceToNow(dueDate)} ago`;
+    } else {
+      return formatDistanceToNow(dueDate, { addSuffix: true });
+    }
+  };
+
+  // Get priority badge color
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-500 hover:bg-red-600';
+      case 'medium':
+        return 'bg-amber-500 hover:bg-amber-600';
+      case 'low':
+        return 'bg-blue-500 hover:bg-blue-600';
+      default:
+        return 'bg-gray-500 hover:bg-gray-600';
+    }
   };
 
   return (
-    <div className="container mx-auto px-4 pb-20 pt-4 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">
-          Welcome Back
-        </h1>
-        <Button variant="outline" onClick={handleFilterClick} className="premium-card">
-          <Filter className="h-4 w-4 mr-2" />
-          Filter
-        </Button>
-      </div>
-
-      <div className="mb-4">
-        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-3 premium-card">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <div className="pb-20">
+      {/* Page header */}
+      <header className="px-4 pt-6 pb-4 bg-white dark:bg-gloop-dark-surface border-b border-gloop-outline dark:border-gloop-dark-outline">
+        <h1 className="text-2xl font-semibold">Task Loop</h1>
+        <p className="text-sm text-gloop-text-muted dark:text-gloop-dark-text-muted">
+          Your household management hub
+        </p>
+      </header>
       
-      <AnimatePresence>
-        {filteredTasks.length > 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-3"
-          >
-            {filteredTasks.map(task => (
-              <motion.div
-                key={task.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.15 }}
-                whileHover={{ scale: 1.02 }}
-                className="premium-card rounded-lg overflow-hidden"
-              >
-                <Card className="border-0 shadow-none bg-transparent">
+      <main className="p-4 space-y-6">
+        {/* Task filtering tabs */}
+        <Tabs 
+          defaultValue="all" 
+          value={activeTab} 
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="grid grid-cols-3 mb-4 bg-gloop-accent dark:bg-gloop-dark-accent">
+            <TabsTrigger value="all" className="text-sm">All</TabsTrigger>
+            <TabsTrigger value="pending" className="text-sm">Pending</TabsTrigger>
+            <TabsTrigger value="completed" className="text-sm">Completed</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all" className="mt-0 space-y-3">
+            {filteredTasks.length === 0 ? (
+              <div className="text-center py-8 text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                <ListTodo className="mx-auto h-10 w-10 mb-2 opacity-50" />
+                <p>No tasks found. Create a new task to get started.</p>
+              </div>
+            ) : (
+              filteredTasks.map(task => (
+                <Card 
+                  key={task.id} 
+                  className="premium-card hover:shadow-md transition-shadow"
+                  onClick={() => handleTaskClick(task.id)}
+                >
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className={`h-6 w-6 rounded-full ${
-                            task.isCompleted
-                              ? "bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end text-white border-0"
-                              : "border-gloop-card-border"
-                          }`}
-                          onClick={() => handleCompleteTask(task.id)}
-                        >
-                          {task.isCompleted && <Check className="h-3 w-3" />}
-                        </Button>
-                        <div className="flex-1">
-                          <div 
-                            className={`font-medium ${
-                              task.isCompleted ? "line-through text-gloop-text-muted" : ""
-                            }`}
-                            onClick={() => handleTaskClick(task.id)}
-                          >
-                            {task.title}
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-medium">{task.title}</span>
+                          {task.isRotating && (
+                            <RotateCw className="h-3.5 w-3.5 text-gloop-primary" />
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center text-sm text-gloop-text-muted mt-1 gap-2">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>{getDueDateDisplay(task.dueDate)}</span>
+                          
+                          {task.location && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span>{task.location}</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex -space-x-2">
+                            {task.assignees.map((assignee, index) => (
+                              <Avatar key={index} className="h-6 w-6 border-2 border-white dark:border-gloop-dark-surface">
+                                <AvatarFallback className="text-xs">
+                                  {assignee.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ))}
                           </div>
-                          <div className="flex items-center text-xs text-gloop-text-muted mt-1">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {new Date(task.dueDate).toLocaleDateString()}
-                            
-                            {task.location && (
-                              <>
-                                <span className="mx-1">•</span>
-                                <MapPin className="h-3 w-3 mr-1" />
-                                {task.location}
-                              </>
-                            )}
-                            
-                            {task.isRotating && (
-                              <>
-                                <span className="mx-1">•</span>
-                                <RotateCw className="h-3 w-3 mr-1" />
-                                Rotating
-                              </>
-                            )}
-                          </div>
+                          <Badge variant="outline" className="text-xs">{task.assignees.length} assignee{task.assignees.length !== 1 ? 's' : ''}</Badge>
+                          <Badge className={`ml-auto text-xs text-white ${getPriorityColor(task.priority)}`}>
+                            {task.priority}
+                          </Badge>
                         </div>
                       </div>
                       
-                      <div className="flex items-center">
-                        <Badge 
-                          variant="outline" 
-                          className={`
-                            ${task.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200' : 
-                              task.priority === 'medium' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200' : 
-                              'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200'}
-                            mr-2
-                          `}
-                        >
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                        </Badge>
-                        
-                        <div className="flex -space-x-2">
-                          {task.assignees.map((assignee, index) => (
-                            <Avatar key={index} className="h-6 w-6 border-2 border-background">
-                              <AvatarFallback className="text-xs bg-gradient-to-br from-gloop-premium-gradient-start to-gloop-premium-gradient-end text-white">
-                                {assignee.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                          ))}
-                        </div>
-                      </div>
+                      <Button
+                        variant={task.isCompleted ? "outline" : "default"}
+                        size="icon"
+                        className={`h-7 w-7 rounded-full ${task.isCompleted ? 'bg-gloop-success text-white' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCompleteTask(task.id);
+                        }}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
-            ))}
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12 premium-card rounded-lg"
-          >
-            <div className="mb-3 mx-auto w-12 h-12 rounded-full bg-gloop-card-background flex items-center justify-center">
-              <Check className="h-6 w-6 text-gloop-text-muted" />
-            </div>
-            <h3 className="text-lg font-medium mb-1">No tasks found</h3>
-            <p className="text-sm text-gloop-text-muted mb-4">
-              {activeTab === "completed" 
-                ? "You haven't completed any tasks yet."
-                : activeTab === "pending"
-                ? "You don't have any pending tasks."
-                : "You don't have any tasks yet."}
-            </p>
-            <Button 
-              onClick={() => setTaskModalOpen(true)}
-              className="premium-gradient-btn"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Task
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="mt-8 mb-6">
-        <h2 className="text-lg font-medium mb-3 flex items-center">
-          <ShoppingCart className="h-5 w-5 mr-2 text-gloop-primary" />
-          Active Shopping Trips
-        </h2>
-        
-        {trips.length > 0 ? (
-          <div className="space-y-3">
-            {trips.map(trip => (
-              <TripCard 
-                key={trip.id}
-                trip={{
-                  id: trip.id,
-                  store: trip.store,
-                  shopper: trip.shopper,
-                  eta: trip.eta,
-                  itemCount: trip.itemCount,
-                  status: trip.status
-                }}
-                onAddItem={() => handleAddItem(trip.id)}
-                onClick={() => handleTripClick(trip.id)}
-                onShare={() => handleShareTrip(trip.id)}
-                onComplete={() => handleCompleteTrip(trip.id)}
-                onDelete={() => handleDeleteTrip(trip.id)}
-                onEdit={() => handleEditTrip(trip.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <Card className="premium-card border-dashed">
-            <CardContent className="flex flex-col items-center justify-center p-6">
-              <div className="w-12 h-12 rounded-full bg-gloop-card-background flex items-center justify-center mb-3">
-                <ShoppingCart className="h-6 w-6 text-gloop-text-muted" />
+              ))
+            )}
+          </TabsContent>
+          
+          <TabsContent value="pending" className="mt-0 space-y-3">
+            {filteredTasks.length === 0 ? (
+              <div className="text-center py-8 text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                <CheckCircle className="mx-auto h-10 w-10 mb-2 opacity-50" />
+                <p>All tasks completed. Great job!</p>
               </div>
-              <h3 className="text-lg font-medium mb-1">No active trips</h3>
-              <p className="text-sm text-gloop-text-muted text-center mb-4">
-                Create a shopping trip to let others know you're heading to the store.
-              </p>
-              <Button 
-                onClick={() => setTripModalOpen(true)}
-                className="premium-gradient-btn"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Start a Trip
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-      
-      <div>
-        <h2 className="text-lg font-medium mb-3 flex items-center">
-          <Map className="h-5 w-5 mr-2 text-gloop-primary" />
-          Nearby Stores
-        </h2>
+            ) : (
+              filteredTasks.map(task => (
+                <Card 
+                  key={task.id} 
+                  className="premium-card hover:shadow-md transition-shadow"
+                  onClick={() => handleTaskClick(task.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-medium">{task.title}</span>
+                          {task.isRotating && (
+                            <RotateCw className="h-3.5 w-3.5 text-gloop-primary" />
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center text-sm text-gloop-text-muted mt-1 gap-2">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>{getDueDateDisplay(task.dueDate)}</span>
+                          
+                          {task.location && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span>{task.location}</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex -space-x-2">
+                            {task.assignees.map((assignee, index) => (
+                              <Avatar key={index} className="h-6 w-6 border-2 border-white dark:border-gloop-dark-surface">
+                                <AvatarFallback className="text-xs">
+                                  {assignee.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ))}
+                          </div>
+                          <Badge variant="outline" className="text-xs">{task.assignees.length} assignee{task.assignees.length !== 1 ? 's' : ''}</Badge>
+                          <Badge className={`ml-auto text-xs text-white ${getPriorityColor(task.priority)}`}>
+                            {task.priority}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        variant={task.isCompleted ? "outline" : "default"}
+                        size="icon"
+                        className={`h-7 w-7 rounded-full ${task.isCompleted ? 'bg-gloop-success text-white' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCompleteTask(task.id);
+                        }}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+          
+          <TabsContent value="completed" className="mt-0 space-y-3">
+            {filteredTasks.length === 0 ? (
+              <div className="text-center py-8 text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                <CheckCircle className="mx-auto h-10 w-10 mb-2 opacity-50" />
+                <p>No completed tasks yet.</p>
+              </div>
+            ) : (
+              filteredTasks.map(task => (
+                <Card 
+                  key={task.id} 
+                  className="premium-card hover:shadow-md transition-shadow"
+                  onClick={() => handleTaskClick(task.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-medium">{task.title}</span>
+                          {task.isRotating && (
+                            <RotateCw className="h-3.5 w-3.5 text-gloop-primary" />
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center text-sm text-gloop-text-muted mt-1 gap-2">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>{getDueDateDisplay(task.dueDate)}</span>
+                          
+                          {task.location && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span>{task.location}</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex -space-x-2">
+                            {task.assignees.map((assignee, index) => (
+                              <Avatar key={index} className="h-6 w-6 border-2 border-white dark:border-gloop-dark-surface">
+                                <AvatarFallback className="text-xs">
+                                  {assignee.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ))}
+                          </div>
+                          <Badge variant="outline" className="text-xs">{task.assignees.length} assignee{task.assignees.length !== 1 ? 's' : ''}</Badge>
+                          <Badge className={`ml-auto text-xs text-white ${getPriorityColor(task.priority)}`}>
+                            {task.priority}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        variant={task.isCompleted ? "outline" : "default"}
+                        size="icon"
+                        className={`h-7 w-7 rounded-full ${task.isCompleted ? 'bg-gloop-success text-white' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCompleteTask(task.id);
+                        }}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
         
-        <div className="space-y-2">
-          <Link to="/map">
-            <Card className="premium-card hover:shadow-md transition-shadow">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Trader Joe's</div>
-                  <div className="text-sm text-gloop-text-muted">0.8 miles away</div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-gloop-text-muted" />
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link to="/map">
-            <Card className="premium-card hover:shadow-md transition-shadow">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Whole Foods Market</div>
-                  <div className="text-sm text-gloop-text-muted">1.2 miles away</div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-gloop-text-muted" />
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link to="/map">
-            <Card className="premium-card hover:shadow-md transition-shadow">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <div className="font-medium">Target</div>
-                  <div className="text-sm text-gloop-text-muted">1.5 miles away</div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-gloop-text-muted" />
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </div>
-
+        {/* Active Shopping Trips Section */}
+        {trips.length > 0 && (
+          <section>
+            <h2 className="flex items-center gap-2 text-lg font-semibold mb-2">
+              <ShoppingCart className="h-5 w-5 text-gloop-primary" />
+              Active Shopping Trips
+            </h2>
+            <div className="space-y-3">
+              {trips.map(trip => (
+                <Card 
+                  key={trip.id} 
+                  className="premium-card hover:shadow-md transition-shadow"
+                  onClick={() => handleTripClick(trip.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{trip.store}</div>
+                        <div className="text-sm flex items-center gap-1 mt-1 text-gloop-text-muted">
+                          <User className="h-3.5 w-3.5" />
+                          <span>{trip.shopper.name}</span>
+                          <span className="mx-1">•</span>
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>ETA {trip.eta}</span>
+                        </div>
+                      </div>
+                      <Badge className="bg-gloop-primary">
+                        {trip.itemCount} {trip.itemCount === 1 ? 'item' : 'items'}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+        
+        {/* Nearby Stores Section */}
+        <section>
+          <h2 className="flex items-center gap-2 text-lg font-semibold mb-2">
+            <Store className="h-5 w-5 text-gloop-primary" />
+            Nearby Stores
+          </h2>
+          <NearbyStores maxStores={3} />
+        </section>
+      </main>
+      
+      {/* Floating Action Button for creating new items */}
       <FloatingActionButton 
-        onClick={handleFabClick} 
-        icon={<Plus className="h-6 w-6" />}
+        onClick={() => setTaskModalOpen(true)}
+        icon={<Plus className="h-5 w-5" />}
+        className="bottom-32"
       />
       
-      <CreateTripModal
-        isOpen={isTripModalOpen}
-        onClose={() => setTripModalOpen(false)}
-        onSubmit={handleCreateTrip}
-      />
-      
-      <CreateTaskModal
-        isOpen={isTaskModalOpen}
+      {/* Task creation modal */}
+      <CreateTaskModal 
+        isOpen={isTaskModalOpen} 
         onClose={() => setTaskModalOpen(false)}
         onSubmit={handleCreateTask}
       />
-
-      {/* Task Detail Modal */}
+      
+      {/* Task detail modal */}
       <Dialog open={isTaskDetailModalOpen} onOpenChange={setTaskDetailModalOpen}>
-        <DialogContent className="sm:max-w-[425px] premium-card">
-          {selectedTask && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center">
-                  <div 
-                    className={`h-5 w-5 rounded-full border-2 flex items-center justify-center cursor-pointer mr-2 ${
-                      selectedTask.isCompleted 
-                        ? 'bg-gloop-primary border-gloop-primary' 
-                        : 'border-gloop-outline'
-                    }`}
-                    onClick={() => handleCompleteTask(selectedTask.id)}
-                  >
-                    {selectedTask.isCompleted && <Check className="h-3 w-3 text-white" />}
-                  </div>
-                  <span className={selectedTask.isCompleted ? 'line-through text-gloop-text-muted' : ''}>
-                    {selectedTask.title}
-                  </span>
-                </DialogTitle>
-                <DialogDescription>
-                  Task Details
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="py-4">
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium mb-1">Assigned to</h4>
+        {selectedTask && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedTask.title}
+                {selectedTask.isRotating && <RotateCw className="h-4 w-4 text-gloop-primary" />}
+              </DialogTitle>
+              <DialogDescription>
+                <div className="mt-2 space-y-2">
                   <div className="flex items-center gap-2">
-                    {selectedTask.assignees.map((assignee, index) => (
-                      <div key={index} className="flex items-center">
-                        <Avatar className="h-6 w-6 mr-1">
-                          <AvatarFallback className="text-xs bg-gradient-to-br from-gloop-premium-gradient-start to-gloop-premium-gradient-end text-white">
-                            {assignee.name.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{assignee.name}</span>
-                      </div>
-                    ))}
+                    <Calendar className="h-4 w-4 text-gloop-text-muted" />
+                    <span>{new Date(selectedTask.dueDate).toLocaleDateString()}</span>
+                    
+                    {selectedTask.location && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <MapPin className="h-4 w-4 text-gloop-text-muted" />
+                        <span>{selectedTask.location}</span>
+                      </>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-gloop-text-muted" />
+                    <span>Assignees: {selectedTask.assignees.map(a => a.name).join(', ')}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-gloop-text-muted" />
+                    <span>Priority: {selectedTask.priority}</span>
+                    
+                    {selectedTask.isRotating && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <RotateCw className="h-4 w-4 text-gloop-text-muted" />
+                        <span>Rotating task</span>
+                      </>
+                    )}
                   </div>
                 </div>
-                
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium mb-1">Due Date</h4>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-2 text-gloop-text-muted" />
-                    <span className="text-sm">{new Date(selectedTask.dueDate).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                
-                {selectedTask.location && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium mb-1">Location</h4>
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-2 text-gloop-text-muted" />
-                      <span className="text-sm">{selectedTask.location}</span>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium mb-1">Priority</h4>
-                  <Badge 
-                    className={`
-                      ${selectedTask.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' : 
-                        selectedTask.priority === 'medium' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 
-                        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'}
-                    `}
-                  >
-                    {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
-                  </Badge>
-                </div>
-                
-                {selectedTask.isRotating && (
-                  <div className="mb-4">
-                    <Badge variant="outline" className="bg-gloop-accent text-gloop-text-main border-none flex items-center">
-                      <RotateCw className="h-3 w-3 mr-1" />
-                      Rotating Task
-                    </Badge>
-                    <p className="text-xs text-gloop-text-muted mt-1">
-                      This task rotates between assignees each time it's completed.
-                    </p>
-                  </div>
-                )}
-              </div>
+              </DialogDescription>
+            </DialogHeader>
+            
+            <DialogFooter className="flex justify-between sm:justify-between">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="gap-1"
+                onClick={() => handleDeleteTask(selectedTask.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
               
-              <DialogFooter className="flex justify-between">
+              <div className="flex gap-2">
                 <Button 
-                  variant="destructive" 
-                  onClick={() => handleDeleteTask(selectedTask.id)}
-                  className="flex items-center"
+                  variant="outline" 
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => handleEditTask(selectedTask.id)}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  <Edit className="h-4 w-4" />
+                  Edit
                 </Button>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setTaskDetailModalOpen(false)}
-                  >
-                    Close
-                  </Button>
-                  <Button 
-                    onClick={() => handleEditTask(selectedTask.id)}
-                    className="flex items-center"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                </div>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
+                
+                <Button 
+                  variant={selectedTask.isCompleted ? "outline" : "default"} 
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => {
+                    handleCompleteTask(selectedTask.id);
+                    setTaskDetailModalOpen(false);
+                  }}
+                >
+                  <Check className="h-4 w-4" />
+                  {selectedTask.isCompleted ? 'Mark Incomplete' : 'Mark Complete'}
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        )}
       </Dialog>
-
+      
+      {/* Bottom navigation */}
       <NavBar />
     </div>
   );

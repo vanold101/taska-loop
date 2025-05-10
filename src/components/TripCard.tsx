@@ -22,6 +22,7 @@ type TripCardProps = {
   onShare?: () => void;
   onComplete?: () => void;
   onEdit?: () => void;
+  onReactivate?: () => void;
 };
 
 const TripCard = ({ 
@@ -31,7 +32,8 @@ const TripCard = ({
   onDelete,
   onShare,
   onComplete,
-  onEdit
+  onEdit,
+  onReactivate
 }: TripCardProps) => {
   const { store, shopper, eta, itemCount, status } = trip;
   const [isActionsVisible, setActionsVisible] = useState(false);
@@ -60,6 +62,11 @@ const TripCard = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    // Don't allow swiping on completed trips
+    if (status === 'completed' || status === 'cancelled') {
+      return;
+    }
+    
     const currentX = e.touches[0].clientX;
     const diff = currentX - startXRef.current;
     
@@ -74,6 +81,11 @@ const TripCard = ({
   };
 
   const handleTouchEnd = () => {
+    // Don't allow swipe actions on completed trips
+    if (status === 'completed' || status === 'cancelled') {
+      return;
+    }
+    
     if (swipeOffset <= -swipeThreshold && onDelete) {
       // Trigger delete action
       onDelete();
@@ -95,15 +107,35 @@ const TripCard = ({
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Only trigger onClick if not clicking on action buttons
-    if (onClick && e.currentTarget === e.target) {
-      onClick();
+    // Only trigger onClick if we have a handler
+    if (onClick) {
+      // Prevent default behavior to avoid any unwanted effects
+      e.preventDefault();
+      
+      // Stop propagation to ensure other handlers don't execute
+      e.stopPropagation();
+      
+      // Only execute if we're not clicking a child interactive element like a button
+      const target = e.target as HTMLElement;
+      const isButton = target.tagName === 'BUTTON' || 
+                       target.closest('button') !== null ||
+                       target.role === 'button' ||
+                       target.getAttribute('aria-label') !== null;
+      
+      if (!isButton) {
+        onClick();
+      }
     }
   };
 
   const handleDoubleTap = (e: React.TouchEvent) => {
     // Prevent default to avoid zooming on mobile
     e.preventDefault();
+    
+    // Don't allow adding items to completed trips
+    if (status === 'completed' || status === 'cancelled') {
+      return;
+    }
     
     // Double tap to add item
     if (onAddItem) {
@@ -153,7 +185,7 @@ const TripCard = ({
       
       <motion.div
         ref={cardRef}
-        className="premium-card overflow-hidden"
+        className="premium-card overflow-hidden relative"
         style={{ 
           x: swipeOffset,
           touchAction: "pan-y"
@@ -164,7 +196,7 @@ const TripCard = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleCardClick}
-        onDoubleClick={onAddItem}
+        onDoubleClick={status !== 'completed' && status !== 'cancelled' ? onAddItem : undefined}
       >
         <div className="p-4">
           <div className="flex justify-between items-start">
@@ -186,7 +218,14 @@ const TripCard = ({
                  status === 'completed' ? 'Completed' : 'Cancelled'}
               </Badge>
               
-              <div className="flex items-center bg-gloop-accent dark:bg-gloop-dark-accent px-2 py-0.5 rounded-full">
+              <div 
+                className="flex items-center bg-gloop-accent dark:bg-gloop-dark-accent px-2 py-0.5 rounded-full cursor-pointer hover:bg-gloop-accent/80 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onClick) onClick();
+                }}
+                aria-label="View trip items"
+              >
                 <ShoppingCart className="h-3 w-3 mr-1 text-gloop-primary" />
                 <span className="text-xs font-medium">{itemCount} items</span>
               </div>
@@ -203,75 +242,122 @@ const TripCard = ({
             }}
             transition={{ duration: 0.2 }}
           >
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onAddItem) onAddItem();
-              }}
-              aria-label="Add item"
-            >
-              <Plus className="h-4 w-4" />
-            </motion.button>
+            {/* Only show Add Item button for active trips */}
+            {status !== 'completed' && status !== 'cancelled' && onAddItem && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddItem();
+                }}
+                aria-label="Add item"
+              >
+                <Plus className="h-4 w-4" />
+              </motion.button>
+            )}
             
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onShare) onShare();
-              }}
-              aria-label="Share trip"
-            >
-              <Share2 className="h-4 w-4" />
-            </motion.button>
+            {/* Share button is available for all trips */}
+            {onShare && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShare();
+                }}
+                aria-label="Share trip"
+              >
+                <Share2 className="h-4 w-4" />
+              </motion.button>
+            )}
             
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onEdit) onEdit();
-              }}
-              aria-label="Edit trip"
-            >
-              <Edit className="h-4 w-4" />
-            </motion.button>
+            {/* Only show Edit button for active trips */}
+            {status !== 'completed' && status !== 'cancelled' && onEdit && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                aria-label="Edit trip"
+              >
+                <Edit className="h-4 w-4" />
+              </motion.button>
+            )}
             
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="quick-action-btn bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onComplete) onComplete();
-              }}
-              aria-label="Complete trip"
-            >
-              <Check className="h-4 w-4" />
-            </motion.button>
+            {/* Only show Complete button for active trips */}
+            {status !== 'completed' && status !== 'cancelled' && onComplete && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="quick-action-btn bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onComplete();
+                }}
+                aria-label="Complete trip"
+              >
+                <Check className="h-4 w-4" />
+              </motion.button>
+            )}
             
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="quick-action-btn bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onDelete) onDelete();
-              }}
-              aria-label="Delete trip"
-            >
-              <Trash2 className="h-4 w-4" />
-            </motion.button>
+            {/* Delete button is available for all trips */}
+            {onDelete && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="quick-action-btn bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                aria-label="Delete trip"
+              >
+                <Trash2 className="h-4 w-4" />
+              </motion.button>
+            )}
+            
+            {/* Show Info button for completed trips */}
+            {(status === 'completed' || status === 'cancelled') && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="quick-action-btn bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onClick) onClick();
+                }}
+                aria-label="View trip details"
+              >
+                <Info className="h-4 w-4" />
+              </motion.button>
+            )}
+            
+            {/* Reactivate button for completed trips */}
+            {status === 'completed' && onReactivate && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="quick-action-btn bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReactivate();
+                }}
+                aria-label="Reactivate trip"
+              >
+                <ShoppingCart className="h-4 w-4" />
+              </motion.button>
+            )}
           </motion.div>
         </div>
         
         {/* Swipe hint - subtle indicator */}
-        <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
           <motion.div 
             className="h-1 w-10 rounded-full bg-gloop-outline dark:bg-gloop-dark-outline opacity-30"
             initial={{ opacity: 0 }}

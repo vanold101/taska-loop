@@ -8,6 +8,14 @@ export interface Task {
   location: string;
   coordinates: { lat: number; lng: number };
   priority: 'low' | 'medium' | 'high';
+  completed?: boolean;
+  isRotating?: boolean;
+  assignees?: Array<{
+    id: string;
+    name: string;
+    avatar: string;
+  }>;
+  notes?: string;
 }
 
 // Define the trip type that will be shared across the app
@@ -17,7 +25,7 @@ export interface Trip {
   location?: string;
   coordinates?: { lat: number; lng: number };
   eta: string;
-  status: 'open' | 'shopping' | 'completed';
+  status: 'open' | 'shopping' | 'completed' | 'cancelled';
   items: TripItem[];
   participants: TripParticipant[];
   shopper?: {
@@ -30,6 +38,8 @@ export interface TripItem {
   id: string;
   name: string;
   quantity: number;
+  price?: number;
+  unit?: string; // Unit ID (e.g., 'kg', 'lb', 'ea')
   addedBy: {
     name: string;
     avatar: string;
@@ -52,6 +62,13 @@ const mockTasks: Task[] = [
     location: 'Downtown Cleaners',
     coordinates: { lat: 39.9622, lng: -83.0007 },
     priority: 'high',
+    completed: false,
+    isRotating: false,
+    assignees: [
+      { id: '1', name: 'You', avatar: "" },
+      { id: '2', name: 'Rachel', avatar: "" }
+    ],
+    notes: "Don't forget the receipt"
   },
   {
     id: '2',
@@ -60,6 +77,12 @@ const mockTasks: Task[] = [
     location: 'Columbus Public Library',
     coordinates: { lat: 39.9611, lng: -83.0101 },
     priority: 'medium',
+    completed: false,
+    isRotating: true,
+    assignees: [
+      { id: '1', name: 'You', avatar: "" }
+    ],
+    notes: "Books due by 8pm"
   },
   {
     id: '3',
@@ -68,6 +91,13 @@ const mockTasks: Task[] = [
     location: 'Trader Joe\'s',
     coordinates: { lat: 39.9702, lng: -83.0150 },
     priority: 'high',
+    completed: true,
+    isRotating: false,
+    assignees: [
+      { id: '3', name: 'Brian', avatar: "" },
+      { id: '4', name: 'Ella', avatar: "" }
+    ],
+    notes: "See shopping list in app"
   }
 ];
 
@@ -89,6 +119,8 @@ const mockTrips: Trip[] = [
         id: '1-1',
         name: "Milk",
         quantity: 1,
+        price: 3.99,
+        unit: 'gal',
         addedBy: {
           name: "You",
           avatar: "https://example.com/you.jpg"
@@ -99,6 +131,8 @@ const mockTrips: Trip[] = [
         id: '1-2',
         name: "Eggs",
         quantity: 1,
+        price: 4.49,
+        unit: 'dozen',
         addedBy: {
           name: "You",
           avatar: "https://example.com/you.jpg"
@@ -127,6 +161,8 @@ const mockTrips: Trip[] = [
         id: '2-1',
         name: "Paper Towels",
         quantity: 1,
+        price: 19.99,
+        unit: 'pkg',
         addedBy: {
           name: "You",
           avatar: "https://example.com/you.jpg"
@@ -137,6 +173,8 @@ const mockTrips: Trip[] = [
         id: '2-2',
         name: "Toilet Paper",
         quantity: 2,
+        price: 21.99,
+        unit: 'pkg',
         addedBy: {
           name: "Ella",
           avatar: "https://example.com/ella.jpg"
@@ -184,7 +222,8 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (storedTrips) {
       try {
-        setTrips(JSON.parse(storedTrips));
+        const parsedTrips = JSON.parse(storedTrips);
+        setTrips(parsedTrips);
       } catch (e) {
         console.error('Error parsing stored trips:', e);
       }
@@ -205,6 +244,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newTask: Task = {
       ...task,
       id: Date.now().toString(),
+      completed: task.completed !== undefined ? task.completed : false,
     };
     setTasks([...tasks, newTask]);
   };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,8 @@ import {
   Refrigerator,
   Minus,
   Trash2,
-  X
+  X,
+  DollarSign
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import FloatingActionButton from "@/components/FloatingActionButton";
@@ -24,6 +25,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PriceComparison from "@/components/PriceComparison";
+import { GroceryStore } from "@/services/priceService";
 
 // Define the PantryItem type
 interface PantryItem {
@@ -96,6 +99,9 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const PantryPage = () => {
+  console.log("PantryPage component rendering");
+  
+  const [isLoaded, setIsLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [pantryItems, setPantryItems] = useState<PantryItem[]>(mockPantryItems);
   const [showFilters, setShowFilters] = useState(false);
@@ -109,6 +115,42 @@ const PantryPage = () => {
     lowStock: false
   });
   const { toast } = useToast();
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 39.9622, lng: -83.0007 }); // Default to Columbus
+
+  // Add an effect to ensure components are properly loaded
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+
+  // Get user's location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error("Error getting user location:", error);
+          // Use default location (Columbus)
+        }
+      );
+    }
+  }, []);
+
+  // Handle getting directions to a store
+  const handleStoreDirections = (store: GroceryStore) => {
+    // Open Google Maps with directions to the store
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${store.coordinates.lat},${store.coordinates.lng}&destination_place_id=${store.name}`;
+    window.open(url, '_blank');
+    
+    toast({
+      title: "Opening Directions",
+      description: `Getting directions to ${store.name}`
+    });
+  };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -220,14 +262,14 @@ const PantryPage = () => {
     }
   };
 
-  // Filter items based on search term and selected category
-  const filteredItems = pantryItems.filter(item => 
+  // Safety check for potentially undefined values
+  const filteredItems = pantryItems ? pantryItems.filter(item => 
     (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.category.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (selectedCategory === null || item.category === selectedCategory)
-  );
+  ) : [];
 
-  // Group items by category
+  // Safety check for groupedItems
   const groupedItems = filteredItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
@@ -248,12 +290,25 @@ const PantryPage = () => {
     return diffDays;
   };
 
+  console.log("PantryItems:", pantryItems);
+  console.log("Filtered items:", filteredItems);
+  console.log("Grouped items:", groupedItems);
+
+  // Return loading state if not fully loaded
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gloop-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="pb-20 pt-6 px-4 max-w-md mx-auto">
       <header className="mb-6">
         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">My Pantry</h1>
       </header>
-
+      
       <div className="mb-4 relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-gloop-text-muted" />
         <Input
@@ -316,7 +371,7 @@ const PantryPage = () => {
                     className="cursor-pointer"
                     onClick={() => handleCategoryFilter(category)}
                   >
-                    {categoryIcons[category]}
+                    {categoryIcons[category] || null}
                     <span className="ml-1">{category}</span>
                   </Badge>
                 ))}
@@ -325,6 +380,23 @@ const PantryPage = () => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Price Comparison Component */}
+      <Card className="premium-card mb-6 shadow-md">
+        <CardHeader className="p-3 pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-gloop-primary" />
+            Best Prices Finder
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-3">
+          <PriceComparison 
+            items={pantryItems.map(item => item.name)} 
+            userLocation={userLocation}
+            onStoreDirections={handleStoreDirections}
+          />
+        </CardContent>
+      </Card>
 
       {Object.entries(groupedItems).length > 0 ? (
         Object.entries(groupedItems).map(([category, items]) => (

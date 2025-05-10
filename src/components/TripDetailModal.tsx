@@ -13,17 +13,36 @@ import {
   UserPlus, 
   Share2, 
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Check,
+  DollarSign,
+  SplitSquareVertical
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import PriceInput from "./PriceInput";
+import { recordPrice } from "@/services/PriceHistoryService";
+import ItemSplitSelector from "./ItemSplitSelector";
+import CostSplitSummary from "./CostSplitSummary";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BarcodeScannerButton from "./BarcodeScannerButton";
+import { findProductByBarcode, Product } from "@/services/ProductService";
+import BarcodeProductSaveDialog from "./BarcodeProductSaveDialog";
+import { detectDuplicateOrSimilar, ItemSuggestion } from "@/services/DuplicateDetectionService";
+import DuplicateItemDialog from "./DuplicateItemDialog";
+import UnitSelector from "./UnitSelector";
+import { guessUnitForItem, formatValueWithUnit } from "@/services/UnitConversionService";
+import { useTaskContext } from "@/context/TaskContext";
+import ReceiptScannerButton from "./ReceiptScannerButton";
 
 // Types for trip data
 export type TripItem = {
   id: string;
   name: string;
   quantity: number;
+  price?: number;
+  unit?: string; // Unit ID (e.g., 'kg', 'lb', 'ea')
   addedBy: {
     name: string;
     avatar: string;
@@ -57,6 +76,10 @@ type TripDetailModalProps = {
   onToggleItemCheck: (tripId: string, itemId: string) => void;
   onInviteParticipant: (tripId: string) => void;
   onCompleteTrip: (tripId: string) => void;
+  onReactivateTrip?: (tripId: string) => void;
+  onUpdateItemPrice?: (tripId: string, itemId: string, price: number) => void;
+  onSettleUp?: (amount: number, toUserId: string, fromUserId: string) => void;
+  onUpdateItemUnit?: (tripId: string, itemId: string, unit: string, newQuantity?: number) => void;
 };
 
 const TripDetailModal = ({ 
@@ -67,10 +90,22 @@ const TripDetailModal = ({
   onRemoveItem, 
   onToggleItemCheck,
   onInviteParticipant,
-  onCompleteTrip
+  onCompleteTrip,
+  onReactivateTrip,
+  onUpdateItemPrice,
+  onSettleUp,
+  onUpdateItemUnit
 }: TripDetailModalProps) => {
   const [newItemName, setNewItemName] = useState("");
   const [newItemQuantity, setNewItemQuantity] = useState(1);
+  const [newItemPrice, setNewItemPrice] = useState<number | undefined>(undefined);
+  const [newItemUnit, setNewItemUnit] = useState<string>("ea"); // Default unit is "each"
+  const [activeTab, setActiveTab] = useState("items");
+  const [showSaveProductDialog, setShowSaveProductDialog] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [duplicateSuggestion, setDuplicateSuggestion] = useState<ItemSuggestion | null>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [pendingItem, setPendingItem] = useState<Omit<TripItem, 'id'> | null>(null);
   const { toast } = useToast();
   
   // Reset form when dialog is opened
@@ -78,8 +113,19 @@ const TripDetailModal = ({
     if (isOpen) {
       setNewItemName("");
       setNewItemQuantity(1);
+      setNewItemPrice(undefined);
+      setNewItemUnit("ea");
+      setActiveTab("items");
     }
   }, [isOpen]);
+  
+  // Update unit when item name changes
+  useEffect(() => {
+    if (newItemName.trim()) {
+      const suggestedUnit = guessUnitForItem(newItemName);
+      setNewItemUnit(suggestedUnit.id);
+    }
+  }, [newItemName]);
   
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,17 +133,14 @@ const TripDetailModal = ({
     if (!trip) return;
     
     if (!newItemName.trim()) {
-      toast({
-        title: "Item name required",
-        description: "Please enter an item name",
-        variant: "destructive",
-      });
       return;
     }
     
     const newItem = {
       name: newItemName,
       quantity: newItemQuantity,
+      price: newItemPrice,
+      unit: newItemUnit,
       addedBy: {
         name: "You", // In a real app, this would be the current user
         avatar: "https://example.com/you.jpg"
@@ -105,16 +148,181 @@ const TripDetailModal = ({
       checked: false
     };
     
-    onAddItem(trip.id, newItem);
+    // Check for duplicates before adding
+    const suggestion = detectDuplicateOrSimilar(newItemName, trip.items);
+    
+    if (suggestion) {
+      // Found a duplicate or similar item
+      setDuplicateSuggestion(suggestion);
+      setShowDuplicateDialog(true);
+      setPendingItem(newItem);
+      return;
+    }
+    
+    // No duplicates, proceed with adding
+    addItemToTrip(newItem);
+  };
+  
+  // New function to finalize adding an item
+  const addItemToTrip = (item: Omit<TripItem, 'id'>) => {
+    if (!trip) return;
+    
+    onAddItem(trip.id, item);
+    
+    // Record price in history if provided
+    if (item.price) {
+      recordPrice(item.name, item.price, trip.store, item.quantity);
+    }
     
     // Reset form
     setNewItemName("");
     setNewItemQuantity(1);
+    setNewItemPrice(undefined);
+    setNewItemUnit("ea");
     
     // Add haptic feedback
     if (navigator.vibrate) {
       navigator.vibrate(50);
     }
+  };
+  
+  // Handle adding item anyway (ignoring duplicate warning)
+  const handleAddAnyway = () => {
+    if (pendingItem) {
+      addItemToTrip(pendingItem);
+      setPendingItem(null);
+    }
+  };
+  
+  // Handle merging with existing item (increase quantity)
+  const handleMergeItems = (existingItem: TripItem, increaseBy: number) => {
+    if (!trip) return;
+    
+    // Update the existing item by increasing its quantity
+    const updatedItems = trip.items.map(item => {
+      if (item.id === existingItem.id) {
+        return {
+          ...item,
+          quantity: item.quantity + increaseBy
+        };
+      }
+      return item;
+    });
+    
+    // Reset form
+    setNewItemName("");
+    setNewItemQuantity(1);
+    setNewItemPrice(undefined);
+    setPendingItem(null);
+  };
+  
+  // Handle updating existing item (for similar items)
+  const handleUpdateExisting = (existingItem: TripItem) => {
+    // Set the form to edit the existing item
+    setNewItemName(existingItem.name);
+    setNewItemQuantity(existingItem.quantity);
+    setNewItemPrice(existingItem.price);
+    setPendingItem(null);
+  };
+  
+  const handleItemPriceChange = (itemId: string, price: number) => {
+    if (!trip || !onUpdateItemPrice) return;
+    
+    onUpdateItemPrice(trip.id, itemId, price);
+    
+    // Find the item to record its price in history
+    const item = trip.items.find(i => i.id === itemId);
+    if (item) {
+      recordPrice(item.name, price, trip.store, item.quantity);
+    }
+  };
+  
+  const handleItemUnitChange = (itemId: string, unit: string, newQuantity?: number) => {
+    if (!trip || !onUpdateItemUnit) return;
+    
+    // Find the item
+    const item = trip.items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    // Update the trip with the unit change
+    onUpdateItemUnit(trip.id, itemId, unit, newQuantity);
+  };
+  
+  const handleSplitUpdate = () => {
+    // Refresh the cost split summary
+    setActiveTab("splits");
+  };
+  
+  // Add new function to handle barcode scan results
+  const handleBarcodeScan = (barcode: string) => {
+    if (!trip) return;
+    
+    // Look up the product in our database
+    const product = findProductByBarcode(barcode);
+    
+    if (product) {
+      // Product found in database
+      setNewItemName(product.name);
+      setNewItemPrice(product.defaultPrice);
+      
+      // Set unit if available
+      if (product.unit) {
+        setNewItemUnit(product.unit);
+      } else {
+        // Otherwise guess based on name
+        const suggestedUnit = guessUnitForItem(product.name);
+        setNewItemUnit(suggestedUnit.id);
+      }
+    } else {
+      // Product not found - just use the barcode as the name for now
+      setNewItemName(`Item (${barcode})`);
+      
+      // Save the barcode and show the save dialog
+      setScannedBarcode(barcode);
+      setShowSaveProductDialog(true);
+    }
+  };
+  
+  // Handle when user saves a product from the dialog
+  const handleProductSave = (product: Product) => {
+    // Update the form with the product info
+    setNewItemName(product.name);
+    if (product.defaultPrice) {
+      setNewItemPrice(product.defaultPrice);
+    }
+  };
+  
+  // Add new function to handle receipt scan results
+  const handleReceiptScan = (items: { name: string; price: number; quantity: number }[]) => {
+    if (!trip) return;
+    
+    // Add each item from the receipt
+    items.forEach(item => {
+      const newItem = {
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        unit: "ea", // Default unit
+        addedBy: {
+          name: "You",
+          avatar: "https://example.com/you.jpg"
+        },
+        checked: false
+      };
+      
+      // Check for duplicates before adding
+      const suggestion = detectDuplicateOrSimilar(item.name, trip.items);
+      
+      if (suggestion) {
+        // Found a duplicate or similar item
+        setDuplicateSuggestion(suggestion);
+        setShowDuplicateDialog(true);
+        setPendingItem(newItem);
+      } else {
+        // No duplicates, proceed with adding
+        addItemToTrip(newItem);
+      }
+    });
   };
   
   if (!trip) return null;
@@ -123,9 +331,32 @@ const TripDetailModal = ({
   const uncheckedItems = trip.items.filter(item => !item.checked);
   const checkedItems = trip.items.filter(item => item.checked);
   
+  // Calculate total price of items
+  const totalPrice = trip.items.reduce((sum, item) => {
+    return sum + (item.price || 0);
+  }, 0);
+  
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto premium-card">
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={onClose}
+      modal={true}
+    >
+      <DialogContent 
+        className="sm:max-w-md premium-card"
+        style={{ 
+          position: 'fixed', 
+          top: '50%', 
+          left: '50%', 
+          transform: 'translate(-50%, -50%)',
+          maxHeight: '85vh', /* Slightly reduced to ensure it doesn't touch screen edges */
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 'var(--padding, 1.5rem)',
+          width: 'calc(100% - 2rem)' /* Ensure margin on smaller screens */
+        }}
+      >
         <DialogHeader className="space-y-2">
           <div className="flex items-center justify-between">
             <Badge className={cn(
@@ -142,11 +373,11 @@ const TripDetailModal = ({
               {trip.status}
             </Badge>
             
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-2">
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-8 w-8"
+                className="h-8 w-8 flex-shrink-0"
                 onClick={() => onInviteParticipant(trip.id)}
               >
                 <UserPlus className="h-4 w-4 text-gloop-primary" />
@@ -155,7 +386,7 @@ const TripDetailModal = ({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-8 w-8"
+                className="h-8 w-8 flex-shrink-0"
               >
                 <Share2 className="h-4 w-4 text-gloop-primary" />
               </Button>
@@ -186,202 +417,303 @@ const TripDetailModal = ({
             </div>
           </div>
           
-          <div className="flex -space-x-2 mt-2">
-            {trip.participants.map((participant, index) => (
-              <Avatar key={index} className="h-6 w-6 border-2 border-white dark:border-gloop-dark-surface">
-                <AvatarImage src={participant.avatar} />
-                <AvatarFallback className="bg-gloop-primary text-white text-xs">
-                  {participant.name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-6 w-6 rounded-full ml-1 p-0 flex items-center justify-center border-dashed"
-              onClick={() => onInviteParticipant(trip.id)}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-            
-            {trip.participants.length > 0 && (
-              <span className="ml-4 text-xs text-gloop-text-muted">
-                {trip.participants.length} participant{trip.participants.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
+          {/* Participants row - updated to prevent overlapping */}
+          {trip.participants.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs text-gloop-text-muted mb-1">Participants:</p>
+              <div className="flex flex-wrap gap-2">
+                {trip.participants.map((participant, index) => (
+                  <div key={index} className="flex items-center bg-gloop-accent/50 dark:bg-gloop-dark-accent/50 rounded-full pl-1 pr-2 py-0.5">
+                    <Avatar className="h-5 w-5 mr-1">
+                      <AvatarImage src={participant.avatar} />
+                      <AvatarFallback className="bg-gloop-primary text-white text-[10px]">
+                        {participant.name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs">{participant.name}</span>
+                  </div>
+                ))}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-6 rounded-full px-2 text-xs flex items-center gap-1"
+                  onClick={() => onInviteParticipant(trip.id)}
+                >
+                  <UserPlus className="h-3 w-3" />
+                  Add
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {/* Total price display */}
+          {totalPrice > 0 && (
+            <div className="mt-2 flex items-center justify-end">
+              <div className="bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-full flex items-center">
+                <DollarSign className="h-3.5 w-3.5 mr-1 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  Total: ${totalPrice.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
         </DialogHeader>
         
-        {trip.status !== 'completed' && trip.status !== 'cancelled' && (
-          <form onSubmit={handleAddItem} className="flex gap-2 mt-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Add an item..."
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                className="premium-card"
-              />
-            </div>
+        {/* Tabs for items and cost splitting */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+          <TabsList className="grid grid-cols-2 w-full premium-card">
+            <TabsTrigger value="items" className="flex items-center gap-1">
+              <ShoppingCart className="h-3.5 w-3.5" />
+              Items
+            </TabsTrigger>
+            <TabsTrigger value="splits" className="flex items-center gap-1">
+              <SplitSquareVertical className="h-3.5 w-3.5" />
+              Cost Split
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* Items tab content */}
+          <TabsContent value="items" className="space-y-2 mt-4 overflow-y-auto pb-16">
+            {/* Add item form */}
+            {(trip.status === 'open' || trip.status === 'shopping') && (
+              <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+                <h3 className="font-medium mb-2">Add Item</h3>
+                <form onSubmit={handleAddItem}>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Item name"
+                      value={newItemName}
+                      onChange={(e) => setNewItemName(e.target.value)}
+                      className="flex-1"
+                    />
+                    <div className="flex gap-2 flex-shrink-0">
+                      {/* Lazy load barcode scanner when button is clicked to prevent automatic camera activation */}
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <BarcodeScannerButton
+                          onScan={handleBarcodeScan}
+                          buttonText=""
+                          buttonSize="icon"
+                          className="h-10 w-10"
+                        />
+                      </div>
+                      
+                      {/* Lazy load receipt scanner when button is clicked to prevent automatic camera activation */}
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <ReceiptScannerButton
+                          onScan={handleReceiptScan}
+                          buttonText=""
+                          buttonSize="icon"
+                          className="h-10 w-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end mt-2">
+                    <Button type="submit" size="sm" className="px-4">
+                      Add
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
             
-            <div className="w-16">
-              <Input
-                type="number"
-                min="1"
-                max="99"
-                value={newItemQuantity}
-                onChange={(e) => setNewItemQuantity(parseInt(e.target.value))}
-                className="premium-card"
-              />
-            </div>
-            
-            <Button type="submit" size="icon" className="premium-gradient-btn">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </form>
-        )}
-        
-        <div className="space-y-4 mt-4">
-          {uncheckedItems.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium mb-2">Items to Get ({uncheckedItems.length})</h3>
-              <ul className="space-y-2">
-                <AnimatePresence>
-                  {uncheckedItems.map((item) => (
-                    <motion.li
-                      key={item.id}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center justify-between p-2 border rounded-md premium-card"
-                    >
+            {uncheckedItems.length > 0 && (
+              <div>
+                <h3 className="font-medium text-sm mb-2">Items to get ({uncheckedItems.length})</h3>
+                <div className="space-y-1">
+                  {uncheckedItems.map(item => (
+                    <div key={item.id} className="p-2 bg-background dark:bg-gloop-dark-surface/50 rounded-md">
                       <div className="flex items-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 rounded-full mr-2"
+                        <div 
+                          className={`flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 ${
+                            item.checked ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' : 'border-gray-300 dark:border-gray-700'
+                          }`}
                           onClick={() => onToggleItemCheck(trip.id, item.id)}
-                          disabled={!isUserShopper && trip.status === 'shopping'}
                         >
-                          <div className="h-5 w-5 rounded-full border-2 border-gloop-primary flex items-center justify-center" />
-                        </Button>
+                          {item.checked && <Check className="h-3 w-3 text-green-600 dark:text-green-400 transition-transform duration-200 transform scale-100" />}
+                        </div>
                         
-                        <div>
-                          <div className="flex items-center">
-                            <span className="font-medium">{item.name}</span>
-                            {item.quantity > 1 && (
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                x{item.quantity}
-                              </Badge>
-                            )}
+                        <div className="ml-3 flex-1 overflow-hidden">
+                          <div className="font-medium text-sm truncate">{item.name}</div>
+                          <div className="flex items-center text-xs text-gloop-text-muted gap-1">
+                            <span>
+                              {formatValueWithUnit(item.quantity, item.unit || 'ea')}
+                            </span>
+                            <span>•</span>
+                            <span className="truncate">Added by: {item.addedBy.name}</span>
                           </div>
+                        </div>
+                        
+                        <div className="flex space-x-2 flex-shrink-0 ml-2">
+                          {/* Split button */}
+                          <ItemSplitSelector
+                            tripId={trip.id}
+                            itemId={item.id}
+                            itemName={item.name}
+                            itemPrice={item.price}
+                            participants={trip.participants}
+                            onSplitUpdated={handleSplitUpdate}
+                          />
                           
-                          <div className="flex items-center text-xs text-gloop-text-muted">
-                            <Avatar className="h-3 w-3 mr-1">
-                              <AvatarImage src={item.addedBy.avatar} />
-                              <AvatarFallback className="text-[8px]">
-                                {item.addedBy.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            Added by {item.addedBy.name}
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-gloop-text-muted hover:text-red-500 flex-shrink-0"
+                            onClick={() => onRemoveItem(trip.id, item.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                       
-                      {(isUserShopper || item.addedBy.name === "You") && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-gloop-text-muted hover:text-gloop-danger"
-                          onClick={() => onRemoveItem(trip.id, item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
-            </div>
-          )}
-          
-          {checkedItems.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium mb-2 text-gloop-text-muted">Checked Items ({checkedItems.length})</h3>
-              <ul className="space-y-2">
-                <AnimatePresence>
-                  {checkedItems.map((item) => (
-                    <motion.li
-                      key={item.id}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center justify-between p-2 border rounded-md premium-card opacity-60"
-                    >
-                      <div className="flex items-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 rounded-full mr-2"
-                          onClick={() => onToggleItemCheck(trip.id, item.id)}
-                          disabled={!isUserShopper && trip.status === 'shopping'}
-                        >
-                          <div className="h-5 w-5 rounded-full border-2 border-gloop-primary flex items-center justify-center bg-gloop-primary text-white">
-                            <CheckCircle className="h-3 w-3" />
+                      {/* Price input for existing item */}
+                      {(trip.status === 'shopping' || trip.status === 'completed') && onUpdateItemPrice && (
+                        <div className="mt-3 pl-8 pt-2 border-t border-gloop-outline/30 dark:border-gloop-dark-outline/30">
+                          <div className="flex flex-col gap-3">
+                            <PriceInput 
+                              itemName={item.name}
+                              value={item.price}
+                              onChange={(price) => handleItemPriceChange(item.id, price)}
+                            />
+                            
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-gloop-text-muted">Unit:</span>
+                              <UnitSelector
+                                itemName={item.name}
+                                quantity={item.quantity}
+                                unit={item.unit}
+                                onQuantityChange={(qty) => handleItemUnitChange(item.id, item.unit || 'ea', qty)}
+                                onUnitChange={(unit) => handleItemUnitChange(item.id, unit)}
+                                showConversion={true}
+                              />
+                            </div>
                           </div>
-                        </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {checkedItems.length > 0 && (
+              <div className="mt-4">
+                <h3 className="font-medium text-sm mb-2 flex items-center">
+                  <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+                  Checked items ({checkedItems.length})
+                </h3>
+                <div className="space-y-1">
+                  {checkedItems.map(item => (
+                    <div key={item.id} className="p-2 bg-muted/50 dark:bg-gloop-dark-surface/20 rounded-md group">
+                      <div className="flex items-center">
+                        <div 
+                          className="flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700"
+                          onClick={() => onToggleItemCheck(trip.id, item.id)}
+                        >
+                          <Check className="h-3 w-3 text-green-600 dark:text-green-400 transition-transform duration-200 transform scale-100" />
+                        </div>
                         
-                        <div>
-                          <div className="flex items-center">
-                            <span className="font-medium line-through">{item.name}</span>
-                            {item.quantity > 1 && (
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                x{item.quantity}
-                              </Badge>
+                        <div className="ml-3 flex-1 overflow-hidden">
+                          <div className="font-medium text-sm text-gloop-text-muted line-through truncate">{item.name}</div>
+                          <div className="flex items-center text-xs text-gloop-text-muted/70 gap-1">
+                            <span>
+                              {formatValueWithUnit(item.quantity, item.unit || 'ea')}
+                            </span>
+                            <span>•</span>
+                            <span className="truncate">Added by: {item.addedBy.name}</span>
+                            {item.price && (
+                              <>
+                                <span>•</span>
+                                <span className="flex items-center">
+                                  <DollarSign className="h-3 w-3 mr-0.5" />
+                                  {item.price.toFixed(2)}
+                                </span>
+                              </>
                             )}
                           </div>
+                        </div>
+                        
+                        <div className="flex space-x-2 flex-shrink-0 ml-2">
+                          {/* Split button */}
+                          <ItemSplitSelector
+                            tripId={trip.id}
+                            itemId={item.id}
+                            itemName={item.name}
+                            itemPrice={item.price}
+                            participants={trip.participants}
+                            onSplitUpdated={handleSplitUpdate}
+                          />
                           
-                          <div className="flex items-center text-xs text-gloop-text-muted">
-                            <Avatar className="h-3 w-3 mr-1">
-                              <AvatarImage src={item.addedBy.avatar} />
-                              <AvatarFallback className="text-[8px]">
-                                {item.addedBy.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            Added by {item.addedBy.name}
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-gloop-text-muted/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                            onClick={() => onRemoveItem(trip.id, item.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                       
-                      {(isUserShopper || item.addedBy.name === "You") && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-gloop-text-muted hover:text-gloop-danger"
-                          onClick={() => onRemoveItem(trip.id, item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      {/* Price display for checked items */}
+                      {item.price === undefined && trip.status === 'completed' && onUpdateItemPrice && (
+                        <div className="mt-2 pl-8">
+                          <div className="flex flex-col gap-2">
+                            <PriceInput 
+                              itemName={item.name}
+                              value={item.price}
+                              onChange={(price) => handleItemPriceChange(item.id, price)}
+                            />
+                            
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gloop-text-muted">Unit:</span>
+                              <UnitSelector
+                                itemName={item.name}
+                                quantity={item.quantity}
+                                unit={item.unit}
+                                onQuantityChange={(qty) => handleItemUnitChange(item.id, item.unit || 'ea', qty)}
+                                onUnitChange={(unit) => handleItemUnitChange(item.id, unit)}
+                                showConversion={true}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       )}
-                    </motion.li>
+                    </div>
                   ))}
-                </AnimatePresence>
-              </ul>
-            </div>
-          )}
+                </div>
+              </div>
+            )}
+            
+            {trip.items.length === 0 && (
+              <div className="text-center py-6">
+                <p className="text-gloop-text-muted">No items added yet</p>
+                <p className="text-sm mt-1">Add items for {trip.shopper.name} to pick up</p>
+              </div>
+            )}
+          </TabsContent>
           
-          {trip.items.length === 0 && (
-            <div className="text-center py-6">
-              <p className="text-gloop-text-muted">No items added yet</p>
-              <p className="text-sm mt-1">Add items for {trip.shopper.name} to pick up</p>
-            </div>
-          )}
-        </div>
+          {/* Cost split tab content */}
+          <TabsContent value="splits" className="mt-4 overflow-y-auto pb-16">
+            <CostSplitSummary
+              tripId={trip.id}
+              tripName={trip.store}
+              items={trip.items}
+              participants={trip.participants}
+              onSettleUp={onSettleUp}
+              onSplitUpdated={() => {
+                // Force a refresh of the split summary when splits are updated
+                setActiveTab("splits");
+              }}
+            />
+          </TabsContent>
+        </Tabs>
         
         {isUserShopper && trip.status !== 'completed' && trip.status !== 'cancelled' && (
-          <div className="mt-4 pt-4 border-t border-gloop-outline dark:border-gloop-dark-surface">
+          <div className="mt-4 pt-4 border-t border-gloop-outline dark:border-gloop-dark-surface sticky bottom-0 bg-background dark:bg-gloop-dark-background pb-4 z-10">
             <Button 
-              className="w-full premium-gradient-btn"
+              className="w-full premium-gradient-btn h-10"
               onClick={() => onCompleteTrip(trip.id)}
             >
               <CheckCircle className="h-4 w-4 mr-2" />
@@ -389,6 +721,37 @@ const TripDetailModal = ({
             </Button>
           </div>
         )}
+        
+        {/* Reactivate button for completed trips */}
+        {trip.status === 'completed' && onReactivateTrip && (
+          <div className="mt-4 pt-4 border-t border-gloop-outline dark:border-gloop-dark-surface sticky bottom-0 bg-background dark:bg-gloop-dark-background pb-4 z-10">
+            <Button 
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+              onClick={() => onReactivateTrip(trip.id)}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Reactivate Trip
+            </Button>
+          </div>
+        )}
+        
+        {/* Duplicate Item Dialog */}
+        <DuplicateItemDialog
+          suggestion={duplicateSuggestion}
+          isOpen={showDuplicateDialog}
+          onClose={() => setShowDuplicateDialog(false)}
+          onAddAnyway={handleAddAnyway}
+          onMergeItems={handleMergeItems}
+          onUpdate={handleUpdateExisting}
+        />
+        
+        {/* Product save dialog */}
+        <BarcodeProductSaveDialog
+          barcode={scannedBarcode}
+          isOpen={showSaveProductDialog}
+          onClose={() => setShowSaveProductDialog(false)}
+          onSave={handleProductSave}
+        />
       </DialogContent>
     </Dialog>
   );

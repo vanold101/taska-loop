@@ -1,363 +1,386 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import NavBar from "@/components/NavBar";
-import FloatingActionButton from "@/components/FloatingActionButton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Map as MapIcon, List, Navigation, MapPin, Clock, Search, Route } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { CreateTaskModal } from "@/components/CreateTaskModal";
-import { motion, AnimatePresence } from "framer-motion";
-import { Input } from "@/components/ui/input";
-import { format } from 'date-fns';
-import { useTaskContext, Task } from "@/context/TaskContext";
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Map as MapIcon, Navigation, MapPin, Route, Trash2, Clock, Plus, CalendarIcon, Search, ShoppingCart } from "lucide-react";
+import NavBar from "../components/NavBar";
+import { useToast } from "../hooks/use-toast";
+import { useTaskContext } from "../context/TaskContext";
+import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
+import { Link } from "react-router-dom";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Calendar } from "../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 
-// Mock tasks with location data
-const mockLocationTasks = [
-  {
-    id: '1',
-    title: 'Pick up dry cleaning',
-    dueDate: '2025-05-05',
-    location: 'Downtown Cleaners',
-    coordinates: { lat: 39.9622, lng: -83.0007 },
-    priority: 'high',
-  },
-  {
-    id: '2',
-    title: 'Return library books',
-    dueDate: '2025-05-08',
-    location: 'Columbus Public Library',
-    coordinates: { lat: 39.9611, lng: -83.0101 },
-    priority: 'medium',
-  },
-  {
-    id: '3',
-    title: 'Get groceries from Trader Joe\'s',
-    dueDate: '2025-05-02',
-    location: 'Trader Joe\'s',
-    coordinates: { lat: 39.9702, lng: -83.0150 },
-    priority: 'high',
+// Define simplified interfaces
+interface RoutePreferences {
+  avoidHighways: boolean;
+  avoidTolls: boolean;
+  transportMode: 'DRIVING' | 'WALKING' | 'BICYCLING' | 'TRANSIT';
+  returnToStart: boolean;
+  considerTraffic: boolean;
+  maxStops?: number;
+}
+
+interface OptimizedRoute {
+  waypoints: Array<{
+    location: {
+      lat: number;
+      lng: number;
+    };
+    stopover: boolean;
+  }>;
+  totalDistance: number;
+  totalDuration: number;
+  segments: Array<{
+    startLocation: {
+      lat: number;
+      lng: number;
+    };
+    endLocation: {
+      lat: number;
+      lng: number;
+    };
+    distance: string;
+    duration: string;
+    priority: string;
+    taskName?: string;
+    fromLocation: string;
+  }>;
+}
+
+// Define Google Maps types
+declare global {
+  interface Window {
+    searchTimeout?: NodeJS.Timeout;
+    google: typeof google;
+    initMap: () => void;
   }
-];
-
-// Global types are now defined in src/types/google-maps.d.ts
+}
 
 const MapPage = () => {
-  const [isCreateTaskModalOpen, setCreateTaskModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
-  // Use tasks from the shared context instead of local mock data
-  const { tasks: contextTasks, trips, syncTasksWithTrips } = useTaskContext();
-  const [locationTasks, setLocationTasks] = useState<Task[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [isRoutePlanned, setIsRoutePlanned] = useState(false);
-  const [sortedRouteLocations, setSortedRouteLocations] = useState<Array<{
-    task: typeof mockLocationTasks[0],
-    distance: string,
-    duration: string,
-    legIndex: number
-  }>>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [autocompleteSelectedPlace, setAutocompleteSelectedPlace] = useState<any>(null);
   const { toast } = useToast();
+  const { tasks, addTask } = useTaskContext();
+  const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [showRoutePreferences, setShowRoutePreferences] = useState(false);
+  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+  const [newTask, setNewTask] = useState({
+    title: "",
+    description: "",
+    location: "",
+    dueDate: new Date(),
+    priority: "medium" as "low" | "medium" | "high",
+    coordinates: null as { lat: number, lng: number } | null
+  });
+  const [placesLoaded, setPlacesLoaded] = useState(false);
+  const [placeSearchResults, setPlaceSearchResults] = useState<Array<{
+    description: string;
+    place_id: string;
+  }>>([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
+  const [showPlacesDropdown, setShowPlacesDropdown] = useState(false);
+  
+  const [routePreferences, setRoutePreferences] = useState<RoutePreferences>({
+    avoidHighways: false,
+    avoidTolls: false,
+    transportMode: 'DRIVING',
+    returnToStart: true,
+    considerTraffic: true,
+    maxStops: undefined
+  });
+  const [optimizedRoute, setOptimizedRoute] = useState<OptimizedRoute | null>(null);
+  const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
+  
   const mapRef = useRef<HTMLDivElement>(null);
-  const googleMapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const directionsRendererRef = useRef<any>(null);
-  const placesServiceRef = useRef<any>(null);
-  const autocompleteRef = useRef<any>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const userMarkerRef = useRef<any>(null);
-
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 39.9622, lng: -83.0007 }); // Default to Columbus
-  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
-  const [locationError, setLocationError] = useState<string | null>(null);
-
-  // Helper function to get color based on priority
-  const getPriorityColor = (priority: string): string => {
-    switch (priority) {
-      case 'high':
-        return '#EA4335'; // Red
-      case 'medium':
-        return '#FBBC04'; // Yellow
-      case 'low':
-        return '#34A853'; // Green
-      default:
-        return '#4285F4'; // Blue
-    }
-  };
-
-  // Helper function to assign default coordinates to tasks without valid coordinates
-  const assignDefaultCoordinates = (tasks: Task[]): Task[] => {
-    // Columbus, Ohio area - spread tasks around this central location
-    const centralLat = 39.9622;
-    const centralLng = -83.0007;
-    const radius = 0.03; // Roughly 3km radius
-    
-    return tasks.map(task => {
-      // If task already has valid coordinates, return it unchanged
-      if (task.coordinates?.lat && task.coordinates?.lng && 
-          Math.abs(task.coordinates.lat) > 0.01 && Math.abs(task.coordinates.lng) > 0.01) {
-        return task;
-      }
-      
-      // Generate random offset within radius to spread tasks
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.random() * radius;
-      const offsetLat = Math.sin(angle) * distance;
-      const offsetLng = Math.cos(angle) * distance;
-      
-      // Create a new task with valid coordinates
-      return {
-        ...task,
-        coordinates: {
-          lat: centralLat + offsetLat,
-          lng: centralLng + offsetLng
-        }
-      };
-    });
-  };
-
-  // Helper function to safely render location values
-  const getLocationString = (location: any): string => {
-    if (location === null || location === undefined) {
-      return 'Unknown Location';
-    }
-    if (typeof location === 'string') {
-      return location;
-    }
-    if (typeof location === 'object' && location.name) {
-      return location.name;
-    }
-    return 'Unknown Location';
-  };
-
-  // Sync tasks from context to local state
+  const googleMapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesSessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+  
+  // Get user's location
   useEffect(() => {
-    // Update local state with tasks from context, assigning default coordinates if needed
-    const tasksWithCoordinates = assignDefaultCoordinates(contextTasks);
-    console.log("Updated tasks with valid coordinates:", tasksWithCoordinates);
-    setLocationTasks(tasksWithCoordinates);
-    // Only call syncTasksWithTrips on mount, not on every update
-  }, [contextTasks]); // Remove syncTasksWithTrips from dependencies
-
-  // Sync trips and tasks once on mount
-  useEffect(() => {
-    syncTasksWithTrips();
-  }, []); // Empty dependency array = only run on mount
-
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoadingLocation(true);
-    
-    // Default to Columbus if geolocation fails or times out
-    const locationTimeout = setTimeout(() => {
-      if (isMounted && isLoadingLocation) {
-        console.log("Location request timed out, using default location");
-        setIsLoadingLocation(false);
-        // Keep using the default location set in state initialization
-      }
-    }, 5000); // 5 second timeout
-    
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          if (!isMounted) return;
-          clearTimeout(locationTimeout);
-          const userLoc = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          console.log("Successfully got user location:", userLoc);
-          setUserLocation(userLoc);
-          setIsLoadingLocation(false);
-        },
-        (error) => {
-          if (!isMounted) return;
-          clearTimeout(locationTimeout);
-          console.error("Error getting location:", error);
-          let errorMessage = "Could not access your location. Using default location instead.";
-          
-          // Provide more specific error messages
-          if (error.code === 1) {
-            errorMessage = "Location access denied. Please enable location services to use your current location.";
-          } else if (error.code === 2) {
-            errorMessage = "Your location is currently unavailable. Using default location instead.";
-          } else if (error.code === 3) {
-            errorMessage = "Location request timed out. Using default location instead.";
-          }
-          
-          setLocationError(errorMessage);
-          setIsLoadingLocation(false);
-        },
-        { 
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
-      );
-    } else {
-      if (isMounted) {
-        clearTimeout(locationTimeout);
-        setLocationError("Geolocation is not supported by your browser. Using default location instead.");
-        setIsLoadingLocation(false);
-      }
-    }
-    
-    return () => {
-      isMounted = false;
-      clearTimeout(locationTimeout);
-    };
-  }, []); // Only run on mount
-
-  useEffect(() => {
-    // Only load script if in map view
-    if (viewMode !== 'map') return;
-    
-    // Define the callback function
-    window.initMap = () => {
-      console.log("InitMap called, checking map reference:", mapRef.current);
-      if (!mapRef.current) {
-        console.log("Map reference not found");
-        return;
-      }
-      
-      console.log("Initializing Google Maps...");
-      
-      if (!window.google || !window.google.maps) {
-        console.error("Google Maps API not fully loaded");
-        return;
-      }
-      
-      try {
-        // Create a new map
-        const mapOptions = {
-          center: userLocation,
-          zoom: 13,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: true,
-          zoomControl: true
-        };
-        
-        googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
-        
-        console.log("Map created successfully");
-        
-        // Add markers for all tasks
-        addTaskMarkers();
-        
-        // Add user location marker
-        addUserLocationMarker();
-        
-        // Initialize search input if available
-        if (searchInputRef.current && window.google.maps.places) {
-          try {
-            // Use standard Autocomplete
-            autocompleteRef.current = new window.google.maps.places.Autocomplete(searchInputRef.current, {
-              types: ['address']
-            });
-            
-            autocompleteRef.current.addListener('place_changed', () => {
-              try {
-                const place = autocompleteRef.current.getPlace();
-                if (!place.geometry || !place.geometry.location) {
-                  toast({
-                    title: "No location found",
-                    description: "Please select a location from the dropdown",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-                
-                // Store the selected place for use in handleSearchSubmit
-                setAutocompleteSelectedPlace(place);
-                
-                // Auto-submit the form when a place is selected
-                handleAddTaskAtLocation(place);
-              } catch (error) {
-                console.error("Error handling place selection:", error);
-              }
-            });
-          } catch (error) {
-            console.error("Error initializing autocomplete:", error);
-          }
-        }
-      } catch (error) {
-        console.error("Error initializing map:", error);
-        setLocationError("Error loading Google Maps. Please try again later.");
-      }
-    };
-    
-    // Check if script is already loaded
-    if (window.google && window.google.maps) {
-      console.log("Google Maps already loaded, initializing map");
-      window.initMap();
+    // Check if geolocation is available
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      setLoading(false);
       return;
     }
     
-    // Load the script if it hasn't been loaded yet
-    if (!document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
-      console.log("Loading Google Maps script");
+    // Get current position
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setLoading(false);
+      },
+      () => {
+        setError("Unable to retrieve your location");
+        setLoading(false);
+        // Use a default location
+        setLocation({ lat: 39.9789, lng: -82.8677 }); // Columbus, OH
+      }
+    );
+  }, []);
+  
+  // Update map markers when tasks change
+  useEffect(() => {
+    if (googleMapRef.current && location && window.google && !loading) {
+      console.log("Tasks changed, updating markers");
+      addTaskMarkers();
+    }
+  }, [tasks, location]);
+  
+  // Load Google Maps with Places library
+  useEffect(() => {
+    if (!location) return;
+    
+    const initializeMap = () => {
+      if (!mapRef.current || !location) return;
+      
+      // Check if Google Maps is loaded
+      if (!window.google || !window.google.maps) {
+        console.error("Google Maps not loaded");
+        return;
+      }
+      
+      // Create the map
+      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
+        center: location,
+        zoom: 12,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+        zoomControl: true
+      });
+      
+      infoWindowRef.current = new window.google.maps.InfoWindow();
+      
+      // Initialize DirectionsRenderer
+      const renderer = new window.google.maps.DirectionsRenderer({
+        suppressMarkers: true,
+        polylineOptions: {
+          strokeColor: '#4285F4',
+          strokeWeight: 5,
+          strokeOpacity: 0.7
+        }
+      });
+      renderer.setMap(googleMapRef.current);
+      setDirectionsRenderer(renderer);
+      
+      // Initialize Places services
+      if (window.google.maps.places) {
+        placesServiceRef.current = new window.google.maps.places.PlacesService(googleMapRef.current);
+        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+        placesSessionToken.current = new window.google.maps.places.AutocompleteSessionToken();
+        setPlacesLoaded(true);
+      }
+      
+      // Add markers for tasks
+      addTaskMarkers();
+    };
+    
+    // Define callback for Google Maps API
+    window.initMap = initializeMap;
+    
+    // If Google Maps is already loaded, initialize map immediately
+    if (window.google && window.google.maps) {
+      initializeMap();
+    } else {
+      // Load Google Maps API with Places library
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8&libraries=places,geometry&callback=initMap`;
       script.async = true;
       script.defer = true;
-      
-      // Handle script load error
-      script.onerror = () => {
-        console.error("Failed to load Google Maps script");
-        setLocationError("Failed to load Google Maps. Please check your internet connection.");
-      };
-      
       document.head.appendChild(script);
+      
+      return () => {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
+    }
+  }, [location]);
+  
+  // Search places as user types in location field
+  const searchPlaces = (query: string) => {
+    if (!query || query.length < 3 || !placesLoaded || !autocompleteServiceRef.current) {
+      setPlaceSearchResults([]);
+      setShowPlacesDropdown(false);
+      return;
     }
     
-    return () => {
-      // Cleanup
-      if (googleMapRef.current) {
-        // Clean up markers and listeners
-        clearMarkers();
-        if (userMarkerRef.current) {
-          userMarkerRef.current.setMap(null);
-          userMarkerRef.current = null;
+    setSearchingPlaces(true);
+    setShowPlacesDropdown(true);
+    
+    // Create request for place predictions
+    const request: google.maps.places.AutocompletionRequest = {
+      input: query,
+      types: ['establishment', 'geocode'],
+      componentRestrictions: { country: 'us' },
+      location: location ? new google.maps.LatLng(location.lat, location.lng) : undefined,
+      radius: 50000 // 50km radius
+    };
+    
+    // Only add session token if it exists
+    if (placesSessionToken.current) {
+      request.sessionToken = placesSessionToken.current;
+    }
+    
+    // Get place predictions
+    autocompleteServiceRef.current.getPlacePredictions(
+      request,
+      (predictions, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
+          setPlaceSearchResults(predictions.map(p => ({
+            description: p.description,
+            place_id: p.place_id
+          })));
+        } else {
+          setPlaceSearchResults([]);
+        }
+        setSearchingPlaces(false);
+      }
+    );
+  };
+  
+  // Handle place selection
+  const handlePlaceSelect = (placeId: string, description: string) => {
+    if (!placesServiceRef.current) return;
+    
+    // Get place details
+    placesServiceRef.current.getDetails(
+      {
+        placeId: placeId,
+        fields: ['name', 'formatted_address', 'geometry']
+      },
+      (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+          // Update task location and coordinates
+          setNewTask(prev => ({
+            ...prev,
+            location: place.formatted_address || description,
+            coordinates: place.geometry?.location ? {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng()
+            } : null
+          }));
+          
+          // Reset places search
+          setPlaceSearchResults([]);
+          setShowPlacesDropdown(false);
+          
+          // Get a new session token for the next search
+          placesSessionToken.current = new google.maps.places.AutocompleteSessionToken();
+        } else {
+          toast({
+            title: "Error",
+            description: "Couldn't get place details",
+            variant: "destructive"
+          });
         }
       }
-    };
-  }, [viewMode, userLocation, toast]); // Remove functions that haven't been declared yet
-
-  useEffect(() => {
-    // Update markers when tasks change
-    if (googleMapRef.current) {
-      clearMarkers();
-      addTaskMarkers();
+    );
+  };
+  
+  // Handle location input change with debounce
+  const handleLocationInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewTask(prev => ({ ...prev, location: value }));
+    
+    // Debounce search
+    if (window.searchTimeout) {
+      clearTimeout(window.searchTimeout);
     }
-  }, [locationTasks]);
-
-  useEffect(() => {
-    // Update route when route planning is toggled
-    if (googleMapRef.current) {
-      if (isRoutePlanned) {
-        calculateAndDisplayRoute();
-      } else if (directionsRendererRef.current) {
-        directionsRendererRef.current.setMap(null);
-        directionsRendererRef.current = null;
+    
+    window.searchTimeout = setTimeout(() => {
+      searchPlaces(value);
+    }, 300);
+  };
+  
+  // Add markers for tasks on the map
+  const addTaskMarkers = () => {
+    if (!googleMapRef.current || !window.google || !location) {
+      console.error("Map not ready for markers");
+      return;
+    }
+    
+    console.log("Adding markers for", tasks.length, "tasks");
+    
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+    
+    const bounds = new window.google.maps.LatLngBounds();
+    
+    // Add task markers
+    let hasValidTasks = false;
+    tasks.forEach(task => {
+      if (task.coordinates && task.coordinates.lat && task.coordinates.lng) {
+        try {
+          console.log("Adding marker for task:", task.title, task.coordinates);
+          const marker = new window.google.maps.Marker({
+            position: { lat: task.coordinates.lat, lng: task.coordinates.lng },
+            map: googleMapRef.current,
+            title: task.title,
+            icon: {
+              path: 'M10 27c-.2 0-.2 0-.5-1-.3-.8-.7-2-1.6-3.5-1-1.5-2-2.7-3-3.8-2.2-2.8-3.9-5-3.9-8.8C1 4.9 5 1 10 1s9 4 9 8.9c0 3.9-1.8 6-4 8.8-1 1.2-1.9 2.4-2.8 3.8-.3 1-.4 1-.6 1Z',
+              fillColor: getPriorityColor(task.priority),
+              fillOpacity: 1,
+              strokeWeight: 1, 
+              strokeColor: '#FFFFFF',
+              anchor: new window.google.maps.Point(15, 29),
+              scale: 1.2,
+            }
+          });
+          
+          // Add click listener to marker
+          marker.addListener('click', () => {
+            setSelectedTask(task);
+            
+            // Show info window with task details
+            const content = `
+              <div class="p-2 min-w-[200px]">
+                <h3 class="font-bold text-base mb-1">${task.title}</h3>
+                <p class="text-gray-500 text-sm mb-1">
+                  <span class="inline-block mr-2">📍</span>${task.location}
+                </p>
+                <p class="text-gray-500 text-sm">
+                  <span class="inline-block mr-2">⏰</span>${format(new Date(task.dueDate), 'PPP')}
+                </p>
+              </div>
+            `;
+            
+            infoWindowRef.current?.setContent(content);
+            infoWindowRef.current?.open(googleMapRef.current, marker);
+          });
+          
+          markersRef.current.push(marker);
+          bounds.extend({ lat: task.coordinates.lat, lng: task.coordinates.lng });
+          hasValidTasks = true;
+        } catch (error) {
+          console.error("Error adding marker for task:", task.id, error);
+        }
+      } else {
+        console.warn("Task missing coordinates:", task.id);
       }
-    }
-  }, [isRoutePlanned]);
-
-  // Add user location marker to the map
-  const addUserLocationMarker = useCallback(() => {
-    if (!googleMapRef.current || !window.google || !window.google.maps) return;
+    });
     
-    // Clear any existing user marker
-    if (userMarkerRef.current) {
-      userMarkerRef.current.setMap(null);
-    }
-    
+    // Add user location marker
     try {
-      // Use standard Marker as fallback
-      userMarkerRef.current = new window.google.maps.Marker({
-        position: userLocation,
+      const userMarker = new window.google.maps.Marker({
+        position: location,
         map: googleMapRef.current,
         title: "Your Location",
         icon: {
@@ -367,931 +390,899 @@ const MapPage = () => {
           strokeWeight: 2,
           strokeColor: '#FFFFFF',
           scale: 8
-        },
-        zIndex: 1000 // Ensure it's on top of other markers
-      });
-    } catch (error) {
-      console.error("Error adding user location marker:", error);
-    }
-  }, [userLocation]);
-
-  // Add task markers to the map
-  const addTaskMarkers = useCallback(() => {
-    if (!googleMapRef.current || !window.google || !window.google.maps) return;
-    
-    // Clear existing markers
-    markersRef.current.forEach(marker => {
-      if (marker) marker.setMap(null);
-    });
-    markersRef.current = [];
-    
-    if (locationTasks.length === 0) return;
-    
-    try {
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend(userLocation); // Include user location in bounds
-      
-      // Add markers for each task
-      locationTasks.forEach(task => {
-        try {
-          // Skip tasks without valid coordinates
-          if (!task.coordinates || typeof task.coordinates !== 'object' || !task.coordinates.lat || !task.coordinates.lng) {
-            console.log(`Skipping task "${task.title}" due to missing/invalid coordinates`);
-            return;
-          }
-
-          const markerColor = getPriorityColor(task.priority);
-          
-          // Use standard Marker as fallback
-          const marker = new window.google.maps.Marker({
-            position: { lat: task.coordinates.lat, lng: task.coordinates.lng },
-            map: googleMapRef.current,
-            title: task.title,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              fillColor: markerColor,
-              fillOpacity: 0.9,
-              strokeWeight: 2,
-              strokeColor: '#FFFFFF',
-              scale: 10
-            }
-          });
-          
-          // Add click event to the marker
-          marker.addListener('click', () => {
-            setSelectedTaskId(task.id);
-          });
-          
-          markersRef.current.push(marker);
-          
-          // Add to bounds
-          if (task.coordinates?.lat && task.coordinates?.lng) {
-            bounds.extend(task.coordinates);
-          }
-        } catch (error) {
-          console.error("Error adding marker for task:", task.title, error);
         }
       });
       
-      // Fit map to show all markers
-      googleMapRef.current.fitBounds(bounds);
+      markersRef.current.push(userMarker);
+      bounds.extend(location);
       
-      // If only one task, zoom out a bit
-      if (locationTasks.length === 1) {
-        googleMapRef.current.setZoom(14);
+      // Fit map to show all markers
+      if (hasValidTasks) {
+        googleMapRef.current.fitBounds(bounds);
+        
+        // If only one task marker, zoom out a bit
+        if (tasks.filter(task => task.coordinates).length === 1) {
+          googleMapRef.current.setZoom(14);
+        }
       }
     } catch (error) {
-      console.error("Error in addTaskMarkers:", error);
+      console.error("Error adding user location marker:", error);
     }
-  }, [locationTasks, userLocation, setSelectedTaskId]);
-
-  // Calculate and display the optimal route between tasks
-  const calculateAndDisplayRoute = useCallback(() => {
-    if (!googleMapRef.current || !window.google || !window.google.maps || locationTasks.length < 1) return;
+  };
+  
+  // Show optimized route
+  const showOptimizedRoute = async () => {
+    if (!googleMapRef.current || !window.google || !location) {
+      toast({
+        title: "Error",
+        description: "Map not initialized or location not available",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const tasksWithCoordinates = tasks.filter(task => 
+      task.coordinates && task.coordinates.lat && task.coordinates.lng
+    );
+    
+    if (tasksWithCoordinates.length === 0) {
+      toast({
+        title: "No tasks with locations",
+        description: "Add tasks with locations to generate a route",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
-      if (!directionsRendererRef.current) {
-        directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+      setLoading(true);
+      console.log("Calculating route for tasks:", tasksWithCoordinates.length);
+      
+      // Create or update directionsRenderer
+      let renderer = directionsRenderer;
+      if (!renderer) {
+        renderer = new window.google.maps.DirectionsRenderer({
           suppressMarkers: true,
           polylineOptions: {
             strokeColor: '#4285F4',
             strokeWeight: 5,
-            strokeOpacity: 0.8
+            strokeOpacity: 0.7
           }
         });
+        renderer.setMap(googleMapRef.current);
+        setDirectionsRenderer(renderer);
+      } else {
+        // Ensure it's attached to the map
+        renderer.setMap(googleMapRef.current);
       }
       
-      directionsRendererRef.current.setMap(googleMapRef.current);
+      // Calculate distances between points for proper optimization
+      const userLatLng = new window.google.maps.LatLng(location.lat, location.lng);
       
-      const directionsService = new window.google.maps.DirectionsService();
-      
-      // Sort tasks by priority and due date
-      const sortedTasks = [...locationTasks].sort((a, b) => {
-        if (a.priority === 'high' && b.priority !== 'high') return -1;
-        if (a.priority !== 'high' && b.priority === 'high') return 1;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      // Create an array of locations with calculated distances from user
+      const locationsWithDistances = tasksWithCoordinates.map(task => {
+        const taskLatLng = new window.google.maps.LatLng(
+          task.coordinates.lat,
+          task.coordinates.lng
+        );
+        
+        // Calculate distance using Google's geometry library
+        const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+          userLatLng,
+          taskLatLng
+        );
+        
+        return {
+          task,
+          distance,
+          latLng: taskLatLng
+        };
       });
       
-      // Create waypoints from all tasks except the last one
-      const waypoints = sortedTasks.slice(0, -1).map(task => ({
-        location: new window.google.maps.LatLng(task.coordinates?.lat || 0, task.coordinates?.lng || 0),
+      // Sort by distance from current location for the nearest neighbor approach
+      locationsWithDistances.sort((a, b) => a.distance - b.distance);
+      
+      console.log("Sorted locations by distance:", 
+        locationsWithDistances.map(loc => ({
+          title: loc.task.title, 
+          distance: (loc.distance / 1609.34).toFixed(2) + " mi"
+        }))
+      );
+      
+      // Convert to waypoints for directions request
+      const waypoints = locationsWithDistances.map(location => ({
+        location: location.latLng,
         stopover: true
       }));
       
-      // If we have only one task, use it as destination with no waypoints
-      const destination = sortedTasks.length > 0 
-        ? new window.google.maps.LatLng(
-            sortedTasks[sortedTasks.length - 1].coordinates?.lat || 0, 
-            sortedTasks[sortedTasks.length - 1].coordinates?.lng || 0
-          )
-        : new window.google.maps.LatLng(userLocation.lat, userLocation.lng);
+      // Create DirectionsService
+      const directionsService = new window.google.maps.DirectionsService();
       
-      // Use user's current location as the origin
-      directionsService.route({
-        origin: new window.google.maps.LatLng(userLocation.lat, userLocation.lng),
-        destination: destination,
-        waypoints: waypoints,
-        optimizeWaypoints: true,
-        travelMode: window.google.maps.TravelMode.DRIVING
-      }, (response, status) => {
-        if (status === 'OK') {
-          // Make sure directionsRendererRef.current exists before using it
-          if (!directionsRendererRef.current) {
-            console.log("Creating new DirectionsRenderer in calculateAndDisplayRoute");
-            directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-              suppressMarkers: true,
-              polylineOptions: {
-                strokeColor: '#4285F4',
-                strokeWeight: 5,
-                strokeOpacity: 0.8
-              }
-            });
-            directionsRendererRef.current.setMap(googleMapRef.current);
-          }
-          
-          // Now safely set directions
-          directionsRendererRef.current.setDirections(response);
-          
-          // Process the optimized route
-          const route = response.routes[0];
-          
-          // Get the order of waypoints from the optimized route
-          const waypointOrder = response.routes?.[0]?.waypoint_order || [];
-          
-          // Create a sorted array of tasks based on the optimized route
-          const sortedTasksData: Array<{
-            task: typeof mockLocationTasks[0],
-            distance: string,
-            duration: string,
-            legIndex: number
-          }> = [];
-          
-          // First, add the first leg (from user location to first stop)
-          if (route && route.legs && sortedTasks.length > 0) {
-            const firstLeg = route.legs[0];
-            let firstTask;
-            
-            // If we have waypoints, the first destination is the first waypoint in the optimized order
-            if (waypointOrder.length > 0) {
-              firstTask = sortedTasks[waypointOrder[0]];
-            } else {
-              // If no waypoints, the first destination is the final destination
-              firstTask = sortedTasks[0];
-            }
-            
-            sortedTasksData.push({
-              task: firstTask,
-              distance: firstLeg.distance.text,
-              duration: firstLeg.duration.text,
-              legIndex: 0
-            });
-            
-            // Add the remaining legs based on the optimized waypoint order
-            if (route.legs.length > 1 && waypointOrder.length > 0) {
-              for (let i = 1; i < route.legs.length; i++) {
-                const leg = route.legs[i];
-                let taskIndex;
-                
-                if (i < waypointOrder.length) {
-                  // This is a waypoint-to-waypoint leg
-                  taskIndex = waypointOrder[i];
-                } else {
-                  // This is the final leg to the destination
-                  taskIndex = sortedTasks.length - 1;
-                }
-                
-                sortedTasksData.push({
-                  task: sortedTasks[taskIndex],
-                  distance: leg.distance.text,
-                  duration: leg.duration.text,
-                  legIndex: i
-                });
-              }
-            }
-          }
-          
-          // Store the sorted locations in state
-          setSortedRouteLocations(sortedTasksData);
-          
-          // Convert to miles and minutes
-          const distanceInMiles = (route.legs.reduce((total, leg) => total + leg.distance.value, 0) / 1609.34).toFixed(1);
-          const durationInMinutes = Math.round(route.legs.reduce((total, leg) => total + leg.duration.value, 0) / 60);
-          
-          toast({
-            title: "Route calculated",
-            description: `Total trip: ${distanceInMiles} miles (${durationInMinutes} min)`,
-          });
-        } else {
-          console.error("Error calculating route:", status);
-          // Provide more specific error messages based on the status
-          let errorMessage = "Could not calculate route. Please try again.";
-          
-          if (status === window.google.maps.DirectionsStatus.ZERO_RESULTS) {
-            errorMessage = "No route found between these locations. Try locations that are closer together.";
-          } else if (status === window.google.maps.DirectionsStatus.NOT_FOUND) {
-            errorMessage = "One or more locations could not be found. Please check your task addresses.";
-          } else if (status === window.google.maps.DirectionsStatus.MAX_WAYPOINTS_EXCEEDED) {
-            errorMessage = "Too many stops in your route. Please reduce the number of tasks.";
-          } else if (status === window.google.maps.DirectionsStatus.INVALID_REQUEST) {
-            errorMessage = "Invalid route request. Make sure all locations have valid coordinates.";
-          }
-
-          // Clear any existing directions
-          if (directionsRendererRef.current) {
-            directionsRendererRef.current.setMap(null);
-            directionsRendererRef.current = null;
-          }
-          
-          // Reset the route planning state
-          setIsRoutePlanned(false);
-          setSortedRouteLocations([]);
-          
-          toast({
-            title: "Route calculation failed",
-            description: errorMessage,
-            variant: "destructive"
-          });
-        }
-      });
-    } catch (error) {
-      console.error("Error calculating route:", error);
-      toast({
-        title: "Error calculating route",
-        description: "There was a problem calculating your route",
-        variant: "destructive"
-      });
-      setIsRoutePlanned(false);
-    }
-  }, [locationTasks, userLocation, setIsRoutePlanned, setSortedRouteLocations, toast]);
-
-  // Handle adding a task at a specific location
-  const handleAddTaskAtLocation = (place: any) => {
-    setCreateTaskModalOpen(true);
-    // Store the place data to use when creating the task
-    sessionStorage.setItem('newTaskLocation', JSON.stringify({
-      name: place.name || place.formatted_address,
-      address: place.formatted_address,
-      coordinates: {
-        lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng()
-      }
-    }));
-  };
-
-  // Clear all markers from the map
-  const clearMarkers = () => {
-    markersRef.current.forEach(marker => {
-      if (marker) marker.setMap(null);
-    });
-    markersRef.current = [];
-  };
-
-  const handleCreateTask = (data: { title: string; dueDate: string; location?: string; coordinates?: {lat: number, lng: number} }) => {
-    // Generate valid coordinates if none are provided
-    let coordinates = data.coordinates;
-    
-    // Check if coordinates are missing or invalid (near 0,0)
-    if (!coordinates || !coordinates.lat || !coordinates.lng || 
-        (Math.abs(coordinates.lat) < 0.01 && Math.abs(coordinates.lng) < 0.01)) {
-      // Default to Columbus area with slight random variation for visual separation
-      const centralLat = 39.9642;
-      const centralLng = -82.9950;
-      const radius = 0.02; // About 2km radius
+      // If we have too many waypoints, we need to break it up
+      // Google's API has a limit of 25 waypoints for a single request
+      const MAX_WAYPOINTS = 23; // Leave some room for origin/destination
+      let finalRoute = null;
       
-      // Create a random offset
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.random() * radius;
-      coordinates = {
-        lat: centralLat + Math.sin(angle) * distance,
-        lng: centralLng + Math.cos(angle) * distance
-      };
-      
-      console.log(`Generated random coordinates for new task "${data.title}":`, coordinates);
-    }
-    
-    const newTask = {
-      id: Date.now().toString(),
-      title: data.title,
-      dueDate: data.dueDate,
-      location: data.location || 'New Location',
-      coordinates: coordinates,
-      priority: 'medium' as 'low' | 'medium' | 'high',
-    };
-    
-    setLocationTasks([newTask, ...locationTasks]);
-    
-    toast({
-      title: "Task created!",
-      description: `Task "${data.title}" added at ${getLocationString(newTask.location)}`,
-    });
-  };
-
-  const toggleViewMode = () => {
-    setViewMode(viewMode === 'map' ? 'list' : 'map');
-  };
-
-  const handleTaskClick = (taskId: string) => {
-    setSelectedTaskId(taskId === selectedTaskId ? null : taskId);
-    
-    if (googleMapRef.current) {
-      const task = locationTasks.find(t => t.id === taskId);
-      if (task && task.coordinates?.lat && task.coordinates?.lng) {
-        googleMapRef.current.panTo(task.coordinates);
-        googleMapRef.current.setZoom(15);
-      }
-    }
-  };
-  
-  // Calculate the optimal route based on current location and tasks
-  const calculateOptimalRoute = () => {
-    if (!window.google || !window.google.maps || locationTasks.length < 1) {
-      // Silent fail instead of showing notification
-      console.log("Cannot calculate route: Google Maps is not loaded or no tasks available");
-      return;
-    }
-    
-    // Make sure we have the user's actual current location
-    if (isLoadingLocation) {
-      toast({
-        title: "Getting your location",
-        description: "Please wait while we access your current location",
-        variant: "default"
-      });
-      return;
-    }
-    
-    // Request fresh location for route calculation
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        // Use the fresh location data
-        const freshLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
+      if (waypoints.length <= MAX_WAYPOINTS) {
+        // We can handle this in a single request
+        console.log("Calculating single route segment with", waypoints.length, "waypoints");
+        
+        const request = {
+          origin: userLatLng,
+          destination: routePreferences.returnToStart ? userLatLng : waypoints[waypoints.length - 1].location,
+          waypoints: routePreferences.returnToStart ? waypoints : waypoints.slice(0, -1),
+          optimizeWaypoints: false, // We've already optimized by distance
+          travelMode: window.google.maps.TravelMode[routePreferences.transportMode],
+          avoidHighways: routePreferences.avoidHighways,
+          avoidTolls: routePreferences.avoidTolls
         };
         
-        console.log("Using fresh location for route calculation:", freshLocation);
-        
-        // Update the user location state
-        setUserLocation(freshLocation);
-        
-        // Calculate route with fresh location
-        calculateRouteWithLocation(freshLocation);
-      },
-      (error) => {
-        console.error("Error getting current location:", error);
+        // Request directions
+        finalRoute = await directionsService.route(request);
+      } else {
+        // Handle multiple segments
+        console.warn("Too many waypoints, breaking into segments");
         toast({
-          title: "Using default location",
-          description: "Using your last known location for route calculation",
-          variant: "default"
-        });
-        // Fall back to the stored user location
-        calculateRouteWithLocation(userLocation);
-      },
-      { 
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-  };
-  
-  // Helper function to calculate route with a specific location
-  const calculateRouteWithLocation = (currentLocation) => {
-    const directionsService = new window.google.maps.DirectionsService();
-    
-    if (!directionsRendererRef.current) {
-      directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-        suppressMarkers: true, // Use our custom markers instead
-        polylineOptions: {
-          strokeColor: "#4285F4",
-          strokeWeight: 5,
-          strokeOpacity: 0.8
-        }
-      });
-    }
-    
-    directionsRendererRef.current.setMap(googleMapRef.current);
-    
-    // Filter tasks that have valid coordinates
-    const validTasks = locationTasks.filter(task => 
-      task.coordinates && task.coordinates.lat && task.coordinates.lng
-    );
-    
-    if (validTasks.length === 0) {
-      // Silent fail instead of showing notification
-      console.log("No valid locations: Tasks don't have valid coordinates");
-      return;
-    }
-
-    console.log("Valid tasks for route:", validTasks.map(t => ({
-      title: t.title,
-      lat: t.coordinates?.lat, 
-      lng: t.coordinates?.lng
-    })));
-    
-    // Start from user's current location - using the fresh coordinates
-    const origin = new window.google.maps.LatLng(currentLocation.lat, currentLocation.lng);
-    console.log("Route origin:", origin.toString());
-    
-    // All tasks are waypoints for optimization
-    const waypoints = validTasks.map(task => {
-      const lat = task.coordinates?.lat || 0;
-      const lng = task.coordinates?.lng || 0;
-      
-      // Skip invalid coordinates (0,0 or near it)
-      if (Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001) {
-        console.log(`Skipping invalid coordinates for task ${task.title}: near (0,0)`);
-        return null;
-      }
-      
-      return {
-        location: new window.google.maps.LatLng(lat, lng),
-        stopover: true
-      };
-    }).filter(wp => wp !== null); // Remove any null waypoints
-    
-    if (waypoints.length === 0) {
-      toast({
-        title: "Cannot calculate route",
-        description: "No valid task locations found",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    console.log("Route waypoints:", waypoints.map(wp => wp.location.toString()));
-    
-    // Return to starting point (round trip)
-    const destination = origin;
-    console.log("Route destination:", destination.toString());
-    
-    // Request for optimal route
-    directionsService.route(
-      {
-        origin: origin,
-        destination: destination,
-        waypoints: waypoints,
-        optimizeWaypoints: true, // This is what makes the route optimal!
-        travelMode: window.google.maps.TravelMode.DRIVING
-      },
-      (result, status) => {
-        if (status === window.google.maps.DirectionsStatus.OK) {
-          // Ensure the renderer is initialized before using it
-          if (!directionsRendererRef.current) {
-            console.log("Creating new DirectionsRenderer");
-            directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-              suppressMarkers: true,
-              polylineOptions: {
-                strokeColor: "#4285F4",
-                strokeWeight: 5,
-                strokeOpacity: 0.8
-              }
-            });
-            directionsRendererRef.current.setMap(googleMapRef.current);
-          }
-          
-          // Now it's safe to set directions
-          directionsRendererRef.current.setDirections(result);
-          
-          // Process the optimized route
-          const route = result.routes[0];
-          
-          // Get the order of waypoints from the optimized route
-          const waypointOrder = result.routes?.[0]?.waypoint_order || [];
-          
-          // Create a sorted array of tasks based on the optimized route
-          const sortedTasks = [];
-          
-          // Add all waypoints in the optimized order
-          if (route && route.legs && waypointOrder) {
-            waypointOrder.forEach((waypointIndex, i) => {
-              // Make sure the waypointIndex is valid
-              if (validTasks[waypointIndex] && route.legs[i]) {
-                const task = validTasks[waypointIndex];
-                const leg = route.legs[i];
-                
-                // Convert distance to miles (Google returns in meters)
-                const distanceInMiles = (leg.distance?.value * 0.000621371 || 0).toFixed(1);
-                
-                sortedTasks.push({
-                  task: task,
-                  distance: `${distanceInMiles} miles`,
-                  duration: leg.duration?.text || "Unknown",
-                  legIndex: i
-                });
-              }
-            });
-          }
-          
-          // Update state
-          setSortedRouteLocations(sortedTasks);
-          setIsRoutePlanned(true);
-          
-          // Success message removed to reduce notifications
-          console.log(`Optimal route calculated! Total distance: ${(route.legs.reduce((total, leg) => total + leg.distance.value, 0) * 0.000621371).toFixed(1)} miles`);
-        } else {
-          console.error("Error calculating route:", status);
-          // Provide more specific error messages based on the status
-          let errorMessage = "Could not calculate route. Please try again.";
-          
-          if (status === window.google.maps.DirectionsStatus.ZERO_RESULTS) {
-            errorMessage = "No route found between these locations. Try locations that are closer together.";
-          } else if (status === window.google.maps.DirectionsStatus.NOT_FOUND) {
-            errorMessage = "One or more locations could not be found. Please check your task addresses.";
-          } else if (status === window.google.maps.DirectionsStatus.MAX_WAYPOINTS_EXCEEDED) {
-            errorMessage = "Too many stops in your route. Please reduce the number of tasks.";
-          } else if (status === window.google.maps.DirectionsStatus.INVALID_REQUEST) {
-            errorMessage = "Invalid route request. Make sure all locations have valid coordinates.";
-          }
-
-          // Clear any existing directions
-          if (directionsRendererRef.current) {
-            directionsRendererRef.current.setMap(null);
-            directionsRendererRef.current = null;
-          }
-          
-          // Reset the route planning state
-          setIsRoutePlanned(false);
-          setSortedRouteLocations([]);
-          
-          toast({
-            title: "Route calculation failed",
-            description: errorMessage,
-            variant: "destructive"
-          });
-        }
-      }
-    );
-  };
-
-  // Clear the calculated route
-  const clearRoute = () => {
-    if (directionsRendererRef.current) {
-      directionsRendererRef.current.setMap(null);
-      directionsRendererRef.current = null;
-    }
-    setSortedRouteLocations([]);
-    setIsRoutePlanned(false);
-  };
-
-  // Function to handle showing route
-  const handleShowRoute = useCallback(() => {
-    // Toggle route planning state
-    const newRoutePlannedState = !isRoutePlanned;
-    setIsRoutePlanned(newRoutePlannedState);
-    
-    // Calculate optimal route if turning on, or clear if turning off
-    if (newRoutePlannedState) {
-      calculateOptimalRoute();
-    } else {
-      clearRoute();
-      setSortedRouteLocations([]);
-    }
-  }, [isRoutePlanned, calculateOptimalRoute, clearRoute]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!searchQuery.trim()) return;
-    
-    setIsSearching(true);
-    
-    // If we have a place from autocomplete, use that directly
-    if (autocompleteSelectedPlace) {
-      handleAddTaskAtLocation(autocompleteSelectedPlace);
-      setAutocompleteSelectedPlace(null);
-      setIsSearching(false);
-      return;
-    }
-    
-    // Otherwise, perform a search with the Places API
-    if (window.google && window.google.maps && window.google.maps.places) {
-      try {
-        // Create a PlacesService if we don't have one yet
-        if (!placesServiceRef.current && googleMapRef.current) {
-          placesServiceRef.current = new window.google.maps.places.PlacesService(googleMapRef.current);
-        }
-        
-        if (placesServiceRef.current) {
-          placesServiceRef.current.findPlaceFromQuery({
-            query: searchQuery,
-            fields: ['name', 'geometry', 'formatted_address']
-          }, (results, status) => {
-            setIsSearching(false);
-            
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-              const place = results[0];
-              handleAddTaskAtLocation(place);
-            } else {
-              toast({
-                title: "Location not found",
-                description: "Please try a different search term",
-                variant: "destructive"
-              });
-            }
-          });
-        } else {
-          setIsSearching(false);
-          toast({
-            title: "Search unavailable",
-            description: "Places service could not be initialized",
-            variant: "destructive"
-          });
-        }
-      } catch (error) {
-        console.error("Error searching for place:", error);
-        setIsSearching(false);
-        toast({
-          title: "Error searching",
-          description: "An error occurred while searching for the location",
+          title: "Route optimization limited",
+          description: "Due to API limits, the route may not be fully optimized",
           variant: "destructive"
         });
+        
+        // Simplified handling for many waypoints - not ideal but works
+        const request = {
+          origin: userLatLng,
+          destination: routePreferences.returnToStart ? userLatLng : waypoints[waypoints.length - 1].location,
+          waypoints: waypoints.slice(0, MAX_WAYPOINTS),
+          optimizeWaypoints: false, // We've already optimized by distance
+          travelMode: window.google.maps.TravelMode[routePreferences.transportMode],
+          avoidHighways: routePreferences.avoidHighways,
+          avoidTolls: routePreferences.avoidTolls
+        };
+        
+        finalRoute = await directionsService.route(request);
       }
-    } else {
-      setIsSearching(false);
+      
+      // Set directions
+      renderer.setDirections(finalRoute);
+      
+      // Process result to create OptimizedRoute object with correct units
+      const route = finalRoute.routes[0];
+      const legs = route.legs;
+      
+      // Calculate total distance and duration
+      let totalDistance = 0;
+      let totalDuration = 0;
+      const segments: OptimizedRoute['segments'] = [];
+      
+      // Process each leg of the route
+      let prevLocation = "Your Location"; // Starting point name
+      let formattedSegments = [];
+      
+      for (let i = 0; i < legs.length; i++) {
+        const leg = legs[i];
+        totalDistance += leg.distance?.value || 0;
+        totalDuration += leg.duration?.value || 0;
+        
+        const distanceInMiles = leg.distance ? 
+          `${(leg.distance.value / 1609.34).toFixed(1)} mi` : 
+          "Unknown";
+        
+        // Get the destination for this leg
+        const destinationTask = i < locationsWithDistances.length ? locationsWithDistances[i].task : null;
+        const destinationName = destinationTask ? destinationTask.title : 
+          (i === legs.length - 1 && routePreferences.returnToStart ? "Your Location" : "Unknown");
+        
+        // Create a segment (if not the last leg returning to start)
+        if (!(i === legs.length - 1 && routePreferences.returnToStart)) {
+          formattedSegments.push({
+            startLocation: {
+              lat: leg.start_location.lat(),
+              lng: leg.start_location.lng()
+            },
+            endLocation: {
+              lat: leg.end_location.lat(),
+              lng: leg.end_location.lng()
+            },
+            distance: distanceInMiles,
+            duration: leg.duration?.text || "Unknown",
+            priority: destinationTask ? destinationTask.priority : "medium",
+            taskName: destinationName,
+            fromLocation: prevLocation
+          });
+        }
+        
+        // Update previous location for next segment
+        prevLocation = destinationName;
+      }
+      
+      // Create optimal route with the data
+      const optimizedWaypoints = locationsWithDistances.map(loc => ({
+        location: {
+          lat: loc.task.coordinates.lat,
+          lng: loc.task.coordinates.lng
+        },
+        stopover: true
+      }));
+      
+      // Set optimized route state
+      setOptimizedRoute({
+        waypoints: optimizedWaypoints,
+        totalDistance,
+        totalDuration,
+        segments: formattedSegments
+      });
+      
+      // Show success toast
       toast({
-        title: "Search unavailable",
-        description: "Google Places API is not available",
+        title: "Route optimized",
+        description: `Total trip: ${(totalDistance / 1609.34).toFixed(1)} mi (${Math.round(totalDuration / 60)} min)`
+      });
+    } catch (error) {
+      console.error('Error showing optimized route:', error);
+      toast({
+        title: "Route optimization failed",
+        description: "Could not calculate optimal route. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
+  };
+  
+  // Clear route
+  const clearRoute = () => {
+    if (directionsRenderer) {
+      directionsRenderer.setDirections({ routes: [] } as any);
+    }
+    setOptimizedRoute(null);
+  };
+  
+  // Handle route preferences change
+  const handleRoutePreferencesChange = (newPreferences: RoutePreferences) => {
+    setRoutePreferences(newPreferences);
+  };
+  
+  // Get color based on task priority
+  const getPriorityColor = (priority: string): string => {
+    switch (priority) {
+      case 'high': return '#EF4444';   // Red
+      case 'medium': return '#F59E0B'; // Amber
+      case 'low': return '#10B981';    // Green
+      default: return '#6B7280';       // Gray
+    }
+  };
+  
+  // Handle task form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    
+    // If the location field changed, clear coordinates
+    if (name === 'location') {
+      handleLocationInputChange(e as React.ChangeEvent<HTMLInputElement>);
+      return;
+    }
+    
+    setNewTask(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Handle priority change
+  const handlePriorityChange = (value: string) => {
+    setNewTask(prev => ({
+      ...prev,
+      priority: value as "low" | "medium" | "high"
+    }));
+  };
+  
+  // Handle date change
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      setNewTask(prev => ({
+        ...prev,
+        dueDate: date
+      }));
+    }
+  };
+  
+  // Geocode location to get coordinates
+  const geocodeLocation = async (address: string): Promise<{ lat: number, lng: number } | null> => {
+    if (!window.google || !window.google.maps) {
+      console.error("Google Maps not initialized for geocoding");
+      return null;
+    }
+    
+    // Initialize geocoder if not already done
+    if (!geocoderRef.current) {
+      geocoderRef.current = new window.google.maps.Geocoder();
+    }
+    
+    try {
+      console.log("Geocoding address:", address);
+      return new Promise((resolve, reject) => {
+        geocoderRef.current?.geocode(
+          { address },
+          (results, status) => {
+            if (status === window.google.maps.GeocoderStatus.OK && results && results.length > 0) {
+              const location = results[0].geometry.location;
+              const coordinates = {
+                lat: location.lat(),
+                lng: location.lng()
+              };
+              console.log("Geocoded coordinates:", coordinates);
+              resolve(coordinates);
+            } else {
+              console.error("Geocoding failed:", status);
+              resolve(null);
+            }
+          }
+        );
+      });
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      return null;
+    }
+  };
+  
+  // Handle task submit
+  const handleSubmitTask = async () => {
+    if (!newTask.title.trim()) {
+      toast({
+        title: "Missing title",
+        description: "Please enter a task title",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!newTask.location.trim()) {
+      toast({
+        title: "Missing location",
+        description: "Please enter a task location",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // If we don't have coordinates yet, try to geocode the location
+      let coordinates = newTask.coordinates;
+      if (!coordinates) {
+        console.log("Geocoding location:", newTask.location);
+        coordinates = await geocodeLocation(newTask.location);
+        
+        if (!coordinates) {
+          toast({
+            title: "Location error",
+            description: "Could not find coordinates for this location",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      
+      console.log("Creating task with coordinates:", coordinates);
+      
+      // Create new task
+      const task = {
+        id: Date.now().toString(),
+        title: newTask.title,
+        description: newTask.description,
+        location: newTask.location,
+        dueDate: newTask.dueDate.toISOString(),
+        priority: newTask.priority,
+        coordinates: coordinates,
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+      
+      // Add task to context
+      addTask(task);
+      
+      // Reset form and close dialog
+      setNewTask({
+        title: "",
+        description: "",
+        location: "",
+        dueDate: new Date(),
+        priority: "medium",
+        coordinates: null
+      });
+      
+      setShowAddTaskDialog(false);
+      
+      // Clear any existing route
+      if (directionsRenderer) {
+        directionsRenderer.setDirections({ routes: [] } as any);
+      }
+      setOptimizedRoute(null);
+      
+      toast({
+        title: "Task added",
+        description: "Your new task has been added to the map"
+      });
+      
+      // Refresh map markers
+      setTimeout(() => {
+        addTaskMarkers(); // Add a slight delay to ensure the context has updated
+      }, 100);
+      
+    } catch (error) {
+      console.error("Error adding task:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add task. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add a function to open Google Maps with all waypoints
+  const openInGoogleMaps = () => {
+    if (!location || !optimizedRoute) return;
+    
+    // Start building the Google Maps URL without specifying origin
+    // This will use the device's current location automatically
+    let url = `https://www.google.com/maps/dir/?api=1`;
+    
+    // Add destination (either last waypoint or back to origin)
+    if (routePreferences.returnToStart) {
+      // If returning to start, use current coordinates as destination
+      url += `&destination=${location.lat},${location.lng}`;
+    } else if (optimizedRoute.waypoints.length > 0) {
+      // Otherwise use the last waypoint
+      const lastWaypoint = optimizedRoute.waypoints[optimizedRoute.waypoints.length - 1];
+      url += `&destination=${lastWaypoint.location.lat},${lastWaypoint.location.lng}`;
+    }
+    
+    // Add waypoints if any
+    if (optimizedRoute.waypoints.length > 0) {
+      // Google Maps API only allows 9 waypoints in the URL
+      const maxWaypoints = Math.min(optimizedRoute.waypoints.length, 9);
+      const waypointsParam = optimizedRoute.waypoints
+        .slice(0, routePreferences.returnToStart ? maxWaypoints : maxWaypoints - 1)
+        .map(wp => `${wp.location.lat},${wp.location.lng}`)
+        .join('|');
+      
+      if (waypointsParam) {
+        url += `&waypoints=${waypointsParam}`;
+      }
+    }
+    
+    // Add travel mode
+    url += `&travelmode=${routePreferences.transportMode.toLowerCase()}`;
+    
+    // Open the URL in a new tab
+    window.open(url, '_blank');
   };
 
   return (
-    <div className="pb-20 pt-6 px-4 max-w-md mx-auto">
-      <header className="mb-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">Tasks Map</h1>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="flex items-center gap-2 premium-card hover:shadow-md"
-          onClick={toggleViewMode}
-        >
-          {viewMode === 'map' ? (
-            <>
-              <List className="h-4 w-4 text-gloop-primary" />
-              <span>List View</span>
-            </>
-          ) : (
-            <>
-              <MapIcon className="h-4 w-4 text-gloop-primary" />
-              <span>Map View</span>
-            </>
-          )}
-        </Button>
+    <div className="pb-20">
+      {/* Page header */}
+      <header className="px-4 pt-6 pb-4 bg-white dark:bg-gloop-dark-surface border-b border-gloop-outline dark:border-gloop-dark-outline">
+        <h1 className="text-2xl font-semibold">Map</h1>
+        <p className="text-sm text-gloop-text-muted dark:text-gloop-dark-text-muted">
+          Find nearby tasks and locations
+        </p>
       </header>
-
-      {viewMode === 'map' && (
-        <form onSubmit={handleSearchSubmit} className="mb-4 relative">
-          <Input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search for a location or business..."
-            className="pr-10"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              // Clear the selected place when the user types
-              if (autocompleteSelectedPlace) {
-                setAutocompleteSelectedPlace(null);
-              }
-            }}
-          />
-          <Button 
-            type="submit" 
-            size="sm" 
-            variant="ghost" 
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-            disabled={isSearching}
-          >
-            {isSearching ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gloop-primary border-t-transparent" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
-      )}
-
-      <div className="mb-4">
-        <Button 
-          variant={isRoutePlanned ? "default" : "outline"}
-          className={`flex items-center gap-2 w-full ${isRoutePlanned ? "premium-gradient-btn" : "premium-card"}`}
-          onClick={handleShowRoute}
-          disabled={locationTasks.length < 1}
-        >
-          <Navigation className="h-4 w-4" />
-          {isRoutePlanned ? "Hide Optimal Route" : "Show Optimal Route"}
-        </Button>
-        
-        {/* Simple Optimal Route List */}
-        {isRoutePlanned && sortedRouteLocations.length > 0 && (
-          <div className="mt-3 bg-white dark:bg-gloop-dark-surface rounded-lg shadow p-3">
-            <h3 className="text-sm font-medium mb-2">Optimal Route Order:</h3>
-            <ol className="list-decimal pl-5 space-y-1">
-              {sortedRouteLocations.map((item) => (
-                <li key={item.task.id} className="text-sm cursor-pointer hover:text-gloop-primary" onClick={() => setSelectedTaskId(item.task.id)}>
-                  {item.task.title} <span className="text-xs text-gloop-text-muted">({item.distance})</span>
-                </li>
-              ))}
-            </ol>
+      
+      <main className="p-4 space-y-6">
+        {loading && !googleMapRef.current ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gloop-primary"></div>
           </div>
-        )}
-      </div>
-
-      {viewMode === 'map' && (
-        <div className="mb-4">
-          <Card className="premium-card overflow-hidden">
-            <CardHeader className="p-3 pb-0">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-gloop-primary" />
-                Location Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-2">
-              {locationTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No tasks with locations yet</p>
-              ) : (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {locationTasks.map(task => (
-                    <div 
-                      key={task.id} 
-                      className="flex items-start gap-2 p-2 rounded-md hover:bg-accent cursor-pointer"
-                      onClick={() => {
-                        setSelectedTaskId(task.id);
-                        if (googleMapRef.current && task.coordinates?.lat && task.coordinates?.lng) {
-                          googleMapRef.current.panTo(task.coordinates);
-                          googleMapRef.current.setZoom(15);
-                        }
-                      }}
-                    >
-                      <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                        task.priority === 'high' ? 'bg-red-500' : 
-                        task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                      }`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{task.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{getLocationString(task.location)}</p>
-                      </div>
-                      <div className="text-xs text-muted-foreground whitespace-nowrap">
-                        {task.dueDate && task.dueDate.trim() !== '' ? 
-                          format(new Date(task.dueDate), 'MMM d') : 
-                          'No date'
-                        }
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+        ) : error ? (
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-red-500">{error}</p>
             </CardContent>
           </Card>
-        </div>
-      )}
+        ) : (
+          <div className="grid gap-4">
+            <div className="flex flex-wrap gap-2 mb-2">
+              <Button 
+                onClick={() => setShowRoutePreferences(true)}
+                variant="outline" 
+                className="flex items-center"
+              >
+                <Route className="mr-2 h-4 w-4" />
+                Route Preferences
+              </Button>
+              
+              <Button 
+                onClick={showOptimizedRoute}
+                variant={optimizedRoute ? "default" : "outline"}
+                className="flex items-center"
+                disabled={tasks.filter(t => t.coordinates).length < 1 || loading}
+              >
+                {loading ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    <Navigation className="mr-2 h-4 w-4" />
+                    {optimizedRoute ? "Update Route" : "Show Optimized Route"}
+                  </>
+                )}
+              </Button>
 
-      {viewMode === 'map' ? (
-        <div className="relative">
-          {isLoadingLocation && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-black/80 rounded-lg">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gloop-primary mx-auto mb-2"></div>
-                <p>Getting your location...</p>
-              </div>
+              {optimizedRoute && (
+                <Button 
+                  onClick={clearRoute}
+                  variant="outline"
+                  className="flex items-center"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clear Route
+                </Button>
+              )}
             </div>
-          )}
-          <div 
-            ref={mapRef} 
-            className="h-[500px] w-full rounded-lg overflow-hidden shadow-md"
-            style={{ minHeight: "500px", background: "#f0f0f0" }}
-          >
-            {/* Google Map will be rendered here */}
-            {!googleMapRef.current && !isLoadingLocation && (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center p-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gloop-primary mx-auto mb-2"></div>
-                  <p>Loading map...</p>
-                  <p className="text-xs mt-2 text-gray-500">If the map doesn't appear, please try refreshing the page.</p>
+            
+            <Card className="overflow-hidden">
+              <CardHeader>
+                <CardTitle>Tasks Map</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 relative">
+                <div ref={mapRef} className="h-[500px] w-full">
+                  {/* Google Map will be rendered here */}
                 </div>
-              </div>
-            )}
-          </div>
-          
-          {locationError && (
-            <div className="absolute bottom-4 left-4 right-4 bg-red-100 dark:bg-red-900/50 p-2 rounded-md text-sm text-red-700 dark:text-red-200">
-              {locationError}
-            </div>
-          )}
-          {/* Selected task info */}
-          {selectedTaskId && (
-            <motion.div 
-              className="absolute bottom-4 left-4 right-4 glass-effect p-4 rounded-lg shadow-lg"
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-            >
-              {(() => {
-                const task = locationTasks.find(t => t.id === selectedTaskId);
-                return task ? (
-                  <div className="relative">
-                    <button
-                      className="absolute top-0 right-0 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                      onClick={() => setSelectedTaskId(null)}
-                      aria-label="Close"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                    <h3 className="font-medium pr-6">{task.title}</h3>
-                    <p className="text-sm text-gloop-text-muted flex items-center">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {getLocationString(task.location)}
-                    </p>
-                    <div className="flex justify-between items-center mt-2">
-                      <p className="text-xs text-gloop-text-muted flex items-center">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Due: {task.dueDate && task.dueDate.trim() !== '' ? format(new Date(task.dueDate), 'MMM d') : 'No date'}
-                      </p>
-                      <Button 
-                        size="sm" 
-                        className="text-xs premium-gradient-btn"
-                        onClick={() => {
-                          // Open Google Maps directions
-                          const url = `https://www.google.com/maps/dir/?api=1&destination=${task.coordinates?.lat || 0},${task.coordinates?.lng || 0}`;
-                          window.open(url, '_blank');
-                        }}
-                      >
-                        Get Directions
-                      </Button>
+                {loading && (
+                  <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-md shadow-lg flex items-center space-x-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                      <span>Loading map...</span>
                     </div>
                   </div>
-                ) : null;
-              })()}
-            </motion.div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {locationTasks.map((task) => (
-            <motion.div 
-              key={task.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="hover-lift"
-            >
-              <Card 
-                className={`hover:shadow-md transition-shadow cursor-pointer premium-card border-l-4 ${
-                  task.priority === 'high' ? 'priority-high' : 
-                  task.priority === 'medium' ? 'priority-medium' : 'priority-low'
-                }`}
-                onClick={() => handleTaskClick(task.id)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-medium">{task.title}</h3>
-                      <div className="flex items-center gap-1 mt-1">
-                        <MapPin className="h-3 w-3 text-gloop-text-muted" />
-                        <p className="text-sm text-gloop-text-muted">
-                          {getLocationString(task.location)}
-                        </p>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Route info */}
+            {optimizedRoute && (
+              <Card className="overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
+                  <CardTitle>Optimized Route</CardTitle>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="flex items-center"
+                    onClick={openInGoogleMaps}
+                  >
+                    <MapIcon className="mr-2 h-4 w-4" />
+                    Open in Google Maps
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {/* Map visualization of the route is already shown in the main map */}
+                  
+                  {/* List of stops */}
+                  <div className="p-4 divide-y">
+                    {optimizedRoute.segments.map((segment, index) => (
+                      <div key={index} className="py-4 first:pt-0 flex items-center">
+                        <div className="h-10 w-10 rounded-full flex items-center justify-center mr-4 flex-shrink-0"
+                             style={{ 
+                               backgroundColor: getPriorityColor(segment.priority),
+                               opacity: 0.9 
+                            }}>
+                          <ShoppingCart className="h-5 w-5 text-white" />
+                        </div>
+                        
+                        <div className="flex-grow">
+                          <div className="font-medium">{segment.taskName}</div>
+                          <div className="text-sm text-gray-500">
+                            {segment.duration} • {segment.distance}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xs text-gloop-text-muted mt-1 flex items-center">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Due: {task.dueDate && task.dueDate.trim() !== '' ? format(new Date(task.dueDate), 'MMM d') : 'No date'}
-                      </p>
+                    ))}
+                    
+                    {/* Summary footer */}
+                    <div className="pt-4 pb-2">
+                      <div className="flex justify-between items-center">
+                        <div className="font-medium">Total trip:</div>
+                        <div className="text-sm text-gray-500">
+                          {Math.round(optimizedRoute.totalDuration / 60)} mins • {(optimizedRoute.totalDistance / 1609.34).toFixed(1)} mi
+                        </div>
+                      </div>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="h-8 w-8 p-0 rounded-full hover:bg-gloop-primary/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTaskClick(task.id);
-                      }}
-                    >
-                      <MapIcon className="h-4 w-4 text-gloop-primary" />
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      <FloatingActionButton onClick={() => setCreateTaskModalOpen(true)} />
+            )}
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Nearby Tasks</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tasks.filter(task => task.coordinates).length > 0 ? (
+                  <div className="space-y-2">
+                    {tasks.filter(task => task.coordinates).map(task => (
+                      <div 
+                        key={task.id} 
+                        className="p-3 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                        onClick={() => {
+                          if (task.coordinates && googleMapRef.current) {
+                            googleMapRef.current.panTo({ lat: task.coordinates.lat, lng: task.coordinates.lng });
+                            googleMapRef.current.setZoom(15);
+                            
+                            // Find and click the corresponding marker
+                            const marker = markersRef.current.find(
+                              m => m.getPosition()?.lat() === task.coordinates.lat && 
+                                  m.getPosition()?.lng() === task.coordinates.lng
+                            );
+                            
+                            if (marker) {
+                              window.google.maps.event.trigger(marker, 'click');
+                            }
+                          }
+                        }}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">{task.title}</div>
+                            <div className="text-sm text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                              {task.location} • {format(new Date(task.dueDate), 'MMM d')}
+                            </div>
+                          </div>
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{
+                              backgroundColor: getPriorityColor(task.priority)
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-4 text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                    No tasks with locations found
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </main>
       
-      <CreateTaskModal
-        isOpen={isCreateTaskModalOpen}
-        onClose={() => setCreateTaskModalOpen(false)}
-        onSubmit={handleCreateTask}
-      />
-
+      {/* Floating Action Button - Add Task */}
+      <Button
+        onClick={() => setShowAddTaskDialog(true)}
+        size="lg"
+        className="fixed z-50 bottom-24 right-6 h-16 w-16 rounded-full shadow-2xl bg-primary hover:bg-primary/90 flex items-center justify-center"
+        style={{ 
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+          zIndex: 9999
+        }}
+      >
+        <Plus size={32} />
+      </Button>
+      
+      {/* Bottom navigation */}
       <NavBar />
+      
+      {/* Route Preferences Dialog */}
+      <Dialog open={showRoutePreferences} onOpenChange={setShowRoutePreferences}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Route Preferences</DialogTitle>
+            <DialogDescription>
+              Customize how your route is calculated
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Avoid Highways</label>
+              <input 
+                type="checkbox" 
+                checked={routePreferences.avoidHighways} 
+                onChange={e => setRoutePreferences({...routePreferences, avoidHighways: e.target.checked})}
+                className="h-4 w-4"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Avoid Tolls</label>
+              <input 
+                type="checkbox" 
+                checked={routePreferences.avoidTolls} 
+                onChange={e => setRoutePreferences({...routePreferences, avoidTolls: e.target.checked})}
+                className="h-4 w-4"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Return to Start</label>
+              <input 
+                type="checkbox" 
+                checked={routePreferences.returnToStart} 
+                onChange={e => setRoutePreferences({...routePreferences, returnToStart: e.target.checked})}
+                className="h-4 w-4"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Consider Traffic</label>
+              <input 
+                type="checkbox" 
+                checked={routePreferences.considerTraffic} 
+                onChange={e => setRoutePreferences({...routePreferences, considerTraffic: e.target.checked})}
+                className="h-4 w-4"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Transport Mode</label>
+              <select
+                value={routePreferences.transportMode}
+                onChange={e => setRoutePreferences({...routePreferences, transportMode: e.target.value as any})}
+                className="p-2 border rounded"
+              >
+                <option value="DRIVING">Driving</option>
+                <option value="WALKING">Walking</option>
+                <option value="BICYCLING">Bicycling</option>
+                <option value="TRANSIT">Transit</option>
+              </select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setShowRoutePreferences(false)}>
+              Save Preferences
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Add Task Dialog */}
+      <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Task</DialogTitle>
+            <DialogDescription>
+              Create a new task with location to add to your map.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                name="title"
+                placeholder="Task title"
+                value={newTask.title}
+                onChange={handleInputChange}
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                placeholder="Task description"
+                value={newTask.description}
+                onChange={handleInputChange}
+              />
+            </div>
+            
+            <div className="grid gap-2 relative">
+              <Label htmlFor="location">Location</Label>
+              <div className="relative">
+                <Input
+                  id="location"
+                  name="location"
+                  placeholder="Search for a place (e.g. Menards, Central Park)"
+                  value={newTask.location}
+                  onChange={handleInputChange}
+                  className="pr-10"
+                />
+                <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              </div>
+              
+              {/* Place search results dropdown */}
+              {showPlacesDropdown && (
+                <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-md max-h-60 overflow-y-auto">
+                  {searchingPlaces ? (
+                    <div className="p-2 text-center text-sm text-gray-500">
+                      Searching...
+                    </div>
+                  ) : placeSearchResults.length > 0 ? (
+                    <ul className="py-1">
+                      {placeSearchResults.map((place, i) => (
+                        <li 
+                          key={place.place_id} 
+                          className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
+                          onClick={() => handlePlaceSelect(place.place_id, place.description)}
+                        >
+                          <div className="flex items-start">
+                            <MapPin className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                            <span>{place.description}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : newTask.location.length >= 3 ? (
+                    <div className="p-2 text-center text-sm text-gray-500">
+                      No places found
+                    </div>
+                  ) : (
+                    <div className="p-2 text-center text-sm text-gray-500">
+                      Type at least 3 characters to search
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(newTask.dueDate, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={newTask.dueDate}
+                    onSelect={handleDateChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select onValueChange={handlePriorityChange} defaultValue={newTask.priority}>
+                <SelectTrigger id="priority">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setShowAddTaskDialog(false)} variant="outline">
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitTask} disabled={loading}>
+              {loading ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                  Adding...
+                </>
+              ) : (
+                "Add Task"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-export default MapPage;
+export default MapPage; 

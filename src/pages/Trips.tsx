@@ -17,6 +17,7 @@ import EditTripModal from "@/components/EditTripModal";
 import TripCalendarView from '@/components/TripCalendarView';
 import TripMapView from '@/components/TripMapView';
 import { useTaskContext, Trip as ContextTrip } from "@/context/TaskContext";
+import { useNavigate } from "react-router-dom";
 
 const TripsPage = () => {
   // Use the shared context for trips and tasks
@@ -27,6 +28,8 @@ const TripsPage = () => {
     deleteTrip: deleteContextTrip, 
     syncTasksWithTrips 
   } = useTaskContext();
+  
+  const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState("active");
   const [isTripModalOpen, setTripModalOpen] = useState(false);
@@ -111,11 +114,6 @@ const TripsPage = () => {
     // Add trip to context
     addContextTrip(newTrip);
     
-    toast({
-      title: "Trip created!",
-      description: `Your trip to ${data.store} has been created.`,
-    });
-    
     setTripModalOpen(false);
   };
   
@@ -136,10 +134,13 @@ const TripsPage = () => {
       items: [...trip.items, newItem]
     });
     
-    toast({
-      title: "Item added",
-      description: `${item.name} added to your trip to ${trip.store}.`,
-    });
+    // Update the selectedTrip if it's the same trip
+    if (selectedTrip && selectedTrip.id === tripId) {
+      setSelectedTrip({
+        ...selectedTrip,
+        items: [...selectedTrip.items, newItem]
+      });
+    }
   };
   
   // Remove an item from a trip
@@ -153,10 +154,13 @@ const TripsPage = () => {
       items: trip.items.filter(item => item.id !== itemId)
     });
     
-    toast({
-      title: "Item removed",
-      description: "The item has been removed from your trip.",
-    });
+    // Update the selectedTrip if it's the same trip
+    if (selectedTrip && selectedTrip.id === tripId) {
+      setSelectedTrip({
+        ...selectedTrip,
+        items: selectedTrip.items.filter(item => item.id !== itemId)
+      });
+    }
   };
   
   // Toggle an item's checked status
@@ -172,12 +176,13 @@ const TripsPage = () => {
       )
     });
     
-    // Find the item to show appropriate toast
-    const item = trip.items.find(i => i.id === itemId);
-    if (item) {
-      toast({
-        title: item.checked ? "Item unchecked" : "Item checked",
-        description: `${item.name} ${item.checked ? "unchecked" : "checked"}.`,
+    // Update the selectedTrip if it's the same trip
+    if (selectedTrip && selectedTrip.id === tripId) {
+      setSelectedTrip({
+        ...selectedTrip,
+        items: selectedTrip.items.map(item => 
+          item.id === itemId ? { ...item, checked: !item.checked } : item
+        )
       });
     }
   };
@@ -205,11 +210,6 @@ const TripsPage = () => {
       store: data.store,
       location: data.store,
       eta: data.eta
-    });
-    
-    toast({
-      title: "Trip updated",
-      description: `Your trip to ${data.store} has been updated.`,
     });
     
     // Update the selected trip if it's open
@@ -246,24 +246,28 @@ const TripsPage = () => {
       eta: 'Completed'
     });
     
-    toast({
-      title: "Trip completed",
-      description: `Your trip to ${trip.store} has been marked as completed.`,
+    // Close the detail modal if it's open
+    setTripDetailModalOpen(false);
+    
+    // Note: We don't need to manually update the local state here
+    // The useEffect that watches contextTrips will handle moving the trip
+    // from active to past when the context is updated
+  };
+  
+  // Reactivate a completed trip
+  const handleReactivateTrip = (tripId: string) => {
+    // Find the trip in context
+    const trip = contextTrips.find(t => t.id === tripId);
+    if (!trip) return;
+    
+    // Update the trip status back to open
+    updateContextTrip(tripId, {
+      status: 'open',
+      eta: 'Reactivated'
     });
     
     // Close the detail modal if it's open
     setTripDetailModalOpen(false);
-    
-    // Move the trip from active to past
-    const updatedTrip = contextTrips.find(t => t.id === tripId);
-    if (updatedTrip) {
-      setTrips(trips.filter(t => t.id !== tripId));
-      setPastTrips([...pastTrips, {
-        ...updatedTrip,
-        status: 'completed',
-        eta: 'Completed'
-      } as TripData]);
-    }
   };
   
   // Delete a trip
@@ -280,11 +284,6 @@ const TripsPage = () => {
     // Delete the trip from context
     deleteContextTrip(tripId);
     
-    toast({
-      title: "Trip deleted",
-      description: `Your trip to ${trip.store} has been deleted.`,
-    });
-    
     // Close any open modals
     setTripDetailModalOpen(false);
     setEditTripModalOpen(false);
@@ -297,20 +296,11 @@ const TripsPage = () => {
     if (!trip) return;
     
     // In a real app, this would open a share dialog
-    // For now, just show a toast
-    toast({
-      title: "Share trip",
-      description: `Sharing your trip to ${trip.store} (feature coming soon).`,
-    });
   };
   
   // Invite a participant to a trip
   const handleInviteParticipant = (tripId: string) => {
     // This would open an invite dialog in a real app
-    toast({
-      title: "Invite participant",
-      description: "This feature is coming soon!",
-    });
   };
   
   // Toggle search bar
@@ -323,13 +313,7 @@ const TripsPage = () => {
   
   // Filter trips
   const handleFilterTrips = () => {
-    toast({
-      title: "Filter trips",
-      description: "This feature is coming soon!",
-    });
-    
     // In a real app, this would open a filter dialog
-    // For now, just show a toast
   };
   
   // Show calendar view
@@ -351,63 +335,120 @@ const TripsPage = () => {
   // View trip calendar
   const handleViewTripCalendar = () => {
     setShowCalendarView(true);
-    setShowMapView(false);
   };
   
   // View trip map
   const handleViewTripMap = () => {
     setShowMapView(true);
-    setShowCalendarView(false);
+  };
+  
+  // Update an item's price
+  const handleUpdateItemPrice = (tripId: string, itemId: string, price: number) => {
+    // Find the trip in context
+    const trip = contextTrips.find(t => t.id === tripId);
+    if (!trip) return;
+    
+    // Update the item's price
+    updateContextTrip(tripId, {
+      items: trip.items.map(item => 
+        item.id === itemId ? { ...item, price: price } : item
+      )
+    });
+    
+    // Update the selectedTrip if it's the same trip
+    if (selectedTrip && selectedTrip.id === tripId) {
+      setSelectedTrip({
+        ...selectedTrip,
+        items: selectedTrip.items.map(item => 
+          item.id === itemId ? { ...item, price: price } : item
+        )
+      });
+    }
+  };
+  
+  // Settle up with a participant
+  const handleSettleUp = (amount: number, toUserId: string, fromUserId: string) => {
+    // After settling up, navigate to the ledger page
+    navigate('/ledger');
+    
+    // Show a toast to let the user know their payment was recorded
+    toast({
+      title: "Payment recorded",
+      description: "Your payment has been recorded in the ledger."
+    });
   };
   
   // Trip settings
   const handleTripSettings = () => {
-    toast({
-      title: "Trip settings",
-      description: "This feature is coming soon!",
+    // In a real app, this would open a settings dialog
+  };
+  
+  // Update an item's unit
+  const handleItemUnitChange = (tripId: string, itemId: string, unit: string, newQuantity?: number) => {
+    // Find the trip in context
+    const trip = contextTrips.find(t => t.id === tripId);
+    if (!trip) return;
+    
+    // Update the trip with the unit change
+    updateContextTrip(tripId, {
+      items: trip.items.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            unit,
+            // If a new quantity is provided (from unit conversion), update it
+            ...(newQuantity !== undefined ? { quantity: newQuantity } : {})
+          };
+        }
+        return item;
+      })
     });
+    
+    // Update the selectedTrip if it's the same trip
+    if (selectedTrip && selectedTrip.id === tripId) {
+      setSelectedTrip({
+        ...selectedTrip,
+        items: selectedTrip.items.map(item => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              unit,
+              // If a new quantity is provided (from unit conversion), update it
+              ...(newQuantity !== undefined ? { quantity: newQuantity } : {})
+            };
+          }
+          return item;
+        })
+      });
+    }
   };
   
   return (
-    <div className="pb-20">
-      <div className="flex justify-between items-center p-4">
-        <h1 className="text-2xl font-bold">Trips</h1>
+    <div className="container mx-auto px-4 pb-20 pt-4 max-w-md">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">
+          Shopping Trips
+        </h1>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="icon"
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-8 w-8 p-0"
             onClick={toggleSearch}
-            className="rounded-full"
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleFilterTrips}
-            className="rounded-full"
-          >
-            <Filter className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="h-8 w-8 p-0"
             onClick={handleCalendarView}
-            className="rounded-full"
           >
-            <Calendar className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleMapView}
-            className="rounded-full"
-          >
-            <Map className="h-4 w-4" />
+            <Calendar className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
-      
+
       <AnimatePresence>
         {showSearch && (
           <motion.form
@@ -415,14 +456,14 @@ const TripsPage = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="px-4 mb-4"
+            className="mb-4"
             onSubmit={(e) => e.preventDefault()}
           >
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search trips..."
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 h-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
@@ -441,125 +482,109 @@ const TripsPage = () => {
           </motion.form>
         )}
       </AnimatePresence>
-      
+
       <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab}>
-        <div className="px-4">
-          <TabsList className="grid grid-cols-2 mb-4 w-full">
-            <TabsTrigger value="active" className="flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              Active
-              {trips.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {trips.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="past" className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4" />
-              Past
-              {pastTrips.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {pastTrips.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="grid grid-cols-2 mb-4 w-full premium-card">
+          <TabsTrigger value="active" className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            Active
+            {trips.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {trips.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="past" className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Past
+            {pastTrips.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {pastTrips.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
         
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, x: activeTab === "active" ? -20 : 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <TabsContent value="active" className="px-4">
-              <div className="space-y-3">
-                {filteredActiveTrips.length > 0 ? (
-                  filteredActiveTrips.map((trip) => (
-                    <motion.div
-                      key={trip.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="hover-lift"
-                    >
-                      <TripCard
-                        trip={{
-                          id: trip.id,
-                          store: trip.store,
-                          shopper: trip.shopper,
-                          eta: trip.eta,
-                          itemCount: trip.items.length,
-                          status: trip.status
-                        }}
-                        onClick={() => handleTripClick(trip)}
-                        onEdit={() => handleEditTrip(trip)}
-                        onAddItem={() => handleTripClick(trip)}
-                        onComplete={() => handleCompleteTrip(trip.id)}
-                        onDelete={() => handleDeleteTrip(trip.id)}
-                        onShare={() => handleShareTrip(trip.id)}
-                      />
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 border rounded-lg bg-white dark:bg-gloop-dark-surface premium-card">
-                    <p className="text-gloop-text-muted dark:text-gloop-dark-text-muted">
-                      {searchQuery ? "No matching trips found" : "No active trips"}
-                    </p>
-                    <p className="text-sm mt-2">Announce a trip to start shopping!</p>
+        <div className="px-4">
+          {activeTab === "active" && (
+            <div className="space-y-3">
+              {filteredActiveTrips.length > 0 ? (
+                filteredActiveTrips.map((trip) => (
+                  <div
+                    key={trip.id}
+                    className="hover-lift"
+                  >
+                    <TripCard
+                      trip={{
+                        id: trip.id,
+                        store: trip.store,
+                        shopper: trip.shopper,
+                        eta: trip.eta,
+                        itemCount: trip.items.length,
+                        status: trip.status
+                      }}
+                      onClick={() => handleTripClick(trip)}
+                      onEdit={() => handleEditTrip(trip)}
+                      onAddItem={() => handleTripClick(trip)}
+                      onComplete={() => handleCompleteTrip(trip.id)}
+                      onDelete={() => handleDeleteTrip(trip.id)}
+                      onShare={() => handleShareTrip(trip.id)}
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-white dark:bg-gloop-dark-surface premium-card">
+                  <p className="text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                    {searchQuery ? "No matching trips found" : "No active trips"}
+                  </p>
+                  <p className="text-sm mt-2">Announce a trip to start shopping!</p>
+                  <div className="flex flex-col gap-2 mt-2">
                     <Button 
-                      className="mt-2 premium-gradient-btn"
+                      className="premium-gradient-btn"
                       onClick={() => setTripModalOpen(true)}
                     >
                       Create a Trip
                     </Button>
                   </div>
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="past" className="px-4">
-              <div className="space-y-3">
-                {filteredPastTrips.length > 0 ? (
-                  filteredPastTrips.map((trip) => (
-                    <motion.div
-                      key={trip.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="hover-lift"
-                    >
-                      <TripCard
-                        trip={{
-                          id: trip.id,
-                          store: trip.store,
-                          shopper: trip.shopper,
-                          eta: trip.eta,
-                          itemCount: trip.items.length,
-                          status: trip.status
-                        }}
-                        onClick={() => handleTripClick(trip)}
-                        onEdit={() => handleEditTrip(trip)}
-                        onAddItem={() => handleTripClick(trip)}
-                        onComplete={() => handleCompleteTrip(trip.id)}
-                        onDelete={() => handleDeleteTrip(trip.id)}
-                        onShare={() => handleShareTrip(trip.id)}
-                      />
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 border rounded-lg bg-white dark:bg-gloop-dark-surface premium-card">
-                    <p className="text-gloop-text-muted dark:text-gloop-dark-text-muted">
-                      {searchQuery ? "No matching past trips found" : "No past trips yet"}
-                    </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {activeTab === "past" && (
+            <div className="space-y-3">
+              {filteredPastTrips.length > 0 ? (
+                filteredPastTrips.map((trip) => (
+                  <div
+                    key={trip.id}
+                    className="hover-lift"
+                  >
+                    <TripCard
+                      trip={{
+                        id: trip.id,
+                        store: trip.store,
+                        shopper: trip.shopper,
+                        eta: trip.eta,
+                        itemCount: trip.items.length,
+                        status: trip.status
+                      }}
+                      onClick={() => handleTripClick(trip)}
+                      onDelete={() => handleDeleteTrip(trip.id)}
+                      onShare={() => handleShareTrip(trip.id)}
+                      onReactivate={() => handleReactivateTrip(trip.id)}
+                    />
                   </div>
-                )}
-              </div>
-            </TabsContent>
-          </motion.div>
-        </AnimatePresence>
+                ))
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-white dark:bg-gloop-dark-surface premium-card">
+                  <p className="text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                    {searchQuery ? "No matching past trips found" : "No past trips yet"}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </Tabs>
 
       <QuickTripButton onCreateTrip={handleCreateTrip} />
@@ -579,6 +604,10 @@ const TripsPage = () => {
         onToggleItemCheck={handleToggleItemCheck}
         onInviteParticipant={handleInviteParticipant}
         onCompleteTrip={handleCompleteTrip}
+        onReactivateTrip={handleReactivateTrip}
+        onUpdateItemPrice={handleUpdateItemPrice}
+        onSettleUp={handleSettleUp}
+        onUpdateItemUnit={handleItemUnitChange}
       />
       
       <EditTripModal

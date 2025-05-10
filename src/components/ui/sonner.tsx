@@ -1,10 +1,24 @@
-import { useTheme } from "next-themes"
-import { Toaster as Sonner, toast } from "sonner"
+import { useState, useEffect } from "react";
+import { Toaster as Sonner, toast } from "sonner";
 
-type ToasterProps = React.ComponentProps<typeof Sonner>
+type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
+
+  // Detect theme based on document class or media query
+  useEffect(() => {
+    // Check if dark mode is enabled via HTML class
+    const isDarkMode = document.documentElement.classList.contains("dark");
+    // Or via system preference if no class is set
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    
+    if (isDarkMode || prefersDark) {
+      setTheme("dark");
+    } else {
+      setTheme("light");
+    }
+  }, []);
 
   return (
     <Sonner
@@ -23,7 +37,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       {...props}
     />
-  )
-}
+  );
+};
 
-export { Toaster, toast }
+export { Toaster, toast };
