@@ -61,12 +61,12 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
   }, [location.pathname, propActiveItem]);
 
   const navItems = [
-    { name: 'Home', path: '/home', icon: <Home className="w-5 h-5" /> },
-    { name: 'Map', path: '/map', icon: <Map className="w-5 h-5" /> },
-    { name: 'Trips', path: '/trips', icon: <ShoppingCart className="w-5 h-5" /> },
-    { name: 'Ledger', path: '/ledger', icon: <Wallet className="w-5 h-5" /> },
-    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { name: 'Profile', path: '/profile', icon: <User className="w-5 h-5" /> }
+    { name: 'Home', path: '/home', icon: <Home className="w-4 h-4 sm:w-5 sm:h-5" /> },
+    { name: 'Map', path: '/map', icon: <Map className="w-4 h-4 sm:w-5 sm:h-5" /> },
+    { name: 'Trips', path: '/trips', icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" /> },
+    { name: 'Ledger', path: '/ledger', icon: <Wallet className="w-4 h-4 sm:w-5 sm:h-5" /> },
+    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" /> },
+    { name: 'Profile', path: '/profile', icon: <User className="w-4 h-4 sm:w-5 sm:h-5" /> }
   ];
 
   // Handle notification actions
@@ -113,7 +113,7 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
         />
         <DarkModeToggle />
       </div>
-      <nav className="flex justify-between items-center max-w-md mx-auto px-2">
+      <nav className="flex justify-between items-center w-full max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl mx-auto px-1 sm:px-2">
         {navItems.map((item) => {
           const isActive = activeItem === item.path || 
                           activeItem === item.name.toLowerCase() ||
@@ -124,7 +124,7 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
               to={item.path} 
               onClick={() => setActiveItem(item.path)}
               className={cn(
-                "flex flex-col items-center py-2 px-1 transition-colors relative",
+                "flex flex-col items-center py-1.5 sm:py-2 px-0.5 sm:px-1 transition-colors relative",
                 isActive 
                   ? "text-gloop-primary dark:text-gloop-primary"
                   : "text-gloop-text-muted hover:text-gloop-text-main dark:text-gloop-dark-text-muted dark:hover:text-gloop-dark-text-main"
@@ -133,19 +133,19 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
               {isActive && (
                 <motion.div 
                   layoutId="activeTab"
-                  className="absolute -top-1 w-8 h-1 rounded-full bg-gloop-primary"
+                  className="absolute -top-1 w-6 sm:w-8 h-1 rounded-full bg-gloop-primary"
                   initial={false}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
               )}
               
               <div className={cn(
-                "p-1.5 rounded-full mb-1",
+                "p-1 sm:p-1.5 rounded-full mb-0.5 sm:mb-1",
                 isActive ? "bg-gloop-accent/80 dark:bg-gloop-dark-accent/80" : ""
               )}>
                 {item.icon}
               </div>
-              <span className="text-xs font-medium">{item.name}</span>
+              <span className="text-[10px] sm:text-xs font-medium">{item.name}</span>
             </Link>
           );
         })}

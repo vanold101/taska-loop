@@ -11,7 +11,7 @@ import { TripData } from "./TripDetailModal";
 type EditTripModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (tripId: string, data: { store: string; eta: string }) => void;
+  onUpdateTrip: (tripId: string, data: { store: string; eta: string }) => void;
   trip: TripData | null;
 };
 
@@ -26,7 +26,7 @@ const storeSuggestions = [
   "Aldi"
 ];
 
-const EditTripModal = ({ isOpen, onClose, onSubmit, trip }: EditTripModalProps) => {
+const EditTripModal = ({ isOpen, onClose, onUpdateTrip, trip }: EditTripModalProps) => {
   const { toast } = useToast();
   const [store, setStore] = useState("");
   const [eta, setEta] = useState("");
@@ -90,7 +90,7 @@ const EditTripModal = ({ isOpen, onClose, onSubmit, trip }: EditTripModalProps) 
       return;
     }
     
-    onSubmit(trip.id, { store, eta });
+    onUpdateTrip(trip.id, { store, eta });
   };
 
   const handleStoreInput = (e: React.ChangeEvent<HTMLInputElement>) => {

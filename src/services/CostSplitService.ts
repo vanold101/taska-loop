@@ -49,7 +49,8 @@ export const createEqualSplit = (
   itemId: string,
   participants: { id: string; name: string }[]
 ): ItemSplit => {
-  if (participants.length === 0) {
+  // Safety check: ensure participants is an array
+  if (!Array.isArray(participants) || participants.length === 0) {
     return {
       itemId,
       splitType: 'equal',
@@ -57,12 +58,23 @@ export const createEqualSplit = (
     };
   }
 
-  const equalShare = 100 / participants.length;
+  // Filter out undefined participants or participants without id or name
+  const validParticipants = participants.filter(p => p && p.id && p.name);
+  
+  if (validParticipants.length === 0) {
+    return {
+      itemId,
+      splitType: 'equal',
+      details: []
+    };
+  }
+
+  const equalShare = 100 / validParticipants.length;
   
   return {
     itemId,
     splitType: 'equal',
-    details: participants.map(p => ({
+    details: validParticipants.map(p => ({
       userId: p.id,
       userName: p.name,
       share: equalShare
@@ -110,11 +122,23 @@ export const calculateSplitAmounts = (
   }[],
   participants: { id: string; name: string }[]
 ): TripSplitSummary[] => {
+  // Safety check: ensure participants is an array with valid entries
+  if (!Array.isArray(participants)) {
+    return [];
+  }
+  
+  // Filter valid participants (with id and name)
+  const validParticipants = participants.filter(p => p && p.id && p.name);
+  
+  if (validParticipants.length === 0) {
+    return [];
+  }
+  
   // Load split configuration
   const splits = loadSplitConfig(tripId);
   
   // Initialize result with zero amounts for each participant
-  const result: TripSplitSummary[] = participants.map(p => ({
+  const result: TripSplitSummary[] = validParticipants.map(p => ({
     userId: p.id,
     userName: p.name,
     totalAmount: 0,
@@ -122,7 +146,7 @@ export const calculateSplitAmounts = (
   }));
   
   // Find the shopper (assuming shopper is "You" - can be updated to use actual shopper info)
-  const shopper = participants.find(p => p.name === "You");
+  const shopper = validParticipants.find(p => p.name === "You");
   
   // Process each item
   items.forEach(item => {
@@ -136,9 +160,9 @@ export const calculateSplitAmounts = (
     // If no split is defined, create a default equal split
     if (!itemSplit) {
       // Apply default equal split among all participants
-      const equalShare = itemTotal / participants.length;
+      const equalShare = itemTotal / validParticipants.length;
       
-      participants.forEach(p => {
+      validParticipants.forEach(p => {
         const participant = result.find(r => r.userId === p.id);
         if (participant) {
           participant.totalAmount += equalShare;

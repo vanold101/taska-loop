@@ -37,7 +37,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <div className="min-h-screen bg-gloop-bg dark:bg-gloop-dark-bg max-w-md mx-auto pb-20">
+          <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-500/5 via-green-500/5 to-blue-500/5 dark:from-blue-900/20 dark:via-green-900/20 dark:to-blue-900/20">
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/home" element={<HomePage />} />

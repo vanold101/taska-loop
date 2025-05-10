@@ -122,9 +122,151 @@ const config = {
         "body-2": ["14px", { lineHeight: "20px", fontWeight: "400" }],
         "caption": ["12px", { lineHeight: "16px", fontWeight: "400" }],
       },
+      // Responsive fluid spacing
+      padding: {
+        'clamp': 'clamp(1.5rem, 5vw, 3rem)',
+        'clamp-sm': 'clamp(1rem, 3vw, 2rem)',
+      },
+      margin: {
+        'clamp': 'clamp(1.5rem, 5vw, 3rem)',
+        'clamp-sm': 'clamp(1rem, 3vw, 2rem)',
+      },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Add plugin for fluid typography and custom responsive classes
+    function({ addComponents, theme }: { addComponents: any; theme: any }) {
+      addComponents({
+        // Responsive typography utility classes
+        '.text-clamp-2xl': {
+          fontSize: 'clamp(1.5rem, 3vw, 2.5rem)',
+          lineHeight: '1.2',
+          fontWeight: '700',
+        },
+        '.text-clamp-xl': {
+          fontSize: 'clamp(1.25rem, 2vw, 1.75rem)',
+          lineHeight: '1.3',
+          fontWeight: '600',
+        },
+        '.text-clamp-lg': {
+          fontSize: 'clamp(1.125rem, 1.5vw, 1.5rem)',
+          lineHeight: '1.4',
+          fontWeight: '600',
+        },
+        '.text-clamp-base': {
+          fontSize: 'clamp(0.875rem, 1vw, 1rem)',
+          lineHeight: '1.5',
+        },
+        '.text-clamp-sm': {
+          fontSize: 'clamp(0.75rem, 0.9vw, 0.875rem)',
+          lineHeight: '1.5',
+        },
+        
+        // Feature card styling
+        '.py-clamp': {
+          paddingTop: 'clamp(3rem, 8vh, 5rem)',
+          paddingBottom: 'clamp(3rem, 8vh, 5rem)',
+        },
+        '.py-clamp-sm': {
+          paddingTop: 'clamp(2rem, 5vh, 3rem)',
+          paddingBottom: 'clamp(2rem, 5vh, 3rem)',
+        },
+        '.mb-clamp': {
+          marginBottom: 'clamp(1.5rem, 5vh, 3rem)',
+        },
+        '.mb-clamp-sm': {
+          marginBottom: 'clamp(1rem, 3vh, 2rem)',
+        },
+        
+        // Feature card components
+        '.feature-card': {
+          background: 'white',
+          borderRadius: 'clamp(1rem, 2vw, 1.5rem)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
+          padding: 'clamp(1.25rem, 3vw, 2rem)',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          transition: 'all 0.3s ease',
+          border: '1px solid rgba(226, 232, 240, 0.8)',
+          backdropFilter: 'blur(10px)',
+          '@apply hover:shadow-lg dark:bg-gray-800/90 dark:border-gray-700/50': {},
+        },
+        '.feature-icon-container': {
+          width: 'clamp(3rem, 4vw, 4rem)',
+          height: 'clamp(3rem, 4vw, 4rem)',
+          marginBottom: 'clamp(1rem, 1.5vw, 1.5rem)',
+          borderRadius: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: '0',
+          '@apply bg-gradient-to-r from-blue-500 to-green-500 shadow-md': {},
+        },
+        '.feature-icon': {
+          width: 'clamp(1.25rem, 1.75vw, 1.75rem)',
+          height: 'clamp(1.25rem, 1.75vw, 1.75rem)',
+          '@apply text-white': {},
+        },
+        '.feature-content': {
+          flexGrow: '1',
+        },
+        '.feature-title': {
+          marginBottom: 'clamp(0.5rem, 1vw, 0.75rem)',
+          '@apply font-semibold text-clamp-lg': {},
+        },
+        '.feature-description': {
+          marginBottom: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+          '@apply text-clamp-base text-gray-600 dark:text-gray-300 line-clamp-2': {},
+        },
+        '.feature-list': {
+          '@apply space-y-2': {},
+        },
+        '.feature-list-item': {
+          display: 'flex',
+          alignItems: 'flex-start',
+          '@apply text-clamp-sm text-gray-600 dark:text-gray-300': {},
+        },
+        '.feature-check-icon': {
+          width: '1rem',
+          height: '1rem',
+          marginRight: '0.5rem',
+          marginTop: '0.125rem',
+          flexShrink: '0',
+          '@apply text-green-500': {},
+        },
+        
+        // Mini feature cards
+        '.mini-feature-card': {
+          textAlign: 'center',
+          borderRadius: 'clamp(0.75rem, 1vw, 1rem)',
+          padding: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+          transition: 'all 0.3s ease',
+          '@apply bg-white/90 dark:bg-gray-800/90 hover:shadow-md shadow-sm': {},
+        },
+        '.mini-feature-icon-container': {
+          width: 'clamp(2.5rem, 3vw, 3rem)',
+          height: 'clamp(2.5rem, 3vw, 3rem)',
+          margin: '0 auto',
+          marginBottom: 'clamp(0.5rem, 0.75vw, 0.75rem)',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          '@apply bg-gradient-to-r from-blue-500/20 to-green-500/20 dark:from-blue-900/30 dark:to-green-900/30': {},
+        },
+        '.mini-feature-icon': {
+          width: 'clamp(1.25rem, 1.5vw, 1.5rem)',
+          height: 'clamp(1.25rem, 1.5vw, 1.5rem)',
+          '@apply text-blue-600 dark:text-blue-400': {},
+        },
+        '.mini-feature-title': {
+          '@apply font-medium text-clamp-sm': {},
+        },
+      });
+    },
+  ],
 } satisfies Config;
 
 export default config;

@@ -238,15 +238,15 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
   const getMarkerColor = (status: string) => {
     switch (status) {
       case 'open':
-        return '#4CAF50'; // Green
-      case 'shopping':
-        return '#2196F3'; // Blue
+        return '#22c55e'; // Green-500
+      case 'in-progress':
+        return '#3b82f6'; // Blue-500
+      case 'waiting':
+        return '#f59e0b'; // Amber-500
       case 'completed':
-        return '#9E9E9E'; // Gray
-      case 'cancelled':
-        return '#F44336'; // Red
+        return '#6b7280'; // Gray-500
       default:
-        return '#FF9800'; // Orange
+        return '#3b82f6'; // Blue-500
     }
   };
 
@@ -310,7 +310,7 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
 
   return (
     <motion.div 
-      className="fixed inset-0 z-50 bg-white dark:bg-gloop-dark-background flex flex-col"
+      className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -339,14 +339,14 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pr-10"
           />
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gloop-text-muted dark:text-gloop-dark-text-muted" />
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
         </div>
 
         <div className="flex-1 relative rounded-lg overflow-hidden">
           {isLoadingLocation ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gloop-primary mx-auto mb-2"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-2"></div>
                 <p>Getting your location...</p>
               </div>
             </div>
@@ -387,7 +387,7 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
               <span className="text-xs">Cancelled</span>
             </div>
           </div>
-          <div className="text-xs text-gloop-text-muted dark:text-gloop-dark-text-muted">
+          <div className="text-xs text-gray-500 dark:text-gray-400">
             {filteredTrips.length} trips shown
           </div>
         </div>

@@ -3,6 +3,7 @@ import { ShoppingCart, Clock, User, Plus, Check, Share2, Trash2, Edit, Info } fr
 import { cn } from "@/lib/utils";
 import { useState, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type TripCardProps = {
   trip: {
@@ -13,27 +14,29 @@ type TripCardProps = {
       avatar: string;
     };
     eta: string;
-    itemCount: number;
+    itemCount?: number;
     status: 'open' | 'shopping' | 'completed' | 'cancelled';
   };
-  onAddItem?: () => void;
-  onClick?: () => void;
-  onDelete?: () => void;
-  onShare?: () => void;
-  onComplete?: () => void;
-  onEdit?: () => void;
-  onReactivate?: () => void;
+  onTripClick?: () => void;
+  onAddItem?: (item: any) => void;
+  onDeleteTrip?: () => void;
+  onShareTrip?: () => void;
+  onCompleteTrip?: () => void;
+  onEditTrip?: () => void;
+  onReactivateTrip?: () => void;
+  isPast?: boolean;
 };
 
 const TripCard = ({ 
   trip,
   onAddItem,
-  onClick,
-  onDelete,
-  onShare,
-  onComplete,
-  onEdit,
-  onReactivate
+  onTripClick,
+  onDeleteTrip,
+  onShareTrip,
+  onCompleteTrip,
+  onEditTrip,
+  onReactivateTrip,
+  isPast = false
 }: TripCardProps) => {
   const { store, shopper, eta, itemCount, status } = trip;
   const [isActionsVisible, setActionsVisible] = useState(false);
@@ -86,12 +89,12 @@ const TripCard = ({
       return;
     }
     
-    if (swipeOffset <= -swipeThreshold && onDelete) {
+    if (swipeOffset <= -swipeThreshold && onDeleteTrip) {
       // Trigger delete action
-      onDelete();
-    } else if (swipeOffset >= swipeThreshold && onComplete) {
+      onDeleteTrip();
+    } else if (swipeOffset >= swipeThreshold && onCompleteTrip) {
       // Trigger complete action
-      onComplete();
+      onCompleteTrip();
     }
     
     // Reset swipe position with animation
@@ -108,7 +111,7 @@ const TripCard = ({
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Only trigger onClick if we have a handler
-    if (onClick) {
+    if (onTripClick) {
       // Prevent default behavior to avoid any unwanted effects
       e.preventDefault();
       
@@ -123,7 +126,7 @@ const TripCard = ({
                        target.getAttribute('aria-label') !== null;
       
       if (!isButton) {
-        onClick();
+        onTripClick();
       }
     }
   };
@@ -139,7 +142,15 @@ const TripCard = ({
     
     // Double tap to add item
     if (onAddItem) {
-      onAddItem();
+      onAddItem({
+        name: "New Item",
+        quantity: 1,
+        addedBy: {
+          name: "You",
+          avatar: "https://example.com/avatar.jpg"
+        },
+        checked: false
+      });
       
       // Add haptic feedback if available
       if (navigator.vibrate) {
@@ -201,18 +212,18 @@ const TripCard = ({
         <div className="p-4">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-semibold text-lg">{store}</h3>
+              <h3 className="font-semibold text-[clamp(1.125rem,2.5vw,1.25rem)]">{store}</h3>
               <div className="flex items-center text-gloop-text-muted dark:text-gloop-dark-text-muted mt-1">
                 <User className="h-3.5 w-3.5 mr-1" />
-                <span className="text-sm">{shopper.name}</span>
+                <span className="text-[clamp(0.875rem,2vw,1rem)]">{shopper.name}</span>
                 <span className="mx-1.5">•</span>
                 <Clock className="h-3.5 w-3.5 mr-1" />
-                <span className="text-sm">{eta}</span>
+                <span className="text-[clamp(0.875rem,2vw,1rem)]">{eta}</span>
               </div>
             </div>
             
             <div className="flex flex-col items-end gap-2">
-              <Badge variant="outline" className={cn("text-xs px-2 py-0.5", getStatusColor())}>
+              <Badge variant="outline" className={cn("text-[clamp(0.75rem,1.8vw,0.875rem)] px-2 py-0.5", getStatusColor())}>
                 {status === 'open' ? 'Open' : 
                  status === 'shopping' ? 'Shopping' : 
                  status === 'completed' ? 'Completed' : 'Cancelled'}
@@ -222,12 +233,12 @@ const TripCard = ({
                 className="flex items-center bg-gloop-accent dark:bg-gloop-dark-accent px-2 py-0.5 rounded-full cursor-pointer hover:bg-gloop-accent/80 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (onClick) onClick();
+                  if (onTripClick) onTripClick();
                 }}
                 aria-label="View trip items"
               >
                 <ShoppingCart className="h-3 w-3 mr-1 text-gloop-primary" />
-                <span className="text-xs font-medium">{itemCount} items</span>
+                <span className="text-[clamp(0.75rem,1.8vw,0.875rem)] font-medium">{itemCount ?? 0} items</span>
               </div>
             </div>
           </div>
@@ -250,7 +261,15 @@ const TripCard = ({
                 className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAddItem();
+                  onAddItem({
+                    name: "New Item",
+                    quantity: 1,
+                    addedBy: {
+                      name: "You",
+                      avatar: "https://example.com/avatar.jpg"
+                    },
+                    checked: false
+                  });
                 }}
                 aria-label="Add item"
               >
@@ -259,14 +278,14 @@ const TripCard = ({
             )}
             
             {/* Share button is available for all trips */}
-            {onShare && (
+            {onShareTrip && (
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onShare();
+                  onShareTrip();
                 }}
                 aria-label="Share trip"
               >
@@ -275,14 +294,14 @@ const TripCard = ({
             )}
             
             {/* Only show Edit button for active trips */}
-            {status !== 'completed' && status !== 'cancelled' && onEdit && (
+            {status !== 'completed' && status !== 'cancelled' && onEditTrip && (
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEdit();
+                  onEditTrip();
                 }}
                 aria-label="Edit trip"
               >
@@ -291,14 +310,14 @@ const TripCard = ({
             )}
             
             {/* Only show Complete button for active trips */}
-            {status !== 'completed' && status !== 'cancelled' && onComplete && (
+            {status !== 'completed' && status !== 'cancelled' && onCompleteTrip && (
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 className="quick-action-btn bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onComplete();
+                  onCompleteTrip();
                 }}
                 aria-label="Complete trip"
               >
@@ -307,14 +326,14 @@ const TripCard = ({
             )}
             
             {/* Delete button is available for all trips */}
-            {onDelete && (
+            {onDeleteTrip && (
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 className="quick-action-btn bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete();
+                  onDeleteTrip();
                 }}
                 aria-label="Delete trip"
               >
@@ -330,7 +349,7 @@ const TripCard = ({
                 className="quick-action-btn bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (onClick) onClick();
+                  if (onTripClick) onTripClick();
                 }}
                 aria-label="View trip details"
               >
@@ -339,14 +358,14 @@ const TripCard = ({
             )}
             
             {/* Reactivate button for completed trips */}
-            {status === 'completed' && onReactivate && (
+            {status === 'completed' && onReactivateTrip && (
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 className="quick-action-btn bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onReactivate();
+                  onReactivateTrip();
                 }}
                 aria-label="Reactivate trip"
               >
@@ -367,6 +386,41 @@ const TripCard = ({
           />
         </div>
       </motion.div>
+      
+      {/* Only show action buttons for non-past trips */}
+      {!isPast && (
+        <div className="flex border-t border-gray-100 dark:border-gray-700">
+          <Button
+            className="flex-1 rounded-none bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-blue-600 dark:text-blue-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onAddItem) {
+                onAddItem({
+                  name: "New Item",
+                  quantity: 1,
+                  addedBy: {
+                    name: "You",
+                    avatar: "https://example.com/avatar.jpg"
+                  },
+                  checked: false
+                });
+              }
+            }}
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add Item
+          </Button>
+          <div className="w-px bg-gray-100 dark:bg-gray-700" />
+          <Button
+            className="flex-1 rounded-none bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-green-600 dark:text-green-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCompleteTrip && onCompleteTrip();
+            }}
+          >
+            <Check className="h-4 w-4 mr-1" /> Complete
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

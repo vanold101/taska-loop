@@ -35,6 +35,7 @@ interface UnitSelectorProps {
   onUnitChange: (unit: string) => void;
   className?: string;
   showConversion?: boolean;
+  compact?: boolean;
 }
 
 const UnitSelector = ({
@@ -45,6 +46,7 @@ const UnitSelector = ({
   onUnitChange,
   className = "",
   showConversion = false,
+  compact = false,
 }: UnitSelectorProps) => {
   // Get the current unit definition, or guess one based on item name
   const [currentUnit, setCurrentUnit] = useState<UnitDefinition>(
@@ -122,6 +124,66 @@ const UnitSelector = ({
     { type: 'package', label: 'Package' },
   ];
   
+  // Compact mode renders just the unit selector without the quantity input
+  if (compact) {
+    return (
+      <div className={className}>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 px-2 flex items-center justify-between rounded-l-none border-l-0"
+            >
+              <span>{currentUnit?.abbreviation || 'ea'}</span>
+              <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[240px] p-2">
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="unit-type" className="text-xs pl-1">
+                Measurement Type
+              </Label>
+              <div className="grid grid-cols-4 gap-1">
+                {unitTypes.map((option) => (
+                  <Button
+                    key={option.type}
+                    variant={activeType === option.type ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => handleTypeSelect(option.type)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+              
+              <Label htmlFor="unit" className="text-xs mt-2 pl-1">
+                Unit
+              </Label>
+              <div className="grid grid-cols-3 gap-1">
+                {availableUnits
+                  .filter((unit) => unit.type === activeType)
+                  .map((unit) => (
+                    <Button
+                      key={unit.id}
+                      variant={currentUnit?.id === unit.id ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => handleUnitSelect(unit.id)}
+                    >
+                      {unit.abbreviation}
+                    </Button>
+                  ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  }
+  
+  // Standard mode with quantity input
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
       <Popover>

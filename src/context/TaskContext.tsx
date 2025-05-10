@@ -236,7 +236,27 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [tasks]);
 
   useEffect(() => {
-    localStorage.setItem('trips', JSON.stringify(trips));
+    try {
+      // Use a replacer function to handle circular references
+      const replacer = (key: string, value: any) => {
+        // Skip React elements, DOM nodes, and other non-serializable objects
+        if (typeof value === 'object' && value !== null) {
+          if (
+            value.$$typeof || // React elements
+            value instanceof Node || // DOM nodes
+            key.startsWith('__react') || // React internal props
+            key === 'stateNode'
+          ) {
+            return undefined; // Skip this value
+          }
+        }
+        return value;
+      };
+      
+      localStorage.setItem('trips', JSON.stringify(trips, replacer));
+    } catch (error) {
+      console.error('Error saving trips to localStorage:', error);
+    }
   }, [trips]);
 
   // Add a new task

@@ -60,40 +60,23 @@ const FloatingActionButton = ({
       className="fixed z-50 bottom-28 right-6"
     >
       <motion.button
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => setIsPressed(false)}
-        whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(58, 91, 220, 0.5)" }}
+        className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-green-500 text-white shadow-lg flex items-center justify-center"
+        whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        aria-label={isTripsPage ? "Broadcast Trip" : "Create New Task"}
-        className={cn(
-          "w-14 h-14 rounded-full flex items-center justify-center shadow-lg",
-          "transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gloop-accent",
-          "bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end text-white",
-          className
-        )}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent event bubbling
+          e.preventDefault(); // Prevent default
+          onClick();
+        }}
       >
-        {icon ? (
-          icon
-        ) : isTripsPage ? (
-          <Megaphone className="h-6 w-6" />
-        ) : (
-          <Plus className="h-6 w-6" />
-        )}
-        
-        {/* Subtle glow effect */}
-        <span className="absolute inset-0 rounded-full bg-gloop-premium-gradient-end opacity-0 hover:opacity-30 transition-opacity duration-300" />
-        
-        {/* Ripple effect */}
-        <span className={cn(
-          "absolute inset-0 rounded-full bg-white",
-          isPressed ? "animate-ripple opacity-20" : "opacity-0",
-        )} />
+        {icon ? icon : <Plus className="h-6 w-6" />}
       </motion.button>
       
       {/* Shadow element */}
-      <div className="absolute -inset-1 bg-gloop-primary/20 rounded-full blur-md -z-10 animate-pulse-subtle" />
+      <div className="absolute -inset-1 bg-blue-500/20 rounded-full blur-md -z-10 animate-pulse-subtle" />
     </motion.div>
   );
 };

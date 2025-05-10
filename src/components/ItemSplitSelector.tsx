@@ -49,7 +49,7 @@ const ItemSplitSelector = ({
   itemId,
   itemName,
   itemPrice,
-  participants,
+  participants = [],
   onSplitUpdated
 }: ItemSplitSelectorProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,10 +70,12 @@ const ItemSplitSelector = ({
         setSelectedParticipants(itemSplit.details.map(d => d.userId));
       } else {
         // Default to equal split among all participants
-        const defaultSplit = createEqualSplit(itemId, participants);
+        // Make sure participants is an array and each participant has id and name
+        const validParticipants = (participants || []).filter(p => p && p.id && p.name);
+        const defaultSplit = createEqualSplit(itemId, validParticipants);
         setSplitType(defaultSplit.splitType);
         setSplitDetails(defaultSplit.details);
-        setSelectedParticipants(participants.map(p => p.id));
+        setSelectedParticipants(validParticipants.map(p => p.id));
       }
     }
   }, [isOpen, tripId, itemId, participants]);
@@ -86,9 +88,9 @@ const ItemSplitSelector = ({
     // Reset details based on new split type
     if (newSplitType === 'equal') {
       // For equal split, we need all selected participants with equal shares
-      const equalShare = 100 / selectedParticipants.length;
+      const equalShare = selectedParticipants.length ? 100 / selectedParticipants.length : 100;
       const newDetails = selectedParticipants.map(id => {
-        const participant = participants.find(p => p.id === id);
+        const participant = participants.find(p => p && p.id === id);
         return {
           userId: id,
           userName: participant?.name || 'Unknown',
@@ -98,9 +100,9 @@ const ItemSplitSelector = ({
       setSplitDetails(newDetails);
     } else if (newSplitType === 'percentage') {
       // For percentage, initialize with equal percentages that sum to 100
-      const equalPercentage = 100 / selectedParticipants.length;
+      const equalPercentage = selectedParticipants.length ? 100 / selectedParticipants.length : 100;
       const newDetails = selectedParticipants.map(id => {
-        const participant = participants.find(p => p.id === id);
+        const participant = participants.find(p => p && p.id === id);
         return {
           userId: id,
           userName: participant?.name || 'Unknown',
@@ -110,9 +112,9 @@ const ItemSplitSelector = ({
       setSplitDetails(newDetails);
     } else if (newSplitType === 'person') {
       // For person-specific, divide the total price equally as a starting point
-      const equalAmount = (itemPrice || 0) / selectedParticipants.length;
+      const equalAmount = selectedParticipants.length ? (itemPrice || 0) / selectedParticipants.length : (itemPrice || 0);
       const newDetails = selectedParticipants.map(id => {
-        const participant = participants.find(p => p.id === id);
+        const participant = participants.find(p => p && p.id === id);
         return {
           userId: id,
           userName: participant?.name || 'Unknown',
@@ -157,7 +159,7 @@ const ItemSplitSelector = ({
       setSelectedParticipants(newSelected);
       
       // Find the participant info
-      const participant = participants.find(p => p.id === participantId);
+      const participant = participants.find(p => p && p.id === participantId);
       if (!participant) return;
       
       // Create new detail for this participant
@@ -169,7 +171,7 @@ const ItemSplitSelector = ({
           ...splitDetails.map(d => ({ ...d, share: newShare })),
           {
             userId: participantId,
-            userName: participant.name,
+            userName: participant.name || 'Unknown',
             share: newShare
           }
         ];
@@ -180,7 +182,7 @@ const ItemSplitSelector = ({
           ...splitDetails,
           {
             userId: participantId,
-            userName: participant.name,
+            userName: participant.name || 'Unknown',
             share: 0
           }
         ];
@@ -191,7 +193,7 @@ const ItemSplitSelector = ({
           ...splitDetails,
           {
             userId: participantId,
-            userName: participant.name,
+            userName: participant.name || 'Unknown',
             share: 0
           }
         ];
@@ -361,7 +363,7 @@ const ItemSplitSelector = ({
               <div className="space-y-2 pt-2">
                 <Label>Who's splitting this item?</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {participants.map(participant => (
+                  {(participants || []).filter(p => p && p.id && p.name).map(participant => (
                     <div 
                       key={participant.id}
                       className={`flex items-center space-x-2 p-2 rounded-md border ${

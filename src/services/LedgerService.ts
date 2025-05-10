@@ -13,13 +13,16 @@ export interface Transaction {
   toUserName: string;
   description: string;
   status: 'pending' | 'completed' | 'cancelled';
+  // Add a flag to indicate if this is a split payment (50/50)
+  isSplit?: boolean;
 }
 
 export interface UserBalance {
   userId: string;
   userName: string;
-  owesAmount: number; // Total amount user owes to others
-  owedAmount: number; // Total amount others owe to the user
+  totalSpent: number; // Total amount user spent (before splits)
+  owesAmount: number; // Amount user owes to others (from split expenses)
+  owedAmount: number; // Amount others owe to the user (from split expenses)
   netBalance: number; // owedAmount - owesAmount
 }
 
@@ -112,6 +115,7 @@ export const calculateUserBalances = (): UserBalance[] => {
       userBalances.set(transaction.fromUserId, {
         userId: transaction.fromUserId,
         userName: transaction.fromUserName,
+        totalSpent: 0,
         owesAmount: 0,
         owedAmount: 0,
         netBalance: 0
@@ -122,6 +126,7 @@ export const calculateUserBalances = (): UserBalance[] => {
       userBalances.set(transaction.toUserId, {
         userId: transaction.toUserId,
         userName: transaction.toUserName,
+        totalSpent: 0,
         owesAmount: 0,
         owedAmount: 0,
         netBalance: 0
@@ -132,11 +137,24 @@ export const calculateUserBalances = (): UserBalance[] => {
     const toUserBalance = userBalances.get(transaction.toUserId)!;
     
     if (transaction.type === 'expense') {
-      // For expenses, the fromUser owes toUser
-      fromUserBalance.owesAmount += transaction.amount;
-      toUserBalance.owedAmount += transaction.amount;
+      if (transaction.isSplit) {
+        // For split expenses (e.g., 50/50):
+        // 1. The person paying (toUser) initially spent the full amount
+        toUserBalance.totalSpent += transaction.amount;
+        
+        // 2. The fromUser owes their share to the toUser
+        const halfAmount = transaction.amount / 2;
+        fromUserBalance.owesAmount += halfAmount;
+        toUserBalance.owedAmount += halfAmount;
+      } else {
+        // For regular expenses (not split), the fromUser fully owes toUser
+        toUserBalance.totalSpent += transaction.amount;
+        fromUserBalance.owesAmount += transaction.amount;
+        toUserBalance.owedAmount += transaction.amount;
+      }
     } else if (transaction.type === 'payment') {
       // For payments, the fromUser paid toUser (reducing debt)
+      fromUserBalance.totalSpent += transaction.amount; // Track payment as spending
       fromUserBalance.owedAmount += transaction.amount;
       toUserBalance.owesAmount += transaction.amount;
     }
@@ -199,7 +217,8 @@ export const createSettlementTransaction = (
   fromUserName: string,
   toUserId: string,
   toUserName: string,
-  amount: number
+  amount: number,
+  isSplit: boolean = true // Default to split payment (50/50)
 ): Transaction => {
   return addTransaction({
     tripId,
@@ -211,7 +230,8 @@ export const createSettlementTransaction = (
     toUserId,
     toUserName,
     description: `Expenses from trip to ${tripName}`,
-    status: 'completed'
+    status: 'completed',
+    isSplit
   });
 };
 

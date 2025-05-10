@@ -103,8 +103,8 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md glass-effect">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">
-            <ShoppingCart className="h-5 w-5 text-gloop-primary" />
+          <DialogTitle className="flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-green-500">
+            <ShoppingCart className="h-5 w-5 text-blue-500" />
             I'm heading to...
           </DialogTitle>
           <DialogDescription>
@@ -116,7 +116,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
           <div className="space-y-2 relative">
             <Label htmlFor="store" className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Store className="h-4 w-4 text-gloop-primary" />
+                <Store className="h-4 w-4 text-blue-500" />
                 <span>Store</span>
               </div>
               {errors.store && (
@@ -142,7 +142,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
             {/* Store suggestions dropdown */}
             {showSuggestions && filteredSuggestions.length > 0 && (
               <motion.div 
-                className="absolute z-10 w-full mt-1 glass-effect rounded-md shadow-lg border border-gloop-card-border"
+                className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
@@ -151,11 +151,11 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
                   {filteredSuggestions.map((suggestion, index) => (
                     <motion.li 
                       key={index}
-                      className="px-3 py-2 hover:bg-gloop-primary/10 cursor-pointer text-sm flex items-center"
+                      className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-sm flex items-center"
                       onClick={() => selectSuggestion(suggestion)}
                       whileHover={{ x: 5 }}
                     >
-                      <Store className="h-3 w-3 mr-2 text-gloop-primary" />
+                      <Store className="h-3 w-3 mr-2 text-blue-500" />
                       {suggestion}
                     </motion.li>
                   ))}
@@ -167,7 +167,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
           <div className="space-y-2">
             <Label htmlFor="eta" className="flex items-center justify-between">
               <div className="flex items-center">
-                <Clock className="h-4 w-4 mr-1 text-gloop-primary" />
+                <Clock className="h-4 w-4 mr-1 text-blue-500" />
                 Time until arrival
               </div>
               {errors.eta && (
@@ -187,9 +187,9 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
                 onChange={(e) => setEta(e.target.value)}
                 className={`w-24 premium-card ${errors.eta ? "border-destructive" : ""}`}
               />
-              <span className="text-gloop-text-muted">minutes</span>
+              <span className="text-gray-500 dark:text-gray-400">minutes</span>
             </div>
-            <p className="text-xs text-gloop-text-muted flex items-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
               <Info className="h-3 w-3 mr-1" />
               Let others know when you expect to arrive at the store
             </p>

@@ -479,7 +479,7 @@ const TripDetailModal = ({
               <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-md">
                 <h3 className="font-medium mb-2">Add Item</h3>
                 <form onSubmit={handleAddItem}>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-3">
                     <Input
                       placeholder="Item name"
                       value={newItemName}
@@ -509,9 +509,55 @@ const TripDetailModal = ({
                     </div>
                   </div>
                   
-                  <div className="flex justify-end mt-2">
+                  {/* Quantity and Price Row */}
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {/* Quantity Input with Unit Selector */}
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="quantity" className="text-sm whitespace-nowrap">Quantity:</Label>
+                      <div className="flex">
+                        <Input
+                          id="quantity"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={newItemQuantity}
+                          onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                          className="w-16 rounded-r-none"
+                        />
+                        <UnitSelector
+                          itemName={newItemName}
+                          quantity={newItemQuantity}
+                          unit={newItemUnit}
+                          onUnitChange={setNewItemUnit}
+                          onQuantityChange={setNewItemQuantity}
+                          className="h-10 rounded-l-none border-l-0"
+                          compact={true}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Price Input */}
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="price" className="text-sm whitespace-nowrap">Price:</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <Input
+                          id="price"
+                          type="number"
+                          min="0.00"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={newItemPrice === undefined ? '' : newItemPrice}
+                          onChange={(e) => setNewItemPrice(e.target.value === '' ? undefined : Number(e.target.value))}
+                          className="pl-7 w-24"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end">
                     <Button type="submit" size="sm" className="px-4">
-                      Add
+                      Add Item
                     </Button>
                   </div>
                 </form>
@@ -552,7 +598,7 @@ const TripDetailModal = ({
                             itemId={item.id}
                             itemName={item.name}
                             itemPrice={item.price}
-                            participants={trip.participants}
+                            participants={trip?.participants?.filter(p => p && p.name) || []}
                             onSplitUpdated={handleSplitUpdate}
                           />
                           
@@ -641,7 +687,7 @@ const TripDetailModal = ({
                             itemId={item.id}
                             itemName={item.name}
                             itemPrice={item.price}
-                            participants={trip.participants}
+                            participants={trip?.participants?.filter(p => p && p.name) || []}
                             onSplitUpdated={handleSplitUpdate}
                           />
                           

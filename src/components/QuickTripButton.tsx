@@ -13,19 +13,38 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 type QuickTripButtonProps = {
-  onCreateTrip: (data: { store: string; eta: string }) => void;
+  onCreateTrip?: (data: { store: string; eta: string }) => void;
+  store?: string;
+  onClick?: () => void;
 };
 
-const QuickTripButton = ({ onCreateTrip }: QuickTripButtonProps) => {
+const QuickTripButton = ({ onCreateTrip, store, onClick }: QuickTripButtonProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [store, setStore] = useState("");
+  const [storeInput, setStoreInput] = useState("");
   const [eta, setEta] = useState("15");
   const { toast } = useToast();
+
+  // If we have a store prop and onClick handler, render a simple button
+  if (store && onClick) {
+    return (
+      <Button
+        variant="outline"
+        className="shrink-0 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent event bubbling
+          onClick();
+        }}
+      >
+        <Store className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
+        {store}
+      </Button>
+    );
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!store.trim()) {
+    if (!storeInput.trim()) {
       toast({
         title: "Store name required",
         description: "Please enter a store name",
@@ -34,8 +53,10 @@ const QuickTripButton = ({ onCreateTrip }: QuickTripButtonProps) => {
       return;
     }
     
-    onCreateTrip({ store, eta });
-    setStore("");
+    if (onCreateTrip) {
+      onCreateTrip({ store: storeInput, eta });
+    }
+    setStoreInput("");
     setEta("15");
     setIsOpen(false);
     
@@ -50,7 +71,7 @@ const QuickTripButton = ({ onCreateTrip }: QuickTripButtonProps) => {
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <motion.button
-            className="w-16 h-16 rounded-full bg-gloop-primary text-white shadow-lg flex items-center justify-center"
+            className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-green-500 text-white shadow-lg flex items-center justify-center"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             initial={{ y: 20, opacity: 0 }}
@@ -62,14 +83,14 @@ const QuickTripButton = ({ onCreateTrip }: QuickTripButtonProps) => {
         </PopoverTrigger>
         
         <PopoverContent 
-          className="w-80 p-4 premium-card border-gloop-outline dark:border-gloop-dark-surface"
+          className="w-80 p-4 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
           sideOffset={5}
           align="end"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg flex items-center">
-                <ShoppingCart className="h-5 w-5 mr-2 text-gloop-primary" />
+                <ShoppingCart className="h-5 w-5 mr-2 text-blue-500" />
                 Quick Trip
               </h3>
               <Button 
@@ -88,9 +109,8 @@ const QuickTripButton = ({ onCreateTrip }: QuickTripButtonProps) => {
               <Input
                 id="store"
                 placeholder="Store name"
-                value={store}
-                onChange={(e) => setStore(e.target.value)}
-                className="premium-card"
+                value={storeInput}
+                onChange={(e) => setStoreInput(e.target.value)}
                 autoFocus
               />
             </div>
@@ -104,20 +124,19 @@ const QuickTripButton = ({ onCreateTrip }: QuickTripButtonProps) => {
                 max="180"
                 value={eta}
                 onChange={(e) => setEta(e.target.value)}
-                className="premium-card"
               />
             </div>
             
             <div className="pt-2">
               <Button 
                 type="submit" 
-                className="w-full premium-gradient-btn"
+                className="w-full bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Start Trip
               </Button>
               
-              <p className="text-xs text-center mt-2 text-gloop-text-muted">
+              <p className="text-xs text-center mt-2 text-gray-500 dark:text-gray-400">
                 Your circle will be notified you're shopping
               </p>
             </div>

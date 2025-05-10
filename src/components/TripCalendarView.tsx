@@ -76,14 +76,14 @@ const TripCalendarView: React.FC<TripCalendarViewProps> = ({ trips, onTripClick,
       exit={{ opacity: 0 }}
     >
       <motion.div 
-        className="bg-white dark:bg-gloop-dark-surface rounded-lg shadow-lg max-w-md w-full p-4 premium-card"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-4 bg-gradient-to-br from-blue-500/5 via-green-500/5 to-blue-500/5 dark:from-blue-900/20 dark:via-green-900/20 dark:to-blue-900/20"
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold flex items-center">
-            <CalendarIcon className="mr-2 h-5 w-5 text-gloop-primary" />
+            <CalendarIcon className="mr-2 h-5 w-5 text-blue-600 dark:text-blue-400" />
             Trip Calendar
           </h2>
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -105,7 +105,7 @@ const TripCalendarView: React.FC<TripCalendarViewProps> = ({ trips, onTripClick,
         
         <div className="grid grid-cols-7 gap-1 mb-2">
           {weekdays.map(day => (
-            <div key={day} className="text-center text-sm font-medium text-gloop-text-muted dark:text-gloop-dark-text-muted">
+            <div key={day} className="text-center text-sm font-medium text-gray-500 dark:text-gray-400">
               {day}
             </div>
           ))}
@@ -122,7 +122,7 @@ const TripCalendarView: React.FC<TripCalendarViewProps> = ({ trips, onTripClick,
             return (
               <div 
                 key={index} 
-                className={`aspect-square p-1 rounded-md ${day ? 'cursor-pointer hover:bg-gloop-accent dark:hover:bg-gloop-dark-accent' : ''} ${isToday ? 'bg-gloop-accent dark:bg-gloop-dark-accent' : ''}`}
+                className={`aspect-square p-1 rounded-md ${day ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20' : ''} ${isToday ? 'bg-blue-100 dark:bg-blue-900/40' : ''}`}
               >
                 {day && (
                   <div className="h-full flex flex-col">
@@ -130,7 +130,7 @@ const TripCalendarView: React.FC<TripCalendarViewProps> = ({ trips, onTripClick,
                     <div className="flex-1 overflow-hidden">
                       {tripsForDay.length > 0 && (
                         <div 
-                          className="mt-1 text-xs bg-gloop-primary text-white rounded px-1 truncate"
+                          className="mt-1 text-xs bg-gradient-to-r from-blue-500 to-green-500 text-white rounded px-1 truncate"
                           onClick={() => tripsForDay.forEach(trip => onTripClick(trip))}
                         >
                           {tripsForDay.length} trip{tripsForDay.length > 1 ? 's' : ''}
@@ -150,17 +150,17 @@ const TripCalendarView: React.FC<TripCalendarViewProps> = ({ trips, onTripClick,
             {trips.slice(0, 3).map(trip => (
               <div 
                 key={trip.id} 
-                className="p-2 bg-gloop-accent dark:bg-gloop-dark-accent rounded-md cursor-pointer hover:bg-gloop-accent/80 dark:hover:bg-gloop-dark-accent/80"
+                className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40"
                 onClick={() => onTripClick(trip)}
               >
                 <div className="flex justify-between items-center">
                   <div>
                     <div className="font-medium">{trip.store}</div>
-                    <div className="text-xs text-gloop-text-muted dark:text-gloop-dark-text-muted">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       {trip.shopper.name} • {trip.eta}
                     </div>
                   </div>
-                  <Badge variant="outline" className={`text-xs ${trip.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                  <Badge variant="outline" className={`text-xs ${trip.status === 'open' ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'}`}>
                     {trip.status}
                   </Badge>
                 </div>

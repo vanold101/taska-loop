@@ -6,26 +6,39 @@ import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, MapPin, X } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 
-// Remove the conflicting type declaration
-// The global google namespace is already defined elsewhere
+// Define a Task type for better type safety
+export interface Task {
+  id?: string;
+  title: string;
+  dueDate: string;
+  priority: 'low' | 'medium' | 'high';
+  isCompleted?: boolean;
+  isRotating?: boolean;
+  location?: string | null;
+  coordinates?: { lat: number; lng: number } | null;
+  assignees?: Array<{ id: string; name: string }>;
+}
 
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (task: any) => void;
+  taskToEdit?: Task | null;
+  isEditing?: boolean;
 }
 
-export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalProps) {
+export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditing = false }: CreateTaskModalProps) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState<Date>();
-  const [priority, setPriority] = useState("medium");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [location, setLocation] = useState("");
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [rotating, setRotating] = useState(false);
   
   const locationInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -125,28 +138,46 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
     };
   }, [isOpen, toast]);
   
-  // Reset form when modal opens
+  // Reset form when modal opens or when taskToEdit changes
   useEffect(() => {
     if (isOpen) {
-      setTitle("");
-      setDate(undefined);
-      setPriority("medium");
-      setLocation("");
-      setCoordinates(null);
+      if (isEditing && taskToEdit) {
+        // Pre-fill form with task data for editing
+        setTitle(taskToEdit.title || "");
+        setDate(taskToEdit.dueDate ? parseISO(taskToEdit.dueDate) : undefined);
+        setPriority(taskToEdit.priority || "medium");
+        setLocation(taskToEdit.location || "");
+        setCoordinates(taskToEdit.coordinates || null);
+        setRotating(taskToEdit.isRotating || false);
+      } else {
+        // Reset form for new task
+        setTitle("");
+        setDate(undefined);
+        setPriority("medium");
+        setLocation("");
+        setCoordinates(null);
+        setRotating(false);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, taskToEdit, isEditing]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     
-    onSubmit({
+    const taskData = {
+      ...(taskToEdit?.id ? { id: taskToEdit.id } : {}),
       title,
       dueDate: date ? format(date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
-      location: location,
-      coordinates: coordinates || undefined
-    });
+      priority,
+      isRotating: rotating,
+      location: location || null,
+      coordinates: coordinates || null,
+      ...(taskToEdit?.assignees ? { assignees: taskToEdit.assignees } : {}),
+      ...(taskToEdit?.isCompleted !== undefined ? { isCompleted: taskToEdit.isCompleted } : {})
+    };
     
+    onSubmit(taskData);
     onClose();
   };
   
@@ -158,7 +189,7 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create Task</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Task" : "Create Task"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
@@ -237,7 +268,15 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
               <Label htmlFor="priority" className="text-right">
                 Priority
               </Label>
-              <Select value={priority} onValueChange={setPriority}>
+              <Select 
+                value={priority} 
+                onValueChange={(value) => {
+                  // Ensure type safety by checking if value is a valid priority
+                  if (value === "low" || value === "medium" || value === "high") {
+                    setPriority(value);
+                  }
+                }}
+              >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -248,12 +287,26 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit }: CreateTaskModalPr
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="rotating" className="text-right">
+                Rotating
+              </Label>
+              <div className="col-span-3 flex items-center">
+                <input
+                  type="checkbox"
+                  id="rotating"
+                  checked={rotating}
+                  onChange={(e) => setRotating(e.target.checked)}
+                  className="mr-2 rounded border-gloop-outline focus:ring-gloop-primary h-4 w-4"
+                />
+                <Label htmlFor="rotating" className="text-sm">
+                  This task rotates between assignees
+                </Label>
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">Create</Button>
+            <Button type="submit">{isEditing ? "Save Changes" : "Create Task"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
