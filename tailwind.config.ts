@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
 
@@ -24,10 +25,16 @@ const config = {
         display: ["var(--font-display)", ...fontFamily.sans],
         inter: ["Inter", "sans-serif"],
       },
+      scale: {
+        '101': '1.01',
+        '102': '1.02',
+        '103': '1.03',
+        '105': '1.05',
+      },
       colors: {
         // Brand & Color System from style guide
         gloop: {
-          bg: "#F0F9FF",
+          bg: "hsl(var(--background))",
           surface: "#FFFFFF",
           "text-main": "#1E293B",
           "text-muted": "#64748B",
@@ -101,10 +108,15 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "pulse-subtle": {
+          '0%, 100%': { opacity: 1 },
+          '50%': { opacity: 0.7 },
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-subtle": "pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
       boxShadow: {
         fab: "0 4px 14px 0 rgba(79, 140, 255, 0.39)",
@@ -130,6 +142,11 @@ const config = {
       margin: {
         'clamp': 'clamp(1.5rem, 5vw, 3rem)',
         'clamp-sm': 'clamp(1rem, 3vw, 2rem)',
+      },
+      backgroundImage: {
+        'premium-gradient': 'linear-gradient(135deg, #3B82F6 0%, #10B981 100%)',
+        'premium-radial': 'radial-gradient(circle at top right, #3B82F6, #10B981)',
+        'dark-gradient': 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
       },
     },
   },
@@ -270,3 +287,4 @@ const config = {
 } satisfies Config;
 
 export default config;
+
