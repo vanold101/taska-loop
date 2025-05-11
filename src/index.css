@@ -1,3 +1,4 @@
+
 /* Add Tailwind directives */
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
@@ -161,6 +162,12 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-4px);
 }
 
+@layer utilities {
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+}
+
 /* Ripple effect for buttons */
 .ripple-effect {
   position: relative;
@@ -304,3 +311,4 @@ h1, h2, h3, h4, h5, h6 {
 .dark .coming-soon-overlay-content p {
   color: #94A3B8;
 }
+

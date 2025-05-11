@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,11 @@ import {
   ChevronRight,
   Edit,
   CheckCircle,
-  Moon
+  Moon,
+  TreeDeciduous
 } from "lucide-react";
 import { motion } from "framer-motion";
+import SignOutDialog from "@/components/SignOutDialog";
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState("account");
@@ -36,6 +39,7 @@ const Profile = () => {
   const [showAddFriendModal, setShowAddFriendModal] = useState(false);
   const [newFriendName, setNewFriendName] = useState("");
   const [newFriendEmail, setNewFriendEmail] = useState("");
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false);
 
   // Check system preference for dark mode on initial load
   useEffect(() => {
@@ -159,18 +163,30 @@ const Profile = () => {
             </div>
             
             <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-              <div className="p-2 rounded-lg bg-gloop-bg/30">
+              <motion.div 
+                className="p-2 rounded-lg bg-gloop-bg/30"
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              >
                 <p className="text-xs text-gloop-text-muted">Tasks</p>
                 <p className="font-semibold">{user.completedTasks}</p>
-              </div>
-              <div className="p-2 rounded-lg bg-gloop-bg/30">
+              </motion.div>
+              <motion.div 
+                className="p-2 rounded-lg bg-gloop-bg/30"
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              >
                 <p className="text-xs text-gloop-text-muted">Saved</p>
                 <p className="font-semibold">{user.savedMoney}</p>
-              </div>
-              <div className="p-2 rounded-lg bg-gloop-bg/30">
+              </motion.div>
+              <motion.div 
+                className="p-2 rounded-lg bg-gloop-bg/30"
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 400, damping: 10 }}
+              >
                 <p className="text-xs text-gloop-text-muted">Time</p>
                 <p className="font-semibold">{user.savedTime}</p>
-              </div>
+              </motion.div>
             </div>
           </CardContent>
         </Card>
@@ -233,9 +249,9 @@ const Profile = () => {
                 />
               </div>
               
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Moon className="h-4 w-4" />
+              <div className="flex items-center justify-between premium-card p-3 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Moon className="h-4 w-4 text-gloop-primary" />
                   <Label htmlFor="dark-mode" className="cursor-pointer">
                     Dark Mode
                   </Label>
@@ -244,6 +260,18 @@ const Profile = () => {
                   id="dark-mode" 
                   checked={darkModeEnabled}
                   onCheckedChange={toggleDarkMode}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between premium-card p-3 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <TreeDeciduous className="h-4 w-4 text-green-500" />
+                  <Label htmlFor="eco-friendly" className="cursor-pointer">
+                    Eco-Friendly Mode
+                  </Label>
+                </div>
+                <Switch 
+                  id="eco-friendly"
                 />
               </div>
             </CardContent>
@@ -306,7 +334,11 @@ const Profile = () => {
                 Privacy Settings
               </Button>
               
-              <Button variant="outline" className="w-full justify-start text-red-600 premium-card hover:text-red-700">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start text-red-600 premium-card hover:text-red-700"
+                onClick={() => setShowSignOutDialog(true)}
+              >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </Button>
@@ -427,22 +459,38 @@ const Profile = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 premium-card rounded-lg text-center">
+                <motion.div 
+                  className="p-3 premium-card rounded-lg text-center"
+                  whileHover={{ scale: 1.03 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                >
                   <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
                   <p className="font-medium text-sm">Early Adopter</p>
-                </div>
-                <div className="p-3 premium-card rounded-lg text-center">
+                </motion.div>
+                <motion.div 
+                  className="p-3 premium-card rounded-lg text-center"
+                  whileHover={{ scale: 1.03 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                >
                   <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
                   <p className="font-medium text-sm">Task Master</p>
-                </div>
-                <div className="p-3 premium-card rounded-lg text-center bg-gray-100">
+                </motion.div>
+                <motion.div 
+                  className="p-3 premium-card rounded-lg text-center bg-gray-100 dark:bg-gray-800/50"
+                  whileHover={{ scale: 1.03 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                >
                   <CheckCircle className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                   <p className="font-medium text-sm text-gray-400">Super Saver</p>
-                </div>
-                <div className="p-3 premium-card rounded-lg text-center bg-gray-100">
+                </motion.div>
+                <motion.div 
+                  className="p-3 premium-card rounded-lg text-center bg-gray-100 dark:bg-gray-800/50"
+                  whileHover={{ scale: 1.03 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                >
                   <CheckCircle className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                   <p className="font-medium text-sm text-gray-400">Team Player</p>
-                </div>
+                </motion.div>
               </div>
             </CardContent>
           </Card>
@@ -508,6 +556,12 @@ const Profile = () => {
           </motion.div>
         </div>
       )}
+      
+      {/* Sign Out Dialog */}
+      <SignOutDialog 
+        open={showSignOutDialog}
+        onOpenChange={setShowSignOutDialog}
+      />
     </div>
   );
 };

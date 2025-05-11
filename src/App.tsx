@@ -1,3 +1,4 @@
+
 import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -36,38 +37,28 @@ const App = () => {
   }, []);
   
   return (
-    <AuthProvider>
-      <TaskProvider>
-        <TripProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <Router>
-              <div className="w-full min-h-screen flex flex-col bg-gradient-to-br from-blue-500/40 via-green-500/40 to-blue-500/40 dark:from-blue-700/50 dark:via-green-700/50 dark:to-blue-700/50">
-                <Routes>
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  
-                  {/* Protected Routes */}
-                  <Route element={<ProtectedRoute />}>
-                    <Route path="/home" element={<HomePage />} />
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/map" element={<MapPage />} />
-                    <Route path="/trips" element={<TripsPage />} />
-                    <Route path="/ledger" element={<LedgerPage />} />
-                    <Route path="/pantry" element={<PantryPage />} />
-                    <Route path="/profile" element={<ProfilePage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                  </Route>
-
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </div>
-            </Router>
-          </TooltipProvider>
-        </TripProvider>
-      </TaskProvider>
-    </AuthProvider>
+    <TaskProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-500/5 via-green-500/5 to-blue-500/5 dark:from-blue-900/20 dark:via-green-900/20 dark:to-blue-900/20">
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/trips" element={<TripsPage />} />
+              <Route path="/ledger" element={<LedgerPage />} />
+              <Route path="/pantry" element={<PantryPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+        </BrowserRouter>
+      </TooltipProvider>
+    </TaskProvider>
   );
 };
 
