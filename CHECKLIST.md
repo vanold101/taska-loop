@@ -4,7 +4,7 @@
 - [x] Basic list creation & management
 - [x] Cost splitting (equal, percentage, fixed amounts)
 - [x] Payment tracking
-- [x] Instant list capture (barcode scan, receipt photo)
+- [ ] Instant list capture (barcode scan, receipt photo)
 - [ ] Adaptive units
 - [ ] Smart categorization
 - [ ] Recurring items
@@ -12,9 +12,9 @@
 - [ ] Export to PDF/CSV
 
 ## B. Price intelligence
-- [x] Price tracking across stores
-- [x] Best price recommendations
-- [x] Price history
+- [ ] Price tracking across stores
+- [ ] Best price recommendations
+- [ ] Price history
 - [ ] Price alerts
 - [ ] Store-specific deals
 - [ ] Bulk buying recommendations
@@ -34,7 +34,7 @@
 - [x] Cost overview
 - [x] Chore completion
 - [x] Payment status
-- [x] Spending trends
+- [ ] Spending trends
 - [ ] Chore performance
 - [ ] Household analytics
 - [ ] Custom reports
@@ -52,7 +52,7 @@
 
 ## F. Mobile features
 - [x] Responsive design
-- [x] Camera integration
+- [ ] Camera integration
 - [x] Mobile-specific UI
 - [x] Touch animations
 - [x] Bottom navigation
@@ -75,7 +75,7 @@
 
 ## H. Security & privacy
 - [x] Basic authentication
-- [x] Data encryption
+- [ ] Data encryption
 - [ ] Advanced permissions
 - [ ] Audit logging
 - [ ] Data retention

@@ -1,16 +1,21 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShoppingCart, AlertCircle, Clock, Store, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 type CreateTripModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { store: string; eta: string }) => void;
+  onSubmit: (data: { store: string; eta: string; date: string }) => void;
 };
 
 // Common store suggestions for convenience
@@ -28,6 +33,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
   const { toast } = useToast();
   const [store, setStore] = useState("");
   const [eta, setEta] = useState("20"); // Default 20 minutes
+  const [date, setDate] = useState<Date>(new Date());
   const [errors, setErrors] = useState<{store?: string, eta?: string}>({});
   const [isFormValid, setIsFormValid] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -40,6 +46,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
       setEta("20");
       setErrors({});
       setShowSuggestions(false);
+      setDate(new Date());
     }
   }, [isOpen]);
 
@@ -86,7 +93,15 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
       return;
     }
     
-    onSubmit({ store, eta });
+    onSubmit({
+      store,
+      eta,
+      date: date.toISOString()
+    });
+    setStore("");
+    setEta("20");
+    setDate(new Date());
+    onClose();
   };
 
   const handleStoreInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,7 +116,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md glass-effect">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-green-500">
             <ShoppingCart className="h-5 w-5 text-blue-500" />
@@ -140,28 +155,30 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
             />
             
             {/* Store suggestions dropdown */}
-            {showSuggestions && filteredSuggestions.length > 0 && (
-              <motion.div 
-                className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <ul className="py-1">
-                  {filteredSuggestions.map((suggestion, index) => (
-                    <motion.li 
-                      key={index}
-                      className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-sm flex items-center"
-                      onClick={() => selectSuggestion(suggestion)}
-                      whileHover={{ x: 5 }}
-                    >
-                      <Store className="h-3 w-3 mr-2 text-blue-500" />
-                      {suggestion}
-                    </motion.li>
-                  ))}
-                </ul>
-              </motion.div>
-            )}
+            <AnimatePresence>
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <motion.div 
+                  className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <ul className="py-1">
+                    {filteredSuggestions.map((suggestion, index) => (
+                      <motion.li 
+                        key={index}
+                        className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer text-sm flex items-center"
+                        onClick={() => selectSuggestion(suggestion)}
+                        whileHover={{ x: 5 }}
+                      >
+                        <Store className="h-3 w-3 mr-2 text-blue-500" />
+                        {suggestion}
+                      </motion.li>
+                    ))}
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="space-y-2">
@@ -195,23 +212,42 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
             </p>
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-md mt-4 border border-blue-100">
-            <p className="text-sm text-blue-800 flex items-start">
-              <Info className="h-4 w-4 mr-2 mt-0.5 text-blue-500" />
-              When you broadcast a trip, your circle members will be notified and can add items to your shopping list.
-            </p>
+          <div>
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(newDate) => setDate(newDate || new Date())}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="premium-card">
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={!isFormValid}
-              className={`premium-gradient-btn ${!isFormValid ? "opacity-50 cursor-not-allowed" : ""}`}
+              className="bg-gradient-to-r from-blue-500 to-green-500 text-white hover:from-blue-600 hover:to-green-600"
             >
-              Broadcast Trip
+              Create Trip
             </Button>
           </div>
         </form>

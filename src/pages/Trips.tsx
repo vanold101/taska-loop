@@ -70,12 +70,10 @@ const TripsPage = () => {
     syncTasksWithTrips();
   }, []); // Empty dependency array = only run on mount
   
-  // Update local state when contextTrips changes
+  // Transform context trips to TripData format
   useEffect(() => {
-    // Convert context trips to TripData format
-    const convertedTrips = contextTrips.map(trip => {
-      // Create TripData object from ContextTrip
-      return {
+    if (contextTrips) {
+      const transformedTrips = contextTrips.map(trip => ({
         id: trip.id,
         store: trip.store,
         shopper: trip.shopper || {
@@ -86,19 +84,23 @@ const TripsPage = () => {
         status: trip.status,
         items: trip.items,
         participants: trip.participants,
-        itemCount: trip.items.length // Add itemCount property based on items array length
-      } as TripData;
-    });
-    
-    // Split trips into active and past
-    setTrips(convertedTrips.filter(trip => trip.status !== 'completed'));
-    setPastTrips(convertedTrips.filter(trip => trip.status === 'completed'));
-  }, [contextTrips]); // Only depend on contextTrips
+        itemCount: trip.items.length,
+        date: trip.date ? new Date(trip.date).toISOString() : new Date().toISOString() // Ensure date is always set
+      }));
+      
+      // Split into active and past trips
+      const active = transformedTrips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled');
+      const past = transformedTrips.filter(trip => trip.status === 'completed' || trip.status === 'cancelled');
+      
+      setTrips(active);
+      setPastTrips(past);
+    }
+  }, [contextTrips]);
   
   // Create a new trip
-  const handleCreateTrip = (data: { store: string; eta: string }) => {
+  const handleCreateTrip = (data: { store: string; eta: string; date: string }) => {
     // Create a new trip with default values
-    const newTrip: Omit<ContextTrip, 'id'> = {
+    const newTrip: Omit<ContextTrip, 'id' | 'createdAt'> = {
       store: data.store,
       location: data.store,
       coordinates: { lat: 39.9650, lng: -83.0200 }, // Default coordinates
@@ -111,13 +113,21 @@ const TripsPage = () => {
       shopper: {
         name: "You",
         avatar: "https://example.com/you.jpg"
-      }
+      },
+      date: new Date(data.date).toISOString() // Ensure date is in ISO format
     };
     
     // Add trip to context
     addContextTrip(newTrip);
     
+    // Close the modal
     setTripModalOpen(false);
+    
+    // Show success toast
+    toast({
+      title: "Trip Created",
+      description: `Your trip to ${data.store} is scheduled for ${new Date(data.date).toLocaleDateString()}`
+    });
   };
   
   // Add an item to a trip
@@ -132,18 +142,37 @@ const TripsPage = () => {
       id: Date.now().toString()
     };
     
+    // Create updated items array
+    const updatedItems = [...trip.items, newItem];
+    
     // Update the trip with the new item
     updateContextTrip(tripId, {
-      items: [...trip.items, newItem]
+      items: updatedItems
     });
     
-    // Update the selectedTrip if it's the same trip
+    // Update the selectedTrip immediately
     if (selectedTrip && selectedTrip.id === tripId) {
-      setSelectedTrip({
+      const updatedTrip = {
         ...selectedTrip,
-        items: [...selectedTrip.items, newItem]
-      });
+        items: updatedItems
+      };
+      setSelectedTrip(updatedTrip);
     }
+    
+    // Update the trips state to reflect changes immediately
+    setTrips(prevTrips => 
+      prevTrips.map(t => 
+        t.id === tripId 
+          ? { ...t, items: updatedItems }
+          : t
+      )
+    );
+    
+    // Show success toast
+    toast({
+      title: "Item Added",
+      description: `${item.name} has been added to your trip.`
+    });
   };
   
   // Remove an item from a trip
@@ -495,7 +524,9 @@ const TripsPage = () => {
         {/* Header with search and view toggles */}
         <header className="mb-6 md:mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-[clamp(1.875rem,4vw,2.5rem)] font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600 dark:from-blue-400 dark:to-green-400">Shopping Trips</h1>
+            <h1 className="text-[clamp(1.875rem,4vw,2.5rem)] font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600 dark:from-blue-400 dark:to-green-400">
+              Shopping Trips
+            </h1>
             
             <div className="flex items-center gap-2">
               {showSearch ? (
@@ -544,23 +575,23 @@ const TripsPage = () => {
             </Button>
             <QuickTripButton store="Kroger" onClick={() => {
               console.log("Kroger quick trip clicked");
-              handleCreateTrip({ store: "Kroger", eta: "20" });
+              handleCreateTrip({ store: "Kroger", eta: "20", date: new Date().toISOString().split('T')[0] });
             }} />
             <QuickTripButton store="Target" onClick={() => {
               console.log("Target quick trip clicked");
-              handleCreateTrip({ store: "Target", eta: "25" });
+              handleCreateTrip({ store: "Target", eta: "25", date: new Date().toISOString().split('T')[0] });
             }} />
             <QuickTripButton store="Walmart" onClick={() => {
               console.log("Walmart quick trip clicked");
-              handleCreateTrip({ store: "Walmart", eta: "15" });
+              handleCreateTrip({ store: "Walmart", eta: "15", date: new Date().toISOString().split('T')[0] });
             }} />
             <QuickTripButton store="Costco" onClick={() => {
               console.log("Costco quick trip clicked");
-              handleCreateTrip({ store: "Costco", eta: "30" });
+              handleCreateTrip({ store: "Costco", eta: "30", date: new Date().toISOString().split('T')[0] });
             }} />
             <QuickTripButton store="Whole Foods" onClick={() => {
               console.log("Whole Foods quick trip clicked");
-              handleCreateTrip({ store: "Whole Foods", eta: "20" });
+              handleCreateTrip({ store: "Whole Foods", eta: "20", date: new Date().toISOString().split('T')[0] });
             }} />
           </div>
         </header>

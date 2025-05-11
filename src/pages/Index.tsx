@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TripCard from "../components/TripCard";
 import FloatingActionButton from "../components/FloatingActionButton";
 import CreateTripModal from "../components/CreateTripModal";
@@ -26,11 +26,12 @@ import {
   CheckCircle,
   Store,
   Users,
-  User,
-  Calendar
+  User as UserIcon,
+  Calendar,
+  LogOut
 } from "lucide-react";
-import { Link } from "react-router-dom";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Link, useNavigate } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Dialog, 
@@ -42,6 +43,7 @@ import {
 } from "../components/ui/dialog";
 import { useToast } from "../hooks/use-toast";
 import { useTaskContext, Task as ContextTask, Trip as ContextTrip, TripItem, TripParticipant } from "../context/TaskContext";
+import { useAuth } from "../context/AuthContext";
 import { formatDistanceToNow, isPast, isToday, isTomorrow, parseISO } from "date-fns";
 import NearbyStores from "../components/NearbyStores";
 import TripDetailModal from "../components/TripDetailModal";
@@ -115,6 +117,8 @@ const HomePage = () => {
     addTrip: addContextTrip,
     updateTrip: updateContextTrip,
   } = useTaskContext();
+  const { user, logout, isLoading: authIsLoading } = useAuth();
+  const navigate = useNavigate();
   
   const [isTripModalOpen, setTripModalOpen] = useState(false);
   const [isTaskModalOpen, setTaskModalOpen] = useState(false);
@@ -127,7 +131,12 @@ const HomePage = () => {
   const [selectedTripForDetail, setSelectedTripForDetail] = useState<ContextTrip | null>(null);
   const [isTripDetailModalOpen, setIsTripDetailModalOpen] = useState(false);
 
-  const handleFilterClick = () => console.log('Filter clicked');
+  // Redirect to login if not authenticated and not loading
+  useEffect(() => {
+    if (!authIsLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, authIsLoading, navigate]);
 
   const handleCreateTrip = (data: { store: string; eta: string }) => {
     const newTripData: Omit<ContextTrip, 'id'> = { 
@@ -139,6 +148,7 @@ const HomePage = () => {
       items: [],
       participants: [{ id: 'user-1', name: 'You', avatar: 'https://example.com/you.jpg' }], 
       shopper: { name: 'You', avatar: 'https://example.com/you.jpg' },
+      date: new Date().toISOString(),
     };
     addContextTrip(newTripData);
     setTripModalOpen(false);
@@ -271,9 +281,9 @@ const HomePage = () => {
         transition={{ duration: 0.3, delay: index * 0.05 }}
         className="premium-card flex flex-col"
       >
-        <CardContent className="p-4 space-y-3 flex-grow">
+        <CardContent className="p-4 space-y-3 flex-grow text-center">
           <div className="flex justify-between items-start">
-            <h3 className="font-semibold text-[clamp(1rem,2.2vw,1.125rem)] mr-2 flex-1 break-words">
+            <h3 className="font-semibold text-[clamp(0.9rem,2vw,1.05rem)] mr-2 flex-1 break-words">
               {task.title}
             </h3>
             <Badge variant="outline" className={`capitalize ${getPriorityColor(task.priority)} whitespace-nowrap`}>
@@ -281,7 +291,7 @@ const HomePage = () => {
             </Badge>
           </div>
           
-          <div className="flex items-center text-xs text-gloop-text-muted space-x-2">
+          <div className="flex items-center text-xs text-slate-600 dark:text-slate-400 space-x-2">
             <Clock className="h-3 w-3" />
             <span className={isTaskPastDue && !task.completed ? "text-red-500 dark:text-red-400 font-medium" : ""}>
               {getDueDateDisplay(task.dueDate)}
@@ -289,13 +299,13 @@ const HomePage = () => {
           </div>
 
           {assignees.length > 0 && (
-            <div className="flex items-center text-xs text-gloop-text-muted space-x-2">
+            <div className="flex items-center text-xs text-slate-600 dark:text-slate-400 space-x-2">
               <Users className="h-3 w-3" />
               <div className="flex -space-x-2 overflow-hidden">
                 {assignees.slice(0, 3).map(assignee => (
                   assignee && assignee.name && (
-                    <Avatar key={assignee.id} className="inline-block h-5 w-5 rounded-full ring-2 ring-background dark:ring-gloop-dark-surface">
-                      <AvatarFallback className="text-[10px] bg-gloop-primary/20 dark:bg-gloop-dark-primary/20">
+                    <Avatar key={assignee.id} className="inline-block h-5 w-5 rounded-full ring-2 ring-background dark:ring-slate-900">
+                      <AvatarFallback className="text-[10px] bg-primary/20 dark:bg-primary/30">
                         {assignee.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -309,20 +319,20 @@ const HomePage = () => {
           )}
 
           {task.location && task.location !== 'N/A' && (
-            <div className="flex items-center text-xs text-gloop-text-muted space-x-2">
+            <div className="flex items-center text-xs text-slate-600 dark:text-slate-400 space-x-2">
               <MapPin className="h-3 w-3" />
               <span>{task.location}</span>
             </div>
           )}
           
           {task.isRotating && (
-            <div className="flex items-center text-xs text-gloop-text-muted space-x-2">
+            <div className="flex items-center text-xs text-slate-600 dark:text-slate-400 space-x-2">
               <RotateCw className="h-3 w-3" />
               <span>Rotating Task</span>
             </div>
           )}
         </CardContent>
-        <div className="p-3 border-t border-gloop-outline/30 dark:border-gloop-dark-outline/30 flex gap-2">
+        <div className="p-3 border-t border-border/70 dark:border-border/50 flex gap-2">
           <Button 
             variant="ghost" 
             size="sm" 
@@ -412,231 +422,217 @@ const HomePage = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-500/5 via-green-500/5 to-blue-500/5 dark:from-blue-900/10 dark:via-green-900/10 dark:to-blue-900/10">
-      <header className="sticky top-0 z-40 bg-background/80 dark:bg-gloop-dark-background/80 backdrop-blur-md border-b border-gloop-outline/50 dark:border-gloop-dark-outline/50 px-[5vw] md:px-[8vw] lg:px-[10vw] py-3">
-        <div className="flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="Taska Loop Logo" className="h-8 w-8 object-contain" />
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-green-500">
-              TaskaLoop
-            </h1>
-          </Link>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleFilterClick} className="text-gloop-text-muted hover:text-gloop-primary">
-              <Filter className="h-5 w-5" />
-            </Button>
-            <Link to="/profile">
-              <Avatar className="h-8 w-8 cursor-pointer border-2 border-blue-500/50 dark:border-blue-400/50">
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-green-500 text-white text-sm">
-                  U
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-col min-h-screen">
+      {/* Header removed based on user request */}
       
-      <main className="flex-grow px-[5vw] md:px-[8vw] lg:px-[10vw] py-6 md:py-8 space-y-6 md:space-y-8 pb-20 md:pb-24">
-        <section>
-          {/* ... existing quick actions or overview content ... */}
-        </section>
-
-        {contextTrips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled').length > 0 && (
+      {!authIsLoading && user && (
+        <main className="flex-grow px-[5vw] md:px-[8vw] lg:px-[10vw] py-6 md:py-8 space-y-6 md:space-y-8 pb-20 md:pb-24">
           <section>
-            <div className="flex justify-between items-center mb-3 md:mb-4">
-              <h2 className="text-[clamp(1.5rem,3vw,1.875rem)] font-semibold flex items-center">
-                <Store className="h-6 w-6 mr-2 text-blue-500" />
-                Active Trips
-              </h2>
-              <Link to="/trips" className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center">
-                View All <ChevronRight className="h-4 w-4 ml-0.5" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {contextTrips
-                .filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled')
-                .slice(0, 3)
-                .map((trip, index) => {
-                  const cardTrip = { 
-                    ...trip,
-                    itemCount: trip.items.length,
-                    shopper: trip.shopper || { name: "Unknown Shopper", avatar: "" },
-                  };
-                  return (
-                    <motion.div
-                      key={trip.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                    >
-                      <TripCard
-                        trip={cardTrip}
-                        onTripClick={() => handleOpenTripDetailModal(trip.id)}
-                        onAddItem={() => handleOpenTripDetailModal(trip.id)}
-                        onCompleteTrip={() => updateContextTrip(trip.id, { status: 'completed' })} 
-                        onDeleteTrip={() => {
-                          if (window.confirm(`Are you sure you want to delete the trip to ${trip.store}?`)) {
-                            console.log("Placeholder: Delete trip", trip.id);
-                            toast({title: "Trip Deleted (Placeholder)", description: `Trip to ${trip.store} removed.`})
-                          }
-                        }} 
-                        onShareTrip={() => console.log("Share trip:", trip.id)} 
-                        onEditTrip={() => console.log("Edit trip:", trip.id)}
-                      />
-                    </motion.div>
-                  );
-                })}
-            </div>
+            {/* ... existing quick actions or overview content ... */}
           </section>
-        )}
-        
-        {/* Nearby Stores - if enabled */}
-        {/* <NearbyStores /> */}
 
-        <section>
-          <div className="flex justify-between items-center mb-3 md:mb-4">
-            <h2 className="text-[clamp(1.5rem,3vw,1.875rem)] font-semibold flex items-center">
-              <ListTodo className="h-6 w-6 mr-2 text-green-500" />
-              My Tasks
-            </h2>
-            <Button 
-              size="sm" 
-              onClick={() => {
-                setTaskToEdit(null);
-                setIsEditingTask(false);
-                setTaskModalOpen(true)
-              }}
-              className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              New Task
-            </Button>
-          </div>
+          {contextTrips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled').length > 0 && (
+            <section>
+              <div className="flex justify-between items-center mb-3 md:mb-4">
+                <h2 className="text-[clamp(1.5rem,3vw,1.875rem)] font-semibold flex items-center">
+                  <Store className="h-6 w-6 mr-2 text-blue-500" />
+                  Active Trips
+                </h2>
+                <Link to="/trips" className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center">
+                  <Button variant="ghost" size="sm" className="ml-auto text-sm">View All</Button>
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                {contextTrips
+                  .filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled')
+                  .slice(0, 3)
+                  .map((trip, index) => {
+                    const cardTrip = { 
+                      ...trip, // Spread properties of trip (type Trip, which has no itemCount by default)
+                      itemCount: trip.items.filter(item => !item.checked).length, // Define itemCount based on unchecked items
+                      shopper: trip.shopper || { name: "Unknown Shopper", avatar: "" },
+                    };
+                    return (
+                      <motion.div
+                        key={trip.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                      >
+                        <TripCard
+                          trip={cardTrip}
+                          onTripClick={() => handleOpenTripDetailModal(trip.id)}
+                          onAddItem={() => handleOpenTripDetailModal(trip.id)}
+                          onCompleteTrip={() => updateContextTrip(trip.id, { status: 'completed' })} 
+                          onDeleteTrip={() => {
+                            if (window.confirm(`Are you sure you want to delete the trip to ${trip.store}?`)) {
+                              console.log("Placeholder: Delete trip", trip.id);
+                              toast({title: "Trip Deleted (Placeholder)", description: `Trip to ${trip.store} removed.`})
+                            }
+                          }} 
+                          onShareTrip={() => console.log("Share trip:", trip.id)} 
+                          onEditTrip={() => console.log("Edit trip:", trip.id)}
+                        />
+                      </motion.div>
+                    );
+                  })}
+              </div>
+            </section>
+          )}
           
-          <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 mb-4 premium-card">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="today">Today</TabsTrigger>
-              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-              <TabsTrigger value="mine">Mine</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-            </TabsList>
+          {/* Nearby Stores - if enabled */}
+          {/* <NearbyStores /> */}
 
-            <TabsContent value="all">
-              <AnimatePresence>
-                {contextTasks.filter(task => !task.completed).length > 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5"
-                  >
-                    {contextTasks
-                      .filter(task => !task.completed)
-                      .sort((a, b) => {
-                        try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
-                      })
-                      .map(renderTaskCard)}
-                  </motion.div>
-                ) : (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-gloop-dark-surface/30 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium mb-1">All tasks cleared!</h3>
-                    <p className="text-gloop-text-muted text-sm">Add a new task or enjoy your free time.</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
-
-            <TabsContent value="today">
-              <AnimatePresence>
-                {contextTasks.filter(task => !task.completed && task.dueDate && isToday(parseISO(task.dueDate))).length > 0 ? (
-                  <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
-                    {contextTasks
-                      .filter(task => !task.completed && task.dueDate && isToday(parseISO(task.dueDate)))
-                      .sort((a, b) => {
-                        try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
-                      })
-                      .map(renderTaskCard)}
-                  </motion.div>
-                ) : (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-gloop-dark-surface/30 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-                     <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium mb-1">No tasks for today!</h3>
-                    <p className="text-gloop-text-muted text-sm">Relax or plan for tomorrow.</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+          <section>
+            <div className="flex justify-between items-center mb-4 md:mb-6">
+              <h2 className="text-[clamp(1.6rem,3.2vw,2rem)] font-bold flex items-center">
+                <UserIcon className="h-7 w-7 mr-2.5 text-green-500" />
+                My Tasks
+              </h2>
+              <Button 
+                size="default" 
+                onClick={() => {
+                  setTaskToEdit(null);
+                  setIsEditingTask(false);
+                  setTaskModalOpen(true)
+                }}
+                className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Task
+              </Button>
+            </div>
             
-            <TabsContent value="upcoming">
-              <AnimatePresence>
-                {contextTasks.filter(task => !task.completed && task.dueDate && (isTomorrow(parseISO(task.dueDate)) || (!isToday(parseISO(task.dueDate)) && !isPast(parseISO(task.dueDate))))).length > 0 ? (
-                  <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
-                    {contextTasks
-                      .filter(task => !task.completed && task.dueDate && (isTomorrow(parseISO(task.dueDate)) || (!isToday(parseISO(task.dueDate)) && !isPast(parseISO(task.dueDate)))))
-                      .sort((a, b) => {
-                        try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
-                      })
-                      .map(renderTaskCard)}
-                  </motion.div>
-                ) : (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-gloop-dark-surface/30 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-                     <Calendar className="h-12 w-12 text-blue-500 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium mb-1">No upcoming tasks.</h3>
-                    <p className="text-gloop-text-muted text-sm">Plan ahead or enjoy the quiet.</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+            <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 mb-4 premium-card">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="today">Today</TabsTrigger>
+                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                <TabsTrigger value="mine">Mine</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="mine">
-              <AnimatePresence>
-                {contextTasks.filter(task => !task.completed && task.assignees && task.assignees.some(a => a && a.name === 'You')).length > 0 ? (
-                   <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
-                    {contextTasks
-                      .filter(task => !task.completed && task.assignees && task.assignees.some(a => a && a.name === 'You'))
-                      .sort((a, b) => {
-                        try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
-                      })
-                      .map(renderTaskCard)}
-                  </motion.div>
-                ) : (
-                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-gloop-dark-surface/30 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-                    <User className="h-12 w-12 text-indigo-500 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium mb-1">Nothing assigned to you.</h3>
-                    <p className="text-gloop-text-muted text-sm">Check other tabs or wait for new assignments.</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+              <TabsContent value="all">
+                <AnimatePresence>
+                  {contextTasks.filter(task => !task.completed).length > 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5"
+                    >
+                      {contextTasks
+                        .filter(task => !task.completed)
+                        .sort((a, b) => {
+                          try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
+                        })
+                        .map(renderTaskCard)}
+                    </motion.div>
+                  ) : (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-background/30 rounded-lg border border-dashed border-border">
+                      <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                      <h3 className="text-lg font-medium mb-1">All tasks cleared!</h3>
+                      <p className="text-slate-600 dark:text-slate-400 text-sm">Add a new task or enjoy your free time.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </TabsContent>
 
-            <TabsContent value="completed">
-              <AnimatePresence>
-                {contextTasks.filter(task => task.completed).length > 0 ? (
-                  <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
-                    {contextTasks
-                      .filter(task => task.completed)
-                      .sort((a, b) => {
-                        try { return parseISO(b.dueDate).getTime() - parseISO(a.dueDate).getTime(); } catch { return 0; }
-                      })
-                      .map(renderTaskCard)}
-                  </motion.div>
-                ) : (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-gloop-dark-surface/30 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
-                    <Info className="h-12 w-12 text-gray-500 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium mb-1">No completed tasks yet.</h3>
-                    <p className="text-gloop-text-muted text-sm">Get to work and see your accomplishments here!</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
-          </Tabs>
-        </section>
-      </main>
+              <TabsContent value="today">
+                <AnimatePresence>
+                  {contextTasks.filter(task => !task.completed && task.dueDate && isToday(parseISO(task.dueDate))).length > 0 ? (
+                    <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
+                      {contextTasks
+                        .filter(task => !task.completed && task.dueDate && isToday(parseISO(task.dueDate)))
+                        .sort((a, b) => {
+                          try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
+                        })
+                        .map(renderTaskCard)}
+                    </motion.div>
+                  ) : (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-background/30 rounded-lg border border-dashed border-border">
+                       <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                      <h3 className="text-lg font-medium mb-1">No tasks for today!</h3>
+                      <p className="text-slate-600 dark:text-slate-400 text-sm">Relax or plan for tomorrow.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </TabsContent>
+              
+              <TabsContent value="upcoming">
+                <AnimatePresence>
+                  {contextTasks.filter(task => !task.completed && task.dueDate && (isTomorrow(parseISO(task.dueDate)) || (!isToday(parseISO(task.dueDate)) && !isPast(parseISO(task.dueDate))))).length > 0 ? (
+                    <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
+                      {contextTasks
+                        .filter(task => !task.completed && task.dueDate && (isTomorrow(parseISO(task.dueDate)) || (!isToday(parseISO(task.dueDate)) && !isPast(parseISO(task.dueDate)))))
+                        .sort((a, b) => {
+                          try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
+                        })
+                        .map(renderTaskCard)}
+                    </motion.div>
+                  ) : (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-background/30 rounded-lg border border-dashed border-border">
+                       <Calendar className="h-12 w-12 text-blue-500 mx-auto mb-3" />
+                      <h3 className="text-lg font-medium mb-1">No upcoming tasks.</h3>
+                      <p className="text-slate-600 dark:text-slate-400 text-sm">Plan ahead or enjoy the quiet.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </TabsContent>
 
-      <NavBar />
+              <TabsContent value="mine">
+                <AnimatePresence>
+                  {contextTasks.filter(task => !task.completed && task.assignees && task.assignees.some(a => a && a.name === 'You')).length > 0 ? (
+                     <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
+                      {contextTasks
+                        .filter(task => !task.completed && task.assignees && task.assignees.some(a => a && a.name === 'You'))
+                        .sort((a, b) => {
+                          try { return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime(); } catch { return 0; }
+                        })
+                        .map(renderTaskCard)}
+                    </motion.div>
+                  ) : (
+                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-background/30 rounded-lg border border-dashed border-border">
+                      <UserIcon className="h-12 w-12 text-indigo-500 mx-auto mb-3" />
+                      <h3 className="text-lg font-medium mb-1">Nothing assigned to you.</h3>
+                      <p className="text-slate-600 dark:text-slate-400 text-sm">Check other tabs or wait for new assignments.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </TabsContent>
 
+              <TabsContent value="completed">
+                <AnimatePresence>
+                  {contextTasks.filter(task => task.completed).length > 0 ? (
+                    <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
+                      {contextTasks
+                        .filter(task => task.completed)
+                        .sort((a, b) => {
+                          try { return parseISO(b.dueDate).getTime() - parseISO(a.dueDate).getTime(); } catch { return 0; }
+                        })
+                        .map(renderTaskCard)}
+                    </motion.div>
+                  ) : (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 bg-background/50 dark:bg-background/30 rounded-lg border border-dashed border-border">
+                      <Info className="h-12 w-12 text-gray-500 mx-auto mb-3" />
+                      <h3 className="text-lg font-medium mb-1">No completed tasks yet.</h3>
+                      <p className="text-slate-600 dark:text-slate-400 text-sm">Get to work and see your accomplishments here!</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </TabsContent>
+            </Tabs>
+          </section>
+        </main>
+      )}
+      
+      {!authIsLoading && user && <NavBar />}
+      
       <CreateTripModal 
         isOpen={isTripModalOpen} 
         onClose={() => setTripModalOpen(false)}
@@ -644,14 +640,15 @@ const HomePage = () => {
       />
       
       <CreateTaskModal
-        isOpen={isTaskModalOpen || isEditingTask} 
+        isOpen={isTaskModalOpen || isEditingTask}
         onClose={() => {
           setTaskModalOpen(false);
           setIsEditingTask(false);
           setTaskToEdit(null);
         }}
-        onSubmit={taskToEdit ? handleTaskUpdate : handleCreateTask} 
+        onSubmit={taskToEdit ? handleTaskUpdate : handleCreateTask}
         taskToEdit={taskToEdit}
+        isEditing={isEditingTask}
       />
 
       {selectedTripForDetail && (
@@ -667,16 +664,42 @@ const HomePage = () => {
             } : null
           }
           onAddItem={handleAddItemToContextTrip}
-          onRemoveItem={(tripId: string, itemId: string) => handleDeleteTripItemContext(tripId, itemId)}
-          onToggleItemCheck={(tripId: string, itemId: string) => {
-            const trip = contextTrips.find(t => t.id === tripId);
-            const item = trip?.items.find(i => i.id === itemId);
-            if (item) {
-              handleUpdateTripItemContext(tripId, itemId, { checked: !item.checked });
+          onRemoveItem={(tripId: string, itemId: string) => {
+            handleDeleteTripItemContext(tripId, itemId);
+            const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
+            if (updatedTripFromContext) {
+              setSelectedTripForDetail(updatedTripFromContext);
             }
           }}
-          onUpdateItemPrice={(tripId: string, itemId: string, price: number) => handleUpdateTripItemContext(tripId, itemId, { price })}
-          onUpdateItemUnit={(tripId: string, itemId: string, unit: string, newQuantity?: number) => handleUpdateTripItemContext(tripId, itemId, { unit, quantity: newQuantity })}
+          onToggleItemCheck={(tripId: string, itemId: string) => {
+            const currentTrip = contextTrips.find(t => t.id === tripId);
+            const item = currentTrip?.items.find(i => i.id === itemId);
+            if (item && currentTrip) {
+              handleUpdateTripItemContext(tripId, itemId, { checked: !item.checked });
+              const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
+              if (updatedTripFromContext) {
+                setSelectedTripForDetail(updatedTripFromContext);
+              }
+            }
+          }}
+          onUpdateItemPrice={(tripId: string, itemId: string, price: number) => {
+            handleUpdateTripItemContext(tripId, itemId, { price });
+            const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
+            if (updatedTripFromContext) {
+              setSelectedTripForDetail(updatedTripFromContext);
+            }
+          }}
+          onUpdateItemUnit={(tripId: string, itemId: string, unit: string, newQuantity?: number) => {
+            const currentContextTrip = contextTrips.find(t => t.id === tripId);
+            const itemToUpdate = currentContextTrip?.items.find(i => i.id === itemId);
+            const updates = { unit, quantity: newQuantity !== undefined ? newQuantity : itemToUpdate?.quantity };
+
+            handleUpdateTripItemContext(tripId, itemId, updates);
+            const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
+            if (updatedTripFromContext) {
+              setSelectedTripForDetail(updatedTripFromContext);
+            }
+          }}
           onInviteParticipant={(tripId: string) => console.log("Invite participant to trip", tripId)}
           onCompleteTrip={(tripId: string) => updateContextTrip(tripId, { status: 'completed' })}
           onReactivateTrip={(tripId: string) => updateContextTrip(tripId, { status: 'open' })}

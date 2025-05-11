@@ -1,195 +1,345 @@
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  getDocs, 
-  query, 
-  where,
-  onSnapshot,
-  arrayUnion,
-  arrayRemove,
-  Timestamp,
-  serverTimestamp
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { TripData, TripItem } from '@/components/TripDetailModal';
+import { Trip, TripItem } from "@/context/TaskContext";
+import { recordStoreVisit } from "@/services/StoreAnalyticsService";
 
-const TRIPS_COLLECTION = 'trips';
+// Constants
+const TRIPS_STORAGE_KEY = 'taska_trips';
+const DEFAULT_AVATAR = '/img/default-avatar.png'; // Placeholder for default avatar
+const DEFAULT_ADDED_BY_USER = { name: 'System', avatar: DEFAULT_AVATAR }; // Placeholder for addedBy user object
 
-// Get all trips for a user
-export const getUserTrips = (userId: string, callback: (trips: TripData[]) => void) => {
-  const q = query(
-    collection(db, TRIPS_COLLECTION),
-    where('participants', 'array-contains', userId)
-  );
+// Types
+export interface TripParticipant {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
+export interface CreateTripData {
+  store: string;
+  location: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  eta?: string;
+  participants?: TripParticipant[];
+  shopper?: TripParticipant;
+}
+
+export interface CreateTripItemData {
+  name: string;
+  quantity?: number;
+  unit?: string;
+  price?: number;
+  // notes?: string; // Assumed not in TaskContext.TripItem
+  // category?: string; // Assumed not in TaskContext.TripItem
+  // addedAt?: string; // Assumed not in TaskContext.TripItem
+}
+
+// Load trips from localStorage
+export const loadTrips = (): Trip[] => {
+  try {
+    const stored = localStorage.getItem(TRIPS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Failed to load trips:', error);
+  }
+  return [];
+};
+
+// Save trips to localStorage
+export const saveTrips = (trips: Trip[]): void => {
+  try {
+    localStorage.setItem(TRIPS_STORAGE_KEY, JSON.stringify(trips));
+  } catch (error) {
+    console.error('Failed to save trips:', error);
+  }
+};
+
+// Get a single trip by ID
+export const getTrip = (tripId: string): Trip | null => {
+  const trips = loadTrips();
+  return trips.find(t => t.id === tripId) || null;
+};
+
+// Add a new trip
+export const addTrip = (data: CreateTripData): Trip => {
+  const trips = loadTrips();
   
-  return onSnapshot(q, (querySnapshot) => {
-    const trips: TripData[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      trips.push({
-        id: doc.id,
-        store: data.store,
-        shopper: data.shopper,
-        eta: data.eta,
-        status: data.status,
-        items: data.items || [],
-        participants: data.participants || []
-      });
-    });
-    callback(trips);
-  });
+  const newTrip: Trip = {
+    id: Date.now().toString(),
+    store: data.store,
+    location: data.location,
+    coordinates: data.coordinates,
+    eta: data.eta || new Date().toISOString(),
+    status: 'open',
+    items: [],
+    participants: data.participants?.map(p => ({ id: p.id, name: p.name, avatar: p.avatar || DEFAULT_AVATAR })) || [],
+    shopper: data.shopper ? { name: data.shopper.name, avatar: data.shopper.avatar || DEFAULT_AVATAR } : undefined,
+    date: new Date().toISOString(),
+  };
+  
+  trips.push(newTrip);
+  saveTrips(trips);
+  
+  return newTrip;
 };
 
-// Create a new trip
-export const createTrip = async (tripData: Omit<TripData, 'id'>) => {
-  try {
-    const docRef = await addDoc(collection(db, TRIPS_COLLECTION), {
-      ...tripData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    return docRef.id;
-  } catch (error) {
-    console.error("Error creating trip: ", error);
-    throw error;
-  }
+// Update a trip
+export const updateTrip = (tripId: string, updates: Partial<Trip>): Trip | null => {
+  const trips = loadTrips();
+  const index = trips.findIndex(t => t.id === tripId);
+  
+  if (index === -1) return null;
+  
+  const { id, ...validUpdates } = updates;
+  
+  const updatedTrip = {
+    ...trips[index],
+    ...validUpdates
+  };
+  
+  trips[index] = updatedTrip;
+  saveTrips(trips);
+  
+  return updatedTrip;
 };
 
-// Update a trip's status
-export const updateTripStatus = async (tripId: string, status: TripData['status']) => {
-  try {
-    const tripRef = doc(db, TRIPS_COLLECTION, tripId);
-    await updateDoc(tripRef, {
-      status,
-      updatedAt: serverTimestamp()
+// Complete a trip and record store visit
+export const completeTrip = (tripId: string): Trip | null => {
+  const trips = loadTrips();
+  const tripIndex = trips.findIndex(t => t.id === tripId);
+  
+  if (tripIndex === -1) return null;
+  
+  const trip = trips[tripIndex];
+  
+  const itemsWithPrices = trip.items.filter(item => item.price !== undefined && item.price > 0);
+  
+  if (itemsWithPrices.length > 0) {
+    const total = itemsWithPrices.reduce((sum, item) => {
+      return sum + (item.price || 0) * (item.quantity || 1);
+    }, 0);
+    
+    recordStoreVisit({
+      store: trip.store,
+      date: new Date().toISOString(),
+      items: itemsWithPrices.map(item => ({
+        name: item.name,
+        price: item.price || 0,
+        quantity: item.quantity || 1,
+        unit: item.unit
+      })),
+      total
     });
-    return true;
-  } catch (error) {
-    console.error("Error updating trip status: ", error);
-    throw error;
   }
-};
-
-// Add an item to a trip
-export const addItemToTrip = async (tripId: string, item: Omit<TripItem, 'id'>) => {
-  try {
-    const tripRef = doc(db, TRIPS_COLLECTION, tripId);
-    const newItem = {
-      ...item,
-      id: Math.random().toString(36).substring(2, 15),
-      addedAt: serverTimestamp()
-    };
-    
-    await updateDoc(tripRef, {
-      items: arrayUnion(newItem),
-      updatedAt: serverTimestamp()
-    });
-    
-    return newItem.id;
-  } catch (error) {
-    console.error("Error adding item to trip: ", error);
-    throw error;
-  }
-};
-
-// Remove an item from a trip
-export const removeItemFromTrip = async (tripId: string, itemId: string) => {
-  try {
-    // First get the current items
-    const tripRef = doc(db, TRIPS_COLLECTION, tripId);
-    const tripDoc = await getDocs(query(collection(db, TRIPS_COLLECTION), where('__name__', '==', tripId)));
-    
-    if (tripDoc.empty) {
-      throw new Error('Trip not found');
-    }
-    
-    const tripData = tripDoc.docs[0].data();
-    const items = tripData.items || [];
-    const itemToRemove = items.find((item: TripItem) => item.id === itemId);
-    
-    if (!itemToRemove) {
-      throw new Error('Item not found');
-    }
-    
-    // Remove the item
-    await updateDoc(tripRef, {
-      items: arrayRemove(itemToRemove),
-      updatedAt: serverTimestamp()
-    });
-    
-    return true;
-  } catch (error) {
-    console.error("Error removing item from trip: ", error);
-    throw error;
-  }
-};
-
-// Toggle item checked status
-export const toggleItemChecked = async (tripId: string, itemId: string) => {
-  try {
-    // First get the current items
-    const tripRef = doc(db, TRIPS_COLLECTION, tripId);
-    const tripDoc = await getDocs(query(collection(db, TRIPS_COLLECTION), where('__name__', '==', tripId)));
-    
-    if (tripDoc.empty) {
-      throw new Error('Trip not found');
-    }
-    
-    const tripData = tripDoc.docs[0].data();
-    const items = tripData.items || [];
-    const itemIndex = items.findIndex((item: TripItem) => item.id === itemId);
-    
-    if (itemIndex === -1) {
-      throw new Error('Item not found');
-    }
-    
-    // Create a new array with the updated item
-    const updatedItems = [...items];
-    updatedItems[itemIndex] = {
-      ...updatedItems[itemIndex],
-      checked: !updatedItems[itemIndex].checked
-    };
-    
-    // Update the trip with the new items array
-    await updateDoc(tripRef, {
-      items: updatedItems,
-      updatedAt: serverTimestamp()
-    });
-    
-    return true;
-  } catch (error) {
-    console.error("Error toggling item checked status: ", error);
-    throw error;
-  }
-};
-
-// Add a participant to a trip
-export const addParticipantToTrip = async (tripId: string, participant: { id: string, name: string, avatar?: string }) => {
-  try {
-    const tripRef = doc(db, TRIPS_COLLECTION, tripId);
-    
-    await updateDoc(tripRef, {
-      participants: arrayUnion(participant),
-      updatedAt: serverTimestamp()
-    });
-    
-    return true;
-  } catch (error) {
-    console.error("Error adding participant to trip: ", error);
-    throw error;
-  }
+  
+  const updatedTripData = { ...trip, status: 'completed' as 'completed' };
+  
+  trips[tripIndex] = updatedTripData;
+  saveTrips(trips);
+  return trips[tripIndex];
 };
 
 // Delete a trip
-export const deleteTrip = async (tripId: string) => {
-  try {
-    await deleteDoc(doc(db, TRIPS_COLLECTION, tripId));
-    return true;
-  } catch (error) {
-    console.error("Error deleting trip: ", error);
-    throw error;
+export const deleteTrip = (tripId: string): boolean => {
+  const trips = loadTrips();
+  const index = trips.findIndex(t => t.id === tripId);
+  
+  if (index === -1) return false;
+  
+  trips.splice(index, 1);
+  saveTrips(trips);
+  
+  return true;
+};
+
+// Add item to trip
+export const addItemToTrip = (tripId: string, itemData: CreateTripItemData): Trip | null => {
+  const trips = loadTrips();
+  const index = trips.findIndex(t => t.id === tripId);
+  
+  if (index === -1) return null;
+  
+  const trip = trips[index];
+  const newItem: TripItem = {
+    id: Date.now().toString(),
+    name: itemData.name,
+    quantity: itemData.quantity || 1,
+    unit: itemData.unit,
+    price: itemData.price,
+    checked: false,
+    addedBy: DEFAULT_ADDED_BY_USER, // Placeholder for actual user object
+  };
+  
+  trip.items.push(newItem);
+  trips[index] = trip;
+  saveTrips(trips);
+  
+  return trip;
+};
+
+// Update item in trip
+export const updateTripItem = (
+  tripId: string,
+  itemId: string,
+  updates: Partial<Omit<TripItem, 'id'>>
+): Trip | null => {
+  const trips = loadTrips();
+  const tripIndex = trips.findIndex(t => t.id === tripId);
+  
+  if (tripIndex === -1) return null;
+  
+  const trip = trips[tripIndex];
+  const itemIndex = trip.items.findIndex(item => item.id === itemId);
+  
+  if (itemIndex === -1) return null;
+  
+  trip.items[itemIndex] = {
+    ...trip.items[itemIndex],
+    ...updates
+  };
+  
+  trips[tripIndex] = trip;
+  saveTrips(trips);
+  
+  return trip;
+};
+
+// Remove item from trip
+export const removeItemFromTrip = (tripId: string, itemId: string): Trip | null => {
+  const trips = loadTrips();
+  const tripIndex = trips.findIndex(t => t.id === tripId);
+  
+  if (tripIndex === -1) return null;
+  
+  const trip = trips[tripIndex];
+  const itemIndex = trip.items.findIndex(item => item.id === itemId);
+  
+  if (itemIndex === -1) return null;
+  
+  trip.items.splice(itemIndex, 1);
+  trips[tripIndex] = trip;
+  saveTrips(trips);
+  
+  return trip;
+};
+
+// Toggle item checked status
+export const toggleItemChecked = (tripId: string, itemId: string): Trip | null => {
+  const trips = loadTrips();
+  const tripIndex = trips.findIndex(t => t.id === tripId);
+  
+  if (tripIndex === -1) return null;
+  
+  const trip = trips[tripIndex];
+  const itemIndex = trip.items.findIndex(item => item.id === itemId);
+  
+  if (itemIndex === -1) return null;
+  
+  trip.items[itemIndex] = {
+    ...trip.items[itemIndex],
+    checked: !trip.items[itemIndex].checked
+  };
+  
+  trips[tripIndex] = trip;
+  saveTrips(trips);
+  
+  return trip;
+};
+
+// Add participant to trip
+export const addParticipantToTrip = (
+  tripId: string,
+  participant: TripParticipant 
+): Trip | null => {
+  const trips = loadTrips();
+  const tripIndex = trips.findIndex(t => t.id === tripId);
+  
+  if (tripIndex === -1) return null;
+  
+  const trip = trips[tripIndex];
+  
+  if (!trip.participants) {
+    trip.participants = [];
   }
+  
+  if (trip.participants.some(p => p.id === participant.id)) {
+    return trip; 
+  }
+  
+  trip.participants.push({ 
+    id: participant.id, 
+    name: participant.name, 
+    avatar: participant.avatar || DEFAULT_AVATAR 
+  });
+  trips[tripIndex] = trip;
+  saveTrips(trips);
+  
+  return trip;
+};
+
+// Remove participant from trip
+export const removeParticipantFromTrip = (
+  tripId: string,
+  participantId: string
+): Trip | null => {
+  const trips = loadTrips();
+  const tripIndex = trips.findIndex(t => t.id === tripId);
+
+  if (tripIndex === -1) return null;
+
+  const trip = trips[tripIndex];
+
+  if (!trip.participants || trip.participants.length === 0) return trip;
+
+  const participantToRemove = trip.participants.find(p => p.id === participantId);
+
+  if (trip.participants.length === 1 && participantToRemove) return trip;
+  
+  if (trip.shopper && participantToRemove && trip.shopper.name === participantToRemove.name) {
+    return trip; 
+  }
+  
+trip.participants = trip.participants.filter(p => p.id !== participantId);
+  trips[tripIndex] = trip;
+  saveTrips(trips);
+  return trip;
+};
+
+
+// Update trip shopper
+export const updateTripShopper = (
+  tripId: string,
+  shopperData: TripParticipant 
+): Trip | null => {
+  const trips = loadTrips();
+  const tripIndex = trips.findIndex(t => t.id === tripId);
+
+  if (tripIndex === -1) return null;
+
+  const trip = trips[tripIndex];
+
+  const shopperForContext = {
+    id: shopperData.id, 
+    name: shopperData.name,
+    avatar: shopperData.avatar || DEFAULT_AVATAR
+  };
+
+  if (!trip.participants?.some(p => p.id === shopperForContext.id)) {
+    if (!trip.participants) {
+      trip.participants = [];
+    }
+    trip.participants.push(shopperForContext);
+  }
+  
+  trip.shopper = { 
+    name: shopperData.name, 
+    avatar: shopperData.avatar || DEFAULT_AVATAR 
+  };
+  trips[tripIndex] = trip;
+  saveTrips(trips);
+  
+  return trip;
 };

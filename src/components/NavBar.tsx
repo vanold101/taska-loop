@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import { ShoppingCart, Home, Map, User, Wallet, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import DarkModeToggle from './DarkModeToggle';
 import NotificationCenter, { Notification } from './NotificationCenter';
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,6 +14,7 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
   const location = useLocation();
   const [activeItem, setActiveItem] = useState(propActiveItem || location.pathname);
   const { toast } = useToast();
+  const isHomePage = location.pathname === '/home' || location.pathname === '/';
 
   // Mock notifications
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -102,55 +102,63 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-gloop-dark-surface border-t border-gloop-outline dark:border-gloop-dark-outline shadow-lg">
-      <div className="absolute top-0 right-0 -mt-16 pr-4 flex gap-2">
-        <NotificationCenter
-          notifications={notifications}
-          onMarkAsRead={handleMarkAsRead}
-          onMarkAllAsRead={handleMarkAllAsRead}
-          onClearAll={handleClearAll}
-          onAction={handleNotificationAction}
-        />
-        <DarkModeToggle />
+    <>
+      {/* Top notification bar - only show on home page */}
+      {isHomePage && (
+        <div className="fixed top-0 left-0 right-0 z-30 bg-white dark:bg-gloop-dark-surface border-b border-gloop-outline dark:border-gloop-dark-outline shadow-sm">
+          <div className="flex justify-end items-center w-full max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl mx-auto px-4 py-2">
+            <NotificationCenter
+              notifications={notifications}
+              onMarkAsRead={handleMarkAsRead}
+              onMarkAllAsRead={handleMarkAllAsRead}
+              onClearAll={handleClearAll}
+              onAction={handleNotificationAction}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Bottom navigation bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-gloop-dark-surface border-t border-gloop-outline dark:border-gloop-dark-outline shadow-lg">
+        <nav className="flex justify-between items-center w-full max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl mx-auto px-1 sm:px-2">
+          {navItems.map((item) => {
+            const isActive = activeItem === item.path || 
+                           activeItem === item.name.toLowerCase() ||
+                           (item.path === '/home' && activeItem === '/');
+            return (
+              <Link 
+                key={item.path} 
+                to={item.path} 
+                onClick={() => setActiveItem(item.path)}
+                className={cn(
+                  "flex flex-col items-center py-1.5 sm:py-2 px-0.5 sm:px-1 transition-colors relative",
+                  isActive 
+                    ? "text-gloop-primary dark:text-gloop-primary"
+                    : "text-gloop-text-muted hover:text-gloop-text-main dark:text-gloop-dark-text-muted dark:hover:text-gloop-dark-text-main"
+                )}
+              >
+                {isActive && (
+                  <motion.div 
+                    layoutId="activeTab"
+                    className="absolute -top-1 w-6 sm:w-8 h-1 rounded-full bg-gloop-primary"
+                    initial={false}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                )}
+                
+                <div className={cn(
+                  "p-1 sm:p-1.5 rounded-full mb-0.5 sm:mb-1",
+                  isActive ? "bg-gloop-accent/80 dark:bg-gloop-dark-accent/80" : ""
+                )}>
+                  {item.icon}
+                </div>
+                <span className="text-[10px] sm:text-xs font-medium">{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
-      <nav className="flex justify-between items-center w-full max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl mx-auto px-1 sm:px-2">
-        {navItems.map((item) => {
-          const isActive = activeItem === item.path || 
-                          activeItem === item.name.toLowerCase() ||
-                          (item.path === '/home' && activeItem === '/');
-          return (
-            <Link 
-              key={item.path} 
-              to={item.path} 
-              onClick={() => setActiveItem(item.path)}
-              className={cn(
-                "flex flex-col items-center py-1.5 sm:py-2 px-0.5 sm:px-1 transition-colors relative",
-                isActive 
-                  ? "text-gloop-primary dark:text-gloop-primary"
-                  : "text-gloop-text-muted hover:text-gloop-text-main dark:text-gloop-dark-text-muted dark:hover:text-gloop-dark-text-main"
-              )}
-            >
-              {isActive && (
-                <motion.div 
-                  layoutId="activeTab"
-                  className="absolute -top-1 w-6 sm:w-8 h-1 rounded-full bg-gloop-primary"
-                  initial={false}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              )}
-              
-              <div className={cn(
-                "p-1 sm:p-1.5 rounded-full mb-0.5 sm:mb-1",
-                isActive ? "bg-gloop-accent/80 dark:bg-gloop-dark-accent/80" : ""
-              )}>
-                {item.icon}
-              </div>
-              <span className="text-[10px] sm:text-xs font-medium">{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+    </>
   );
 };
 

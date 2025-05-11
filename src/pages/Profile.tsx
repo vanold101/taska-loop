@@ -122,7 +122,7 @@ const Profile = () => {
   ];
 
   return (
-    <div className="pb-20 pt-6 px-4 max-w-md mx-auto">
+    <div className="pb-20 pt-16 px-4 max-w-md mx-auto">
       <header className="mb-6">
         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">My Profile</h1>
       </header>
@@ -214,34 +214,20 @@ const Profile = () => {
           <Card className="premium-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
-                <Settings className="h-5 w-5 mr-2 text-gloop-primary" />
-                Settings
+                <Bell className="h-5 w-5 mr-2 text-gloop-primary" />
+                Preferences
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between premium-card p-3 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-gloop-primary" />
-                  <Label htmlFor="notifications" className="cursor-pointer">
-                    Notifications
-                  </Label>
-                </div>
-                <Switch 
-                  id="notifications" 
-                  checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
-                />
-              </div>
-              
-              <div className="flex items-center justify-between premium-card p-3 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-gloop-primary" />
-                  <Label htmlFor="location" className="cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <MapPin className="h-4 w-4" />
+                  <Label htmlFor="location-services" className="cursor-pointer">
                     Location Services
                   </Label>
                 </div>
                 <Switch 
-                  id="location" 
+                  id="location-services" 
                   checked={locationEnabled}
                   onCheckedChange={setLocationEnabled}
                 />

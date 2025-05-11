@@ -13,6 +13,7 @@ import {
   Bar
 } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { loadTransactions, Transaction } from "@/services/LedgerService";
 
 interface SpendingData {
   date: string;
@@ -35,22 +36,35 @@ const SpendingTrends = () => {
   const [spendingData, setSpendingData] = useState<SpendingData[]>([]);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
 
-  // Generate mock data
   useEffect(() => {
-    // Generate mock spending data for the last 7 days
-    const mockData: SpendingData[] = Array.from({ length: 7 }, (_, i) => ({
-      date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      amount: Math.random() * 100 + 50,
-      category: ['Groceries', 'Household', 'Utilities', 'Entertainment'][Math.floor(Math.random() * 4)]
-    }));
-
-    setSpendingData(mockData);
-
-    // Calculate category totals
-    const categories = mockData.reduce((acc, curr) => {
-      acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+    // Load real transaction data
+    const transactions = loadTransactions();
+    
+    // Group transactions by month and calculate totals
+    const monthlyData = transactions.reduce((acc: Record<string, number>, transaction) => {
+      const date = new Date(transaction.timestamp);
+      const monthKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+      acc[monthKey] = (acc[monthKey] || 0) + transaction.amount;
       return acc;
-    }, {} as Record<string, number>);
+    }, {});
+
+    // Convert to array format for chart
+    const monthlySpendingData = Object.entries(monthlyData)
+      .map(([date, amount]) => ({
+        date,
+        amount,
+        category: 'All' // We'll implement category tracking in a future update
+      }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    setSpendingData(monthlySpendingData);
+
+    // Calculate category totals from transactions
+    const categories = transactions.reduce((acc: Record<string, number>, transaction) => {
+      const category = transaction.tripId ? 'Shopping' : transaction.type;
+      acc[category] = (acc[category] || 0) + transaction.amount;
+      return acc;
+    }, {});
 
     const total = Object.values(categories).reduce((sum, amount) => sum + amount, 0);
 
@@ -64,10 +78,10 @@ const SpendingTrends = () => {
   }, []);
 
   const categoryColors: CategoryColors = {
-    Groceries: '#FF9F2F',
-    Household: '#3DBE7B',
-    Utilities: '#FFC940',
-    Entertainment: '#FF5757'
+    Shopping: '#FF9F2F',
+    expense: '#3DBE7B',
+    payment: '#FFC940',
+    Other: '#808080'
   };
 
   return (

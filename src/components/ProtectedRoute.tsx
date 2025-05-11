@@ -1,77 +1,35 @@
-import React, { useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useRole } from '@/context/RoleContext';
-import { useAuth } from '@/hooks/use-auth';
-import { Loader2 } from 'lucide-react';
+import React from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
-  requiredPermissions?: {
-    action: string;
-    resource: string;
-  }[];
+  // You can add any additional props you might need, e.g., roles/permissions
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
-  children,
-  requiredPermissions = []
-}) => {
-  const { user, loading: authLoading } = useAuth();
-  const { checkPermission, loading: roleLoading } = useRole();
-  const [hasAccess, setHasAccess] = useState(false);
-  const [checking, setChecking] = useState(true);
+const ProtectedRoute: React.FC<ProtectedRouteProps> = () => {
+  const { user, isLoading } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!user) {
-        setHasAccess(false);
-        setChecking(false);
-        return;
-      }
-
-      if (requiredPermissions.length === 0) {
-        setHasAccess(true);
-        setChecking(false);
-        return;
-      }
-
-      try {
-        const permissionChecks = await Promise.all(
-          requiredPermissions.map(({ action, resource }) =>
-            checkPermission(action, resource)
-          )
-        );
-
-        setHasAccess(permissionChecks.every(Boolean));
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-        setHasAccess(false);
-      } finally {
-        setChecking(false);
-      }
-    };
-
-    checkAccess();
-  }, [user, checkPermission, requiredPermissions]);
-
-  if (authLoading || roleLoading || checking) {
+  if (isLoading) {
+    // You can render a loading spinner or a blank page while checking auth status
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-gloop-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500/40 via-green-500/40 to-blue-500/40 dark:from-blue-700/50 dark:via-green-700/50 dark:to-blue-700/50">
+        <svg className="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
       </div>
     );
   }
 
   if (!user) {
+    // User not authenticated, redirect to login page
+    // Pass the current location to redirect back after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!hasAccess) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  return <>{children}</>;
+  // User is authenticated, render the child route content
+  return <Outlet />;
 };
 
 export default ProtectedRoute; 

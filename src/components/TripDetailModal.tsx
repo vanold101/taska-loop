@@ -50,13 +50,11 @@ export type TripItem = {
   checked: boolean;
 };
 
-export type TripData = {
+export interface TripData {
   id: string;
   store: string;
-  shopper: {
-    name: string;
-    avatar: string;
-  };
+  location?: string;
+  coordinates?: { lat: number; lng: number };
   eta: string;
   status: 'open' | 'shopping' | 'completed' | 'cancelled';
   items: TripItem[];
@@ -65,7 +63,12 @@ export type TripData = {
     name: string;
     avatar: string;
   }[];
-};
+  shopper: {
+    name: string;
+    avatar: string;
+  };
+  date: string; // ISO string format
+}
 
 type TripDetailModalProps = {
   isOpen: boolean;
@@ -133,6 +136,11 @@ const TripDetailModal = ({
     if (!trip) return;
     
     if (!newItemName.trim()) {
+      toast({
+        title: "Item Name Required",
+        description: "Please enter a name for the item.",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -142,7 +150,7 @@ const TripDetailModal = ({
       price: newItemPrice,
       unit: newItemUnit,
       addedBy: {
-        name: "You", // In a real app, this would be the current user
+        name: "You",
         avatar: "https://example.com/you.jpg"
       },
       checked: false
@@ -167,6 +175,7 @@ const TripDetailModal = ({
   const addItemToTrip = (item: Omit<TripItem, 'id'>) => {
     if (!trip) return;
     
+    // Call the parent component's onAddItem function
     onAddItem(trip.id, item);
     
     // Record price in history if provided
@@ -184,6 +193,12 @@ const TripDetailModal = ({
     if (navigator.vibrate) {
       navigator.vibrate(50);
     }
+    
+    // Show success toast
+    toast({
+      title: "Item Added",
+      description: `${item.name} has been added to your trip.`
+    });
   };
   
   // Handle adding item anyway (ignoring duplicate warning)
@@ -575,7 +590,11 @@ const TripDetailModal = ({
                           className={`flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 ${
                             item.checked ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' : 'border-gray-300 dark:border-gray-700'
                           }`}
-                          onClick={() => onToggleItemCheck(trip.id, item.id)}
+                          onClick={() => {
+                            if (trip) {
+                              onToggleItemCheck(trip.id, item.id);
+                            }
+                          }}
                         >
                           {item.checked && <Check className="h-3 w-3 text-green-600 dark:text-green-400 transition-transform duration-200 transform scale-100" />}
                         </div>
@@ -587,7 +606,7 @@ const TripDetailModal = ({
                               {formatValueWithUnit(item.quantity, item.unit || 'ea')}
                             </span>
                             <span>•</span>
-                            <span className="truncate">Added by: {item.addedBy.name}</span>
+                            <span className="truncate">Added by: {item.addedBy?.name || 'Unknown User'}</span>
                           </div>
                         </div>
                         
@@ -655,7 +674,11 @@ const TripDetailModal = ({
                       <div className="flex items-center">
                         <div 
                           className="flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700"
-                          onClick={() => onToggleItemCheck(trip.id, item.id)}
+                          onClick={() => {
+                            if (trip) {
+                              onToggleItemCheck(trip.id, item.id);
+                            }
+                          }}
                         >
                           <Check className="h-3 w-3 text-green-600 dark:text-green-400 transition-transform duration-200 transform scale-100" />
                         </div>
@@ -667,7 +690,7 @@ const TripDetailModal = ({
                               {formatValueWithUnit(item.quantity, item.unit || 'ea')}
                             </span>
                             <span>•</span>
-                            <span className="truncate">Added by: {item.addedBy.name}</span>
+                            <span className="truncate">Added by: {item.addedBy?.name || 'Unknown User'}</span>
                             {item.price && (
                               <>
                                 <span>•</span>

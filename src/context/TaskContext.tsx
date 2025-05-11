@@ -32,6 +32,7 @@ export interface Trip {
     name: string;
     avatar: string;
   };
+  date: string; // ISO string format
 }
 
 export interface TripItem {
@@ -142,8 +143,9 @@ const mockTrips: Trip[] = [
     ],
     participants: [
       { id: '1', name: 'You', avatar: "https://example.com/you.jpg" },
-      { id: '2', name: 'Brian', avatar: "https://example.com/brian.jpg" }
-    ]
+      { id: '2', name: 'Rachel', avatar: "https://example.com/rachel.jpg" }
+    ],
+    date: new Date().toISOString() // Today
   },
   {
     id: '2',
@@ -151,41 +153,60 @@ const mockTrips: Trip[] = [
     location: "Costco",
     coordinates: { lat: 39.9650, lng: -83.0200 },
     shopper: {
-      name: "Brian",
-      avatar: "https://example.com/brian.jpg"
+      name: "You",
+      avatar: "https://example.com/you.jpg"
     },
-    eta: "25 min",
+    eta: "15 min",
     status: 'shopping',
     items: [
       {
         id: '2-1',
         name: "Paper Towels",
-        quantity: 1,
+        quantity: 2,
         price: 19.99,
-        unit: 'pkg',
+        unit: 'pack',
         addedBy: {
           name: "You",
           avatar: "https://example.com/you.jpg"
         },
         checked: true
-      },
+      }
+    ],
+    participants: [
+      { id: '1', name: 'You', avatar: "https://example.com/you.jpg" }
+    ],
+    date: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+  },
+  {
+    id: '3',
+    store: "Whole Foods",
+    location: "Whole Foods",
+    coordinates: { lat: 39.9600, lng: -83.0180 },
+    shopper: {
+      name: "Alex",
+      avatar: "https://example.com/alex.jpg"
+    },
+    eta: "Completed",
+    status: 'completed',
+    items: [
       {
-        id: '2-2',
-        name: "Toilet Paper",
-        quantity: 2,
-        price: 21.99,
-        unit: 'pkg',
+        id: '3-1',
+        name: "Organic Bananas",
+        quantity: 1,
+        price: 3.99,
+        unit: 'bunch',
         addedBy: {
-          name: "Ella",
-          avatar: "https://example.com/ella.jpg"
+          name: "Alex",
+          avatar: "https://example.com/alex.jpg"
         },
-        checked: false
+        checked: true
       }
     ],
     participants: [
       { id: '1', name: 'You', avatar: "https://example.com/you.jpg" },
-      { id: '3', name: 'Ella', avatar: "https://example.com/ella.jpg" }
-    ]
+      { id: '3', name: 'Alex', avatar: "https://example.com/alex.jpg" }
+    ],
+    date: new Date(Date.now() - 86400000).toISOString() // Yesterday
   }
 ];
 
@@ -235,24 +256,17 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('tasks', JSON.stringify(tasks));
   }, [tasks]);
 
+  // Function to handle special values during JSON serialization
+  const replacer = (key: string, value: any) => {
+    // Handle special cases like Date objects
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    return value;
+  };
+
   useEffect(() => {
     try {
-      // Use a replacer function to handle circular references
-      const replacer = (key: string, value: any) => {
-        // Skip React elements, DOM nodes, and other non-serializable objects
-        if (typeof value === 'object' && value !== null) {
-          if (
-            value.$$typeof || // React elements
-            value instanceof Node || // DOM nodes
-            key.startsWith('__react') || // React internal props
-            key === 'stateNode'
-          ) {
-            return undefined; // Skip this value
-          }
-        }
-        return value;
-      };
-      
       localStorage.setItem('trips', JSON.stringify(trips, replacer));
     } catch (error) {
       console.error('Error saving trips to localStorage:', error);
@@ -286,43 +300,36 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newTrip: Trip = {
       ...trip,
       id: Date.now().toString(),
+      date: trip.date ? new Date(trip.date).toISOString() : new Date().toISOString() // Ensure date is in ISO format
     };
-    setTrips([...trips, newTrip]);
     
-    // If the trip has coordinates, create a corresponding task
-    if (trip.coordinates) {
-      addTask({
-        title: `Trip to ${trip.store}`,
-        dueDate: new Date().toISOString().split('T')[0],
-        location: trip.store,
-        coordinates: trip.coordinates,
-        priority: 'medium',
-      });
-    }
+    setTrips(prevTrips => {
+      const updatedTrips = [...prevTrips, newTrip];
+      // Save to localStorage
+      localStorage.setItem('trips', JSON.stringify(updatedTrips, replacer));
+      return updatedTrips;
+    });
   };
 
   // Update an existing trip
   const updateTrip = (id: string, updatedTrip: Partial<Trip>) => {
-    setTrips(trips.map(trip => 
-      trip.id === id ? { ...trip, ...updatedTrip } : trip
-    ));
-    
-    // Update corresponding task if coordinates or store name changed
-    if (updatedTrip.coordinates || updatedTrip.store) {
-      const trip = trips.find(t => t.id === id);
-      if (trip) {
-        const taskTitle = `Trip to ${trip.store}`;
-        const existingTask = tasks.find(t => t.title === taskTitle);
-        
-        if (existingTask) {
-          updateTask(existingTask.id, {
-            title: updatedTrip.store ? `Trip to ${updatedTrip.store}` : existingTask.title,
-            location: updatedTrip.store || existingTask.location,
-            coordinates: updatedTrip.coordinates || existingTask.coordinates,
-          });
+    setTrips(prevTrips => {
+      const updatedTrips = prevTrips.map(trip => {
+        if (trip.id === id) {
+          // If date is being updated, ensure it's in ISO format
+          const newDate = updatedTrip.date ? new Date(updatedTrip.date).toISOString() : trip.date;
+          return { 
+            ...trip, 
+            ...updatedTrip,
+            date: newDate
+          };
         }
-      }
-    }
+        return trip;
+      });
+      // Save to localStorage
+      localStorage.setItem('trips', JSON.stringify(updatedTrips, replacer));
+      return updatedTrips;
+    });
   };
 
   // Delete a trip

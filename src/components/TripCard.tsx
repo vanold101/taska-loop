@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ShoppingCart, Clock, User, Plus, Check, Share2, Trash2, Edit, Info } from "lucide-react";
+import { ShoppingCart, Clock, User, Plus, Check, Share2, Trash2, Edit, Info, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -212,7 +212,7 @@ const TripCard = ({
         <div className="p-4">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-semibold text-[clamp(1.125rem,2.5vw,1.25rem)]">{store}</h3>
+              <h3 className="text-lg font-semibold">{store}</h3>
               <div className="flex items-center text-gloop-text-muted dark:text-gloop-dark-text-muted mt-1">
                 <User className="h-3.5 w-3.5 mr-1" />
                 <span className="text-[clamp(0.875rem,2vw,1rem)]">{shopper.name}</span>
@@ -245,132 +245,73 @@ const TripCard = ({
           
           {/* Quick action buttons - always visible on hover/tap */}
           <motion.div 
-            className="flex justify-end mt-3 gap-1"
+            className="flex justify-start mt-3 gap-1"
             initial={{ opacity: 1, y: 0 }}
             animate={{ 
-              opacity: 1,
-              y: 0
+              opacity: (status !== 'completed' && status !== 'cancelled') || isActionsVisible ? 1 : 0, 
+              y: (status !== 'completed' && status !== 'cancelled') || isActionsVisible ? 0 : 5 
             }}
             transition={{ duration: 0.2 }}
           >
-            {/* Only show Add Item button for active trips */}
-            {status !== 'completed' && status !== 'cancelled' && onAddItem && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddItem({
-                    name: "New Item",
-                    quantity: 1,
-                    addedBy: {
-                      name: "You",
-                      avatar: "https://example.com/avatar.jpg"
-                    },
-                    checked: false
-                  });
-                }}
-                aria-label="Add item"
-              >
-                <Plus className="h-4 w-4" />
-              </motion.button>
-            )}
-            
-            {/* Share button is available for all trips */}
-            {onShareTrip && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShareTrip();
-                }}
-                aria-label="Share trip"
-              >
-                <Share2 className="h-4 w-4" />
-              </motion.button>
-            )}
-            
-            {/* Only show Edit button for active trips */}
+            {/* Edit Trip Button - Icon only */}
             {status !== 'completed' && status !== 'cancelled' && onEditTrip && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="quick-action-btn bg-gloop-accent dark:bg-gloop-dark-accent text-gloop-primary"
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-700/30 hover:bg-blue-100 dark:hover:bg-blue-600/40 text-blue-600 dark:text-blue-300 p-2"
                 onClick={(e) => {
                   e.stopPropagation();
                   onEditTrip();
                 }}
                 aria-label="Edit trip"
               >
-                <Edit className="h-4 w-4" />
-              </motion.button>
+                <Edit className="h-3.5 w-3.5" />
+              </Button>
             )}
             
-            {/* Only show Complete button for active trips */}
-            {status !== 'completed' && status !== 'cancelled' && onCompleteTrip && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="quick-action-btn bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+            {/* Share Trip Button - Icon only */}
+            {onShareTrip && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-700/30 hover:bg-purple-100 dark:hover:bg-purple-600/40 text-purple-600 dark:text-purple-300 p-2"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onCompleteTrip();
+                  onShareTrip();
                 }}
-                aria-label="Complete trip"
+                aria-label="Share trip"
               >
-                <Check className="h-4 w-4" />
-              </motion.button>
+                <Share2 className="h-3.5 w-3.5" />
+              </Button>
             )}
             
-            {/* Delete button is available for all trips */}
+            {/* Delete Trip Button - Icon only */}
             {onDeleteTrip && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="quick-action-btn bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-700/30 hover:bg-red-100 dark:hover:bg-red-600/40 text-red-600 dark:text-red-300 p-2"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDeleteTrip();
                 }}
                 aria-label="Delete trip"
               >
-                <Trash2 className="h-4 w-4" />
-              </motion.button>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             )}
             
-            {/* Show Info button for completed trips */}
-            {(status === 'completed' || status === 'cancelled') && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="quick-action-btn bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onTripClick) onTripClick();
-                }}
-                aria-label="View trip details"
-              >
-                <Info className="h-4 w-4" />
-              </motion.button>
-            )}
-            
-            {/* Reactivate button for completed trips */}
+            {/* Reactivate Trip Button - Icon only */}
             {status === 'completed' && onReactivateTrip && (
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="quick-action-btn bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReactivateTrip();
-                }}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-700/30 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 text-indigo-600 dark:text-indigo-300 p-2"
+                onClick={(e) => { e.stopPropagation(); onReactivateTrip(); }}
                 aria-label="Reactivate trip"
               >
-                <ShoppingCart className="h-4 w-4" />
-              </motion.button>
+                <RotateCw className="h-3.5 w-3.5" />
+              </Button>
             )}
           </motion.div>
         </div>
@@ -389,9 +330,9 @@ const TripCard = ({
       
       {/* Only show action buttons for non-past trips */}
       {!isPast && (
-        <div className="flex border-t border-gray-100 dark:border-gray-700">
+        <div className="flex border-t border-l border-r border-b border-gray-200 dark:border-gray-700 rounded-b-lg">
           <Button
-            className="flex-1 rounded-none bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-blue-600 dark:text-blue-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
+            className="flex-1 rounded-none rounded-bl-lg bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-blue-600 dark:text-blue-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
             onClick={(e) => {
               e.stopPropagation();
               if (onAddItem) {
@@ -409,9 +350,9 @@ const TripCard = ({
           >
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>
-          <div className="w-px bg-gray-100 dark:bg-gray-700" />
+          <div className="w-px bg-gray-200 dark:bg-gray-700" />
           <Button
-            className="flex-1 rounded-none bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-green-600 dark:text-green-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
+            className="flex-1 rounded-none rounded-br-lg bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-green-600 dark:text-green-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
             onClick={(e) => {
               e.stopPropagation();
               onCompleteTrip && onCompleteTrip();
