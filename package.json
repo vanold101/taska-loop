@@ -2,7 +2,7 @@
   "name": "taska-loop",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://devanshagarwal.github.io/taska-loop",
+  "homepage": "https://vanold101.github.io/taska-loop",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
