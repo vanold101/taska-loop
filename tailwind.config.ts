@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
 
@@ -147,6 +146,8 @@ const config = {
         'premium-gradient': 'linear-gradient(135deg, #3B82F6 0%, #10B981 100%)',
         'premium-radial': 'radial-gradient(circle at top right, #3B82F6, #10B981)',
         'dark-gradient': 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+        'gradient-radial': 'radial-gradient(circle, var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
       },
     },
   },

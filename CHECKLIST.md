@@ -4,39 +4,256 @@
 - [x] Basic list creation & management
 - [x] Cost splitting (equal, percentage, fixed amounts)
 - [x] Payment tracking
-- [ ] Instant list capture (barcode scan, receipt photo)
+- [x] Instant list capture (barcode scan, receipt photo)
+    -   **✅ Implementation Details:**
+        -   Implemented barcode scanning with react-qr-barcode-scanner
+        -   Added UPCItemDB API integration for product lookup
+        -   Created product database and save dialog for new products
+        -   Added duplicate detection to prevent multiple identical items
+        -   Implemented receipt scanning functionality
+    -   **Research & Select Libraries:**
+        -   Investigate React Native camera libraries (e.g., `react-native-camera`, `expo-camera`) for image capture.
+        -   Explore OCR libraries (e.g., Tesseract.js, Google Cloud Vision API, AWS Textract) for text extraction from receipts.
+        -   Evaluate barcode scanning libraries (e.g., `react-native-camera` with barcode detection, dedicated barcode scanning SDKs).
+    -   **UI/UX Design:**
+        -   Design a user-friendly interface for initiating scans (camera view, buttons for barcode/receipt).
+        -   Create a review and confirmation screen for scanned items, allowing users to edit extracted data.
+    -   **Barcode Scanning Implementation:**
+        -   Integrate the chosen barcode scanning library.
+        -   Implement logic to call a product database API (e.g., OpenFoodFacts, or a custom one) with the scanned barcode to fetch item details (name, category, average price).
+        -   Populate the item fields in the app with fetched data.
+    -   **Receipt Photo OCR Implementation:**
+        -   Integrate the chosen OCR library/service.
+        -   Develop image preprocessing steps if needed (cropping, rotation, contrast adjustment) to improve OCR accuracy.
+        -   Implement parsing logic to extract item names, quantities, and prices from the OCR text output. This might involve regex or pattern matching.
+        -   Handle cases where OCR is inaccurate or data is missing.
+    -   **Item Addition Logic:**
+        -   Allow users to add scanned/OCR-extracted items to the current grocery list.
+        -   Ensure new items are correctly formatted and include all necessary fields (name, quantity, price if available, unit, etc.).
+        -   **Backend Integration (Optional but Recommended):**
+            -   Consider if OCR processing should happen on a backend server to offload client devices and protect API keys for cloud services.
 - [ ] Adaptive units
+    -   **Define Common Units & Conversions:**
+        -   Compile a list of common grocery units (e.g., kg, g, lb, oz, L, mL, piece, pack).
+        -   Establish standard conversion factors between compatible units (e.g., 1 kg = 1000 g, 1 lb = 16 oz).
+    -   **UI for Unit Selection:**
+        -   When a user adds/edits an item, provide a dropdown or input field for selecting the unit.
+        -   As the user types a quantity, suggest common units or allow free-form input.
+    -   **Smart Unit Suggestion (Optional):**
+        -   Based on item name/category, suggest a default unit (e.g., "milk" defaults to "L" or "mL").
+    -   **Conversion Logic:**
+        -   Implement functions to convert quantities between units (e.g., if a recipe needs 500g of flour and user has 1kg, calculate remaining).
+        -   Display total quantities for items in a consistent, user-preferred unit or the most logical unit (e.g., show 1.5 kg instead of 1500 g).
+        -   **Context/Storage:**
+            -   Ensure `TripItem` (or equivalent) in `TaskContext` and `tripService` can store the selected unit for each item.
 - [ ] Smart categorization
+    -   **Define Categories:**
+        -   Create a predefined list of common grocery categories (e.g., Produce, Dairy, Meat, Bakery, Pantry, Frozen, Beverages, Household).
+    -   **Categorization Logic:**
+        -   **Keyword-based:** Develop a system that assigns a category based on keywords in the item name (e.g., "apple" -> Produce, "milk" -> Dairy). This might involve a dictionary of keywords to categories.
+        -   **Machine Learning (Advanced):** Train a simple text classification model on a dataset of item names and their categories.
+        -   **User History:** Learn from how users categorize items over time.
+    -   **UI for Categorization:**
+        -   When adding an item, automatically suggest a category.
+        -   Allow users to manually override or select a category from the predefined list.
+        -   Display items grouped by category in the grocery list view.
+        -   **Storage:**
+            -   Add a `category` field to the `TripItem` interface and store it in `TaskContext`/`tripService`.
 - [ ] Recurring items
+    -   **Data Model:**
+        -   Define how recurring items will be stored. This might involve a new data structure or extending the existing `TripItem`.
+        -   Fields needed: `itemId` (to link to a base item definition), `frequency` (daily, weekly, monthly), `nextDueDate`, `startDate`, `endDate` (optional).
+    -   **UI for Setting Recurrence:**
+        -   When adding/editing an item, provide an option to mark it as recurring.
+        -   Allow users to select the recurrence pattern (e.g., every Tuesday, every 2 weeks, 1st of the month).
+    -   **Logic for Adding to Lists:**
+        -   Implement a system (e.g., a daily check or a function triggered on app open/list creation) that identifies recurring items due to be added.
+        -   Automatically add these items to the relevant grocery list (or a dedicated "Recurring Items" list).
+    -   **Notifications (Optional):**
+        -   Remind users about upcoming recurring items.
 - [ ] Shopping history
+    -   **Data Storage:**
+        -   Ensure completed trips and their items (with prices, quantities, dates) are persistently stored (Firebase, local storage if not already robust).
+        -   Consider if `tripService.ts` needs modification for archiving or marking trips as "historically significant".
+    -   **UI for History View:**
+        -   Create a new page or section to display past shopping trips.
+        -   Allow users to view details of past trips (items, total cost, date, store).
+        -   Implement filtering/sorting (by date, store, total cost).
+    -   **Data Aggregation (Optional):**
+        -   Calculate and display summary statistics (e.g., average spending per month, most frequently bought items).
 - [ ] Export to PDF/CSV
+    -   **Select Libraries:**
+        -   For PDF: `jspdf`, `react-pdf`.
+        -   For CSV: `papaparse` or custom string generation.
+    -   **Data Preparation:**
+        -   Functions to gather the data for the current grocery list (or selected history) to be exported.
+        -   Format data appropriately for PDF (layout, tables) or CSV (rows, columns).
+    -   **UI for Export:**
+        -   Add "Export" buttons (e.g., "Export as PDF", "Export as CSV") in the grocery list view or shopping history.
+    -   **File Generation & Download:**
+        -   Implement logic to generate the file in the chosen format.
+        -   Trigger a file download in the browser.
 
 ## B. Price intelligence
 - [ ] Price tracking across stores
+    -   **Data Model:**
+        -   Define a data structure to store item prices at different stores over time.
+        -   Fields: `itemId`, `storeId` (or name), `price`, `dateRecorded`.
+    -   **Data Input:**
+        -   Allow users to manually input prices for items they see at different stores.
+        -   Potentially integrate with OCR for receipt scanning to capture prices from multiple stores.
+    -   **Storage:**
+        -   Use Firebase or a similar backend to store this price data centrally.
+    -   **UI for Price Input/Viewing:**
+        -   When viewing an item, show its price history across stores.
+        -   Provide an interface for users to add a new price sighting.
 - [ ] Best price recommendations
+    -   **Algorithm:**
+        -   When a user adds an item to their list, query the price tracking data.
+        -   Identify the store(s) that recently offered the lowest price for that item (and similar items).
+    -   **UI for Recommendations:**
+        -   Display a "Best Price Found At..." suggestion below the item in the list.
+        -   Consider proximity if location data for stores is available.
 - [ ] Price history
+    -   **Data Retrieval:**
+        -   Fetch price data for a specific item from the database.
+    -   **UI - Charts/Graphs:**
+        -   Display a line chart showing the price of an item over time, potentially filterable by store.
+        -   Use a charting library (e.g., `recharts`, `chart.js`).
 - [ ] Price alerts
+    -   **User Configuration:**
+        -   Allow users to set a target price for specific items.
+        -   UI to manage these alerts (add, edit, delete).
+    -   **Notification System:**
+        -   Implement a backend process (e.g., Firebase Cloud Functions) that periodically checks if any item prices have dropped below user-set alert thresholds.
+        -   Send push notifications or in-app notifications.
 - [ ] Store-specific deals
+    -   **Data Source:**
+        -   Manual input by users (community-sourced).
+        -   Potential for web scraping (complex, ethical considerations) or API integration if stores provide them.
+    -   **Data Model:**
+        -   Store details: `dealDescription`, `item`, `store`, `validFrom`, `validTo`, `discountType` (%, fixed amount).
+    -   **UI for Deals:**
+        -   A dedicated "Deals" section in the app.
+        -   Highlight deals relevant to items in the user's current grocery list.
 - [ ] Bulk buying recommendations
+    -   **Algorithm:**
+        -   Analyze item price per unit (e.g., price/kg, price/L).
+        -   Compare unit price for different package sizes of the same item.
+        -   Factor in user's consumption rate (if available from shopping history).
+    -   **UI:**
+        -   When a user adds an item, suggest if a larger package size offers better value.
+        -   "Consider buying X in bulk to save Y%".
 - [ ] Price prediction
+    -   **Data Requirements:**
+        -   Significant historical price data for various items.
+    -   **Algorithm (Advanced):**
+        -   Time series analysis (e.g., ARIMA models) or machine learning regression models to predict future price trends.
+        -   Requires data science expertise.
+    -   **UI:**
+        -   "Price likely to increase/decrease in the next X weeks."
 
 ## C. Rotating chores
 - [x] Basic chore assignment
-- [x] Rotation scheduling
+- [x] Rotation scheduling (initial setup, needs logic for `nextRotationDate`)
+    -   **Update `TaskContext.tsx` & `taskService.ts` (if applicable for backend persistence):**
+        -   In `addTask` and `updateTask`:
+            -   If `rotationFrequency` is set and `task.status` is "completed" (or a similar trigger), calculate `nextRotationDate`.
+            -   Store the calculated `nextRotationDate`.
+    -   **`calculateNextRotationDate` Function:**
+        -   Create a utility function `calculateNextRotationDate(currentDate: Date, frequency: RotationFrequency): Date`.
+        -   Based on `frequency` ('daily', 'weekly', 'bi-weekly', 'monthly'), add the corresponding duration to `currentDate`.
+        -   Handle edge cases (e.g., end of month for monthly rotations).
+    -   **Completion Logic:**
+        -   When a rotating chore is marked complete:
+            -   Call `calculateNextRotationDate` using its `completionDate` (or `Date.now()`) and `rotationFrequency`.
+            -   Update the chore's `nextRotationDate` in the context/backend.
+            -   Reset the chore's status to "pending" or "open".
+    -   **UI Display:**
+        -   Ensure `nextRotationDate` is displayed clearly on chore cards/details.
+        -   Potentially indicate overdue rotating chores.
 - [x] Completion tracking
-- [ ] Chore preferences
-- [ ] Difficulty weighting
-- [ ] Time-based scheduling
+- [x] Chore preferences
+    -   **User Profile Extension:**
+        -   Add a section in user profiles (Firebase and `AuthContext` state) to store chore preferences.
+        -   Data model: `userId`, `choreId` (or `choreType`), `preferenceLevel` (e.g., like, dislike, neutral), `notes` (optional).
+    -   **UI for Setting Preferences:**
+        -   In user settings or a dedicated chore management area, allow users to indicate preferences for specific chores or types of chores.
+    -   **Assignment Consideration:**
+        -   When assigning chores (manually or automatically), display or factor in user preferences. This is more relevant for automated assignment.
+- [x] Difficulty weighting
+    -   **Chore Definition Extension:**
+        -   Add a `difficulty` field to the `Task` interface (e.g., a number from 1-5 or labels like "Easy", "Medium", "Hard").
+    -   **UI for Setting Difficulty:**
+        -   When creating/editing a chore, allow setting its difficulty.
+    -   **Usage:**
+        -   Can be used in reports/dashboards to show effort distribution.
+        -   Can be a factor in automated chore assignment algorithms (balancing workload).
+- [ ] Time-based scheduling (Beyond simple rotation, e.g., "Clean fridge every 1st Monday of the month")
+    -   **Advanced Recurrence Rules:**
+        -   Investigate libraries for handling complex recurrence patterns (e.g., `rrule.js` which implements iCalendar RFC 5545).
+        -   Update the `Task` interface: instead of just `rotationFrequency`, use a more flexible `recurrenceRule` (e.g., an RRULE string).
+    -   **UI for Complex Scheduling:**
+        -   Provide a more advanced scheduling UI, perhaps using a calendar or rule builder, to define these complex patterns.
+        -   This would likely replace or augment the simple `rotationFrequency` dropdown.
+    -   **`nextDueDate` Calculation:**
+        -   Use the chosen recurrence library to calculate the `nextDueDate` based on the `recurrenceRule` and the last completion date.
 - [ ] Chore history
+    -   **Data Logging:**
+        -   When a chore is completed, log its `choreId`, `userId` (who completed it), `completionDate`, and any relevant notes.
+        -   Store this history in Firebase.
+    -   **UI for History View:**
+        -   A new page/section to display chore completion history.
+        -   Filterable by chore, user, date range.
 - [ ] Chore statistics
+    -   **Data Aggregation:**
+        -   From chore history, calculate statistics:
+            -   Chores completed per user.
+            -   Most/least frequently completed chores.
+            -   On-time completion rates.
+    -   **UI - Dashboards/Reports:**
+        -   Display these statistics using charts and tables in the household dashboard or a dedicated chore analytics section.
 
 ## D. Household-wide dashboards
 - [x] Cost overview
 - [x] Chore completion
 - [x] Payment status
-- [ ] Spending trends
+- [ ] Spending trends (Partially done with interactive charts, needs to be fully integrated and potentially expanded)
+    -   **Data Source:**
+        -   Aggregated data from `shopping history` (completed trips: total cost, items, categories, store, date).
+    -   **Analysis & Aggregation:**
+        -   Calculate spending over time periods (weekly, monthly, yearly).
+        -   Break down spending by category (e.g., "Produce", "Dairy").
+        -   Break down spending by store.
+    -   **UI - Charts & Visualizations (e.g., using `Recharts` or similar):**
+        -   Line chart for total spending over time.
+        -   Pie chart or bar chart for spending by category.
+        -   Bar chart for spending by store.
+        -   Filters for date ranges.
+    -   **Components:**
+        -   Create reusable chart components in `src/components/charts/`.
+        -   Integrate these into `src/pages/DashboardPage.tsx`.
+        -   Ensure data is fetched/passed correctly from context or services.
 - [ ] Chore performance
+    -   **Data Source:**
+        -   Aggregated data from `chore history` and `chore statistics`.
+    -   **Metrics:**
+        -   Completion rates per chore / per user.
+        -   Timeliness of completions (if due dates are tracked).
+        -   Distribution of chore workload (based on difficulty or number of chores).
+    -   **UI - Charts & Tables:**
+        -   Bar charts for completion rates by user/chore.
+        -   Tables showing detailed performance data.
+        -   Integrate into `DashboardPage.tsx`.
 - [ ] Household analytics
+    -   **Concept:**
+        -   A summary page or section combining key insights from spending, chores, payments, etc.
+        -   Provide a holistic view of household activity and efficiency.
+    -   **Potential Metrics:**
+        -   Overall household budget adherence (if budgets are set).
+        -   Trends in grocery spending vs. chore completion.
+        -   Activity summaries per household member.
+    -   **UI:**
 - [ ] Custom reports
 - [ ] Export functionality
 

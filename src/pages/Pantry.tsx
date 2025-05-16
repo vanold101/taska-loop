@@ -519,20 +519,20 @@ const PantryPage = () => {
             <DialogTitle>Add Pantry Item</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="name" className="sm:text-right">
                 Name
               </Label>
               <Input
                 id="name"
                 value={newItem.name || ''}
                 onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                className="col-span-3"
+                className="sm:col-span-3"
                 placeholder="Enter item name"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="quantity" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="quantity" className="sm:text-right">
                 Quantity
               </Label>
               <Input
@@ -541,11 +541,11 @@ const PantryPage = () => {
                 min="1"
                 value={newItem.quantity || 1}
                 onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value)})}
-                className="col-span-3"
+                className="sm:col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="expiry" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="expiry" className="sm:text-right">
                 Expiry Date
               </Label>
               <Input
@@ -553,18 +553,18 @@ const PantryPage = () => {
                 type="date"
                 value={newItem.expiry || ''}
                 onChange={(e) => setNewItem({...newItem, expiry: e.target.value})}
-                className="col-span-3"
+                className="sm:col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="category" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="category" className="sm:text-right">
                 Category
               </Label>
               <Select 
                 value={newItem.category} 
                 onValueChange={(value) => setNewItem({...newItem, category: value})}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger className="sm:col-span-3">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>

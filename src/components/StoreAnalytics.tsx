@@ -106,28 +106,28 @@ const StoreAnalytics = () => {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full mb-4 bg-white/35 backdrop-blur dark:bg-[#262A24] grid grid-cols-4">
+          <TabsList className="w-full mb-4 bg-white/35 backdrop-blur dark:bg-[#262A24] flex overflow-x-auto no-scrollbar">
             <TabsTrigger
               value="insights"
-              className="flex-1 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
+              className="flex-shrink-0 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
             >
               My List Hotspots
             </TabsTrigger>
             <TabsTrigger
               value="stores"
-              className="flex-1 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
+              className="flex-shrink-0 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
             >
               Store Overview
             </TabsTrigger>
             <TabsTrigger
               value="items"
-              className="flex-1 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
+              className="flex-shrink-0 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
             >
               Item Deep Dive
             </TabsTrigger>
             <TabsTrigger
               value="recent"
-              className="flex-1 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
+              className="flex-shrink-0 data-[state=active]:bg-[#FF9F2F] data-[state=active]:text-white text-xs px-2 py-1.5"
             >
               Recent Visits
             </TabsTrigger>

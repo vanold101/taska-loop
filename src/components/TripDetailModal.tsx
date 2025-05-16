@@ -476,12 +476,12 @@ const TripDetailModal = ({
         
         {/* Tabs for items and cost splitting */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid grid-cols-2 w-full premium-card">
-            <TabsTrigger value="items" className="flex items-center gap-1">
+          <TabsList className="flex w-full premium-card">
+            <TabsTrigger value="items" className="flex-1 flex items-center gap-1">
               <ShoppingCart className="h-3.5 w-3.5" />
               Items
             </TabsTrigger>
-            <TabsTrigger value="splits" className="flex items-center gap-1">
+            <TabsTrigger value="splits" className="flex-1 flex items-center gap-1">
               <SplitSquareVertical className="h-3.5 w-3.5" />
               Cost Split
             </TabsTrigger>
@@ -598,15 +598,25 @@ const TripDetailModal = ({
                         >
                           {item.checked && <Check className="h-3 w-3 text-green-600 dark:text-green-400 transition-transform duration-200 transform scale-100" />}
                         </div>
-                        
-                        <div className="ml-3 flex-1 overflow-hidden">
-                          <div className="font-medium text-sm truncate">{item.name}</div>
-                          <div className="flex items-center text-xs text-gloop-text-muted gap-1">
-                            <span>
-                              {formatValueWithUnit(item.quantity, item.unit || 'ea')}
-                            </span>
-                            <span>•</span>
-                            <span className="truncate">Added by: {item.addedBy?.name || 'Unknown User'}</span>
+                        <div className="flex-1 ml-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">{item.name}</span>
+                            <PriceInput 
+                              itemName={item.name} 
+                              value={item.price} 
+                              onChange={(newPrice) => handleItemPriceChange(item.id, newPrice)} 
+                            />
+                          </div>
+                          <div className="text-xs text-gloop-text-muted flex items-center">
+                            <span>{formatValueWithUnit(item.quantity, item.unit || 'ea')}</span>
+                            <span className="mx-1">·</span>
+                            <span>Added by {item.addedBy.name}</span>
+                            {item.price && <span className="mx-1">·</span>}
+                            {item.price && (
+                              <span className="font-semibold text-gloop-text-main dark:text-gloop-dark-text-main">
+                                ${item.price.toFixed(2)}
+                              </span>
+                            )}
                           </div>
                         </div>
                         

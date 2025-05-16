@@ -27,7 +27,7 @@ const MobileLayout = ({ children, className }: MobileLayoutProps) => {
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        "fixed inset-0 bg-background z-50 overflow-y-auto",
+        "fixed inset-0 bg-transparent z-50 overflow-y-auto",
         "flex flex-col",
         className
       )}

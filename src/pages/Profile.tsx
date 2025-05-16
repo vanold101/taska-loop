@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import { Button } from "@/components/ui/button";
@@ -193,8 +192,8 @@ const Profile = () => {
       </div>
 
       <Tabs defaultValue="account" className="mb-6" onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 glass-effect">
-          <TabsTrigger value="account" className="data-[state=active]:bg-transparent data-[state=active]:text-gloop-primary relative">
+        <TabsList className="flex w-full overflow-x-auto no-scrollbar glass-effect">
+          <TabsTrigger value="account" className="flex-shrink-0 data-[state=active]:bg-transparent data-[state=active]:text-gloop-primary relative">
             <User className="h-4 w-4 mr-2" />
             <span>Account</span>
             {activeTab === "account" && (
@@ -204,7 +203,7 @@ const Profile = () => {
               />
             )}
           </TabsTrigger>
-          <TabsTrigger value="friends" className="data-[state=active]:bg-transparent data-[state=active]:text-gloop-primary relative">
+          <TabsTrigger value="friends" className="flex-shrink-0 data-[state=active]:bg-transparent data-[state=active]:text-gloop-primary relative">
             <Users className="h-4 w-4 mr-2" />
             <span>Circle</span>
             {activeTab === "friends" && (
@@ -214,7 +213,7 @@ const Profile = () => {
               />
             )}
           </TabsTrigger>
-          <TabsTrigger value="activity" className="data-[state=active]:bg-transparent data-[state=active]:text-gloop-primary relative">
+          <TabsTrigger value="activity" className="flex-shrink-0 data-[state=active]:bg-transparent data-[state=active]:text-gloop-primary relative">
             <Clock className="h-4 w-4 mr-2" />
             <span>Activity</span>
             {activeTab === "activity" && (

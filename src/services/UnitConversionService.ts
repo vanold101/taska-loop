@@ -142,9 +142,18 @@ export const units: UnitDefinition[] = [
     commonItems: ['eggs', 'fruit', 'canned goods']
   },
   {
-    id: 'dozen',
+    id: 'pc',
+    name: 'Piece',
+    abbreviation: 'pc',
+    type: 'quantity',
+    system: 'universal',
+    conversionFactor: 1,
+    commonItems: ['fruit', 'bread', 'cheese']
+  },
+  {
+    id: 'dz',
     name: 'Dozen',
-    abbreviation: 'doz',
+    abbreviation: 'dz',
     type: 'quantity',
     system: 'universal',
     conversionFactor: 12, // 1 dozen = 12 items
@@ -153,13 +162,13 @@ export const units: UnitDefinition[] = [
   
   // Package units
   {
-    id: 'pkg',
+    id: 'pack',
     name: 'Package',
-    abbreviation: 'pkg',
+    abbreviation: 'pack',
     type: 'package',
     system: 'universal',
     conversionFactor: 1,
-    commonItems: ['pasta', 'bacon', 'cheese']
+    commonItems: ['pasta', 'bacon', 'cheese', 'snacks']
   },
   {
     id: 'box',
@@ -177,7 +186,7 @@ export const units: UnitDefinition[] = [
     type: 'package',
     system: 'universal',
     conversionFactor: 1,
-    commonItems: ['soup', 'beans', 'tomatoes']
+    commonItems: ['soup', 'beans', 'tomatoes', 'soda']
   },
   {
     id: 'bottle',
@@ -186,7 +195,25 @@ export const units: UnitDefinition[] = [
     type: 'package',
     system: 'universal',
     conversionFactor: 1,
-    commonItems: ['soda', 'wine', 'oils']
+    commonItems: ['soda', 'wine', 'oils', 'water', 'juice']
+  },
+  {
+    id: 'bunch',
+    name: 'Bunch',
+    abbreviation: 'bunch',
+    type: 'quantity',
+    system: 'universal',
+    conversionFactor: 1,
+    commonItems: ['bananas', 'grapes', 'carrots', 'herbs']
+  },
+  {
+    id: 'jar',
+    name: 'Jar',
+    abbreviation: 'jar',
+    type: 'package',
+    system: 'universal',
+    conversionFactor: 1,
+    commonItems: ['sauces', 'pickles', 'jam', 'peanut butter']
   }
 ];
 

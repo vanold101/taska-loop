@@ -1,4 +1,3 @@
-
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import './index.css'
@@ -16,31 +15,21 @@ themeColorMeta.name = 'theme-color';
 themeColorMeta.content = '#F0F9FF';
 document.getElementsByTagName('head')[0].appendChild(themeColorMeta);
 
-// Apply system preference for dark mode
-const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+// Apply theme preference with light mode as default
 const storedTheme = localStorage.getItem('theme');
 
-if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
+if (storedTheme === 'dark') {
   document.documentElement.classList.add('dark');
   themeColorMeta.content = '#0F172A';
 } else {
+  // Default to light mode
   document.documentElement.classList.remove('dark');
+  // If no theme is set, initialize to light mode
+  if (!storedTheme) {
+    localStorage.setItem('theme', 'light');
+  }
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-// Add event listener for system theme changes
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-  const storedTheme = localStorage.getItem('theme');
-  
-  // Only change if the user hasn't set a preference
-  if (!storedTheme) {
-    if (e.matches) {
-      document.documentElement.classList.add('dark');
-      themeColorMeta.content = '#0F172A';
-    } else {
-      document.documentElement.classList.remove('dark');
-      themeColorMeta.content = '#F0F9FF';
-    }
-  }
-});
+// Remove event listener for system theme changes as we no longer respect system preferences

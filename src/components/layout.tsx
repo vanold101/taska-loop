@@ -11,9 +11,9 @@ const Layout = ({ children }: LayoutProps) => {
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-transparent">
       <MobileLayout>
-        <main className="container mx-auto px-4 pb-20">
+        <main className="max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 pb-20">
           {children}
         </main>
       </MobileLayout>

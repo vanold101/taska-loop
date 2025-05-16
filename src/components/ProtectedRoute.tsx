@@ -1,12 +1,12 @@
-import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import React, { ReactNode } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
-  // You can add any additional props you might need, e.g., roles/permissions
+  children: ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = () => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
@@ -28,8 +28,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = () => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // User is authenticated, render the child route content
-  return <Outlet />;
+  // User is authenticated, render the child components
+  return <>{children}</>;
 };
 
 export default ProtectedRoute; 

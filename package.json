@@ -2,12 +2,13 @@
   "name": "taska-loop",
   "version": "0.1.0",
   "private": false,
+  "type": "module",
   "homepage": "https://vanold101.github.io/taska-loop/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "start": "vite preview",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint .",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
@@ -56,10 +57,13 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@eslint/js": "^8.57.0",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^20.10.4",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.55.0",
@@ -67,9 +71,11 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "gh-pages": "^6.3.0",
+    "globals": "^14.0.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^7.2.0",
     "vite": "^5.0.10"
   }
 }

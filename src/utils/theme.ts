@@ -1,7 +1,7 @@
-// Theme utility functions for dark mode support
+// Theme utility functions with light mode as default
 
 /**
- * Initialize the theme based on user preferences or system settings
+ * Initialize the theme based on user preferences with light mode as default
  */
 export function initializeTheme() {
   // Check if theme is stored in localStorage
@@ -9,16 +9,12 @@ export function initializeTheme() {
   
   if (savedTheme === 'dark') {
     document.documentElement.classList.add('dark');
-  } else if (savedTheme === 'light') {
-    document.documentElement.classList.remove('dark');
   } else {
-    // If no saved preference, check system preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Default to light mode for any other value or if no theme is set
+    document.documentElement.classList.remove('dark');
     
-    if (prefersDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
+    // If no theme is set, initialize to light mode
+    if (!savedTheme) {
       localStorage.setItem('theme', 'light');
     }
   }

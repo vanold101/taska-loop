@@ -1,29 +1,42 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Mail, ShieldCheck } from 'lucide-react'; // Using Mail as a generic icon for Google sign-in
 
+interface LocationState {
+  from?: {
+    pathname: string;
+  };
+}
+
 const LoginPage: React.FC = () => {
   const { loginWithGoogle, isLoading, error, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Get the redirect location or default to home
+  const from = (location.state as LocationState)?.from?.pathname || '/home';
 
   const handleGoogleLogin = async () => {
+    setLoginError(null);
     try {
       await loginWithGoogle();
-      // The redirection will be handled by a ProtectedRoute or effect watching the user state
+      // The redirection will be handled by the useEffect below
     } catch (err) {
-      // Error is already handled in AuthContext, but you can add specific UI feedback here if needed
+      setLoginError("Login failed. Please try again.");
       console.error("Login failed on page:", err);
     }
   };
 
   React.useEffect(() => {
     if (user) {
-      navigate('/home');
+      // Navigate to the previous route or home
+      navigate(from, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, from]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-500/40 via-green-500/40 to-blue-500/40 dark:from-blue-700/50 dark:via-green-700/50 dark:to-blue-700/50 p-4">
@@ -38,8 +51,10 @@ const LoginPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-6 md:p-8">
-          {error && (
-            <p className="text-center text-red-500 dark:text-red-400 bg-red-500/10 p-3 rounded-md">{error}</p>
+          {(error || loginError) && (
+            <p className="text-center text-red-500 dark:text-red-400 bg-red-500/10 p-3 rounded-md">
+              {error || loginError}
+            </p>
           )}
           <Button 
             onClick={handleGoogleLogin} 

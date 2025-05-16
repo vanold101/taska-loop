@@ -10,19 +10,7 @@ import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-
-// Define a Task type for better type safety
-export interface Task {
-  id?: string;
-  title: string;
-  dueDate: string;
-  priority: 'low' | 'medium' | 'high';
-  isCompleted?: boolean;
-  isRotating?: boolean;
-  location?: string | null;
-  coordinates?: { lat: number; lng: number } | null;
-  assignees?: Array<{ id: string; name: string }>;
-}
+import { Task } from "@/context/TaskContext";
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -35,10 +23,12 @@ interface CreateTaskModalProps {
 export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditing = false }: CreateTaskModalProps) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState<Date>();
-  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [priority, setPriority] = useState<Task['priority']>("medium");
   const [location, setLocation] = useState("");
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [rotating, setRotating] = useState(false);
+  const [rotationFrequency, setRotationFrequency] = useState<Task['rotationFrequency']>(null);
+  const [difficulty, setDifficulty] = useState<Task['difficulty']>("Medium");
   
   const locationInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -149,6 +139,8 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
         setLocation(taskToEdit.location || "");
         setCoordinates(taskToEdit.coordinates || null);
         setRotating(taskToEdit.isRotating || false);
+        setRotationFrequency(taskToEdit.rotationFrequency || null);
+        setDifficulty(taskToEdit.difficulty || "Medium");
       } else {
         // Reset form for new task
         setTitle("");
@@ -157,6 +149,8 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
         setLocation("");
         setCoordinates(null);
         setRotating(false);
+        setRotationFrequency(null);
+        setDifficulty("Medium");
       }
     }
   }, [isOpen, taskToEdit, isEditing]);
@@ -165,16 +159,19 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
     e.preventDefault();
     if (!title.trim()) return;
     
-    const taskData = {
+    const taskData: Partial<Task> = {
       ...(taskToEdit?.id ? { id: taskToEdit.id } : {}),
       title,
       dueDate: date ? format(date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
       priority,
       isRotating: rotating,
-      location: location || null,
-      coordinates: coordinates || null,
-      ...(taskToEdit?.assignees ? { assignees: taskToEdit.assignees } : {}),
-      ...(taskToEdit?.isCompleted !== undefined ? { isCompleted: taskToEdit.isCompleted } : {})
+      location: location || undefined,
+      coordinates: coordinates || undefined,
+      rotationFrequency: rotating ? rotationFrequency : null,
+      difficulty: difficulty,
+      ...(taskToEdit?.assignees ? { assignees: taskToEdit.assignees } : { assignees: [] }),
+      ...(taskToEdit?.completed !== undefined ? { completed: taskToEdit.completed } : { completed: false }),
+      ...(taskToEdit?.nextRotationDate ? { nextRotationDate: taskToEdit.nextRotationDate } : {})
     };
     
     onSubmit(taskData);
@@ -193,19 +190,19 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="title" className="sm:text-right">
                 Title
               </Label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="col-span-3"
+                className="sm:col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="date" className="sm:text-right">
                 Due Date
               </Label>
               <Popover>
@@ -213,7 +210,7 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
                   <Button
                     variant={"outline"}
                     className={cn(
-                      "col-span-3 justify-start text-left font-normal",
+                      "sm:col-span-3 justify-start text-left font-normal",
                       !date && "text-muted-foreground"
                     )}
                   >
@@ -231,11 +228,11 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="location" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="location" className="sm:text-right">
                 Location
               </Label>
-              <div className="col-span-3 relative">
+              <div className="sm:col-span-3 relative">
                 <div className="flex">
                   <div className="relative flex-1">
                     <Input
@@ -264,20 +261,12 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="priority" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="priority" className="sm:text-right">
                 Priority
               </Label>
-              <Select 
-                value={priority} 
-                onValueChange={(value) => {
-                  // Ensure type safety by checking if value is a valid priority
-                  if (value === "low" || value === "medium" || value === "high") {
-                    setPriority(value);
-                  }
-                }}
-              >
-                <SelectTrigger className="col-span-3">
+              <Select value={priority} onValueChange={(value: Task['priority']) => setPriority(value)}>
+                <SelectTrigger className="sm:col-span-3">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -287,11 +276,26 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="rotating" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="difficulty" className="sm:text-right">
+                Difficulty
+              </Label>
+              <Select value={difficulty} onValueChange={(value: Task['difficulty']) => setDifficulty(value)}>
+                <SelectTrigger className="sm:col-span-3">
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Easy">Easy</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="rotating" className="sm:text-right">
                 Rotating
               </Label>
-              <div className="col-span-3 flex items-center">
+              <div className="sm:col-span-3 flex items-center">
                 <input
                   type="checkbox"
                   id="rotating"

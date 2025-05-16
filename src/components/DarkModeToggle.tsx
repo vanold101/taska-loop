@@ -5,26 +5,13 @@ import { getCurrentTheme, toggleTheme } from '@/utils/theme';
 const DarkModeToggle: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Check for user's preferred color scheme or saved preference
+  // Check for the current theme
   useEffect(() => {
     // Set initial state based on current theme
     setIsDarkMode(getCurrentTheme() === 'dark');
     
-    // Listen for system color scheme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('theme')) {
-        setIsDarkMode(e.matches);
-        if (e.matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      }
-    };
-    
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    // We no longer use system preference changes to automatically switch themes
+    // as we want light mode to be the default regardless of system preferences
   }, []);
 
   const handleToggle = () => {

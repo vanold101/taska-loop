@@ -10,6 +10,9 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   completed?: boolean;
   isRotating?: boolean;
+  rotationFrequency?: 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | null;
+  nextRotationDate?: string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard' | string;
   assignees?: Array<{
     id: string;
     name: string;

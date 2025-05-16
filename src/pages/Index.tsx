@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import TripCard from "../components/TripCard";
 import FloatingActionButton from "../components/FloatingActionButton";
 import CreateTripModal from "../components/CreateTripModal";
-import { CreateTaskModal, Task as ModalTask } from "../components/CreateTaskModal";
+import { CreateTaskModal } from "../components/CreateTaskModal";
 import NavBar from "../components/NavBar";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -49,46 +49,53 @@ import NearbyStores from "../components/NearbyStores";
 import TripDetailModal from "../components/TripDetailModal";
 
 // Define TaskAssignee locally if not directly importable with avatar
-type TaskAssignee = { id: string; name: string; avatar?: string };
+// type TaskAssignee = { id: string; name: string; avatar?: string }; // This might be redundant if ContextTask.assignees is used directly
 
-// Mock data for tasks
-const mockTasks: ModalTask[] = [
+// Mock data for tasks - Updated to ContextTask and conformed to interface
+const mockTasks: ContextTask[] = [
   {
     id: '1',
     title: 'Take out trash',
     assignees: [
-      { id: '1', name: 'You' },
-      { id: '2', name: 'Rachel' }
+      { id: '1', name: 'You', avatar: '' }, 
+      { id: '2', name: 'Rachel', avatar: '' } 
     ],
     dueDate: '2025-05-02',
     isRotating: true,
     priority: 'high',
-    isCompleted: false,
-    location: null,
+    completed: false,
+    location: 'N/A', // Ensured string
+    coordinates: { lat: 0, lng: 0 }, 
+    rotationFrequency: 'weekly', 
+    difficulty: 'Easy', 
   },
   {
     id: '2',
     title: 'Clean kitchen',
     assignees: [
-      { id: '1', name: 'You' },
+      { id: '1', name: 'You', avatar: '' }, 
     ],
     dueDate: '2025-05-03',
     isRotating: false,
     priority: 'medium',
-    isCompleted: false,
-    location: null,
+    completed: false,
+    location: 'Kitchen', // Ensured string, was undefined
+    coordinates: { lat: 0, lng: 0 },
+    difficulty: 'Medium',
   },
   {
     id: '3',
     title: 'Buy milk',
     assignees: [
-      { id: '2', name: 'Rachel' },
+      { id: '2', name: 'Rachel', avatar: '' }, 
     ],
     dueDate: '2025-05-01',
     isRotating: false,
     priority: 'low',
-    isCompleted: true,
-    location: 'Grocery Store',
+    completed: true,
+    location: 'Grocery Store', // Already a string
+    coordinates: { lat: 0, lng: 0 },
+    difficulty: 'Easy',
   }
 ];
 
@@ -123,7 +130,7 @@ const HomePage = () => {
   const [isTripModalOpen, setTripModalOpen] = useState(false);
   const [isTaskModalOpen, setTaskModalOpen] = useState(false);
   const [isEditingTask, setIsEditingTask] = useState(false);
-  const [taskToEdit, setTaskToEdit] = useState<ModalTask | null>(null);
+  const [taskToEdit, setTaskToEdit] = useState<ContextTask | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const { toast } = useToast();
 
@@ -146,8 +153,8 @@ const HomePage = () => {
       eta: data.eta,
       status: 'open' as const,
       items: [],
-      participants: [{ id: 'user-1', name: 'You', avatar: 'https://example.com/you.jpg' }], 
-      shopper: { name: 'You', avatar: 'https://example.com/you.jpg' },
+      participants: [{ id: user?.id || 'user-1', name: user?.name || 'You', avatar: user?.avatar || '' }], 
+      shopper: { name: user?.name || 'You', avatar: user?.avatar || '' },
       date: new Date().toISOString(),
     };
     addContextTrip(newTripData);
@@ -155,69 +162,49 @@ const HomePage = () => {
     toast({ title: "Trip Broadcasted!", description: `Your trip to ${data.store} is live.` });
   };
 
-  const handleCreateTask = (data: { 
-    title: string; 
-    dueDate: string; 
-    location?: string | null;
-    coordinates?: { lat: number; lng: number }; 
-    assignees?: TaskAssignee[]; 
-    priority?: 'low' | 'medium' | 'high'; 
-    isRotating?: boolean; 
-  }) => {
+  const handleCreateTask = (data: Partial<ContextTask>) => {
     const newTaskForContext: Omit<ContextTask, 'id'> = { 
-      title: data.title,
-      assignees: data.assignees?.map(a => ({ ...a, avatar: a.avatar || '' })) || [{ id: 'user-1', name: 'You', avatar: '' }], 
-      dueDate: data.dueDate,
+      title: data.title || "Untitled Task",
+      assignees: data.assignees || [{ id: user?.id || 'user-1', name: user?.name || 'You', avatar: user?.avatar || '' }], 
+      dueDate: data.dueDate || new Date().toISOString().split('T')[0],
       isRotating: data.isRotating || false,
       priority: data.priority || 'medium',
-      location: data.location || 'N/A',
+      location: data.location || 'N/A', // Ensured string default for location
       coordinates: data.coordinates || { lat: 0, lng: 0 }, 
-      completed: false,
+      completed: data.completed || false,
+      rotationFrequency: data.rotationFrequency, 
+      difficulty: data.difficulty, 
     };
     addContextTask(newTaskForContext);
     setTaskModalOpen(false);
-    toast({ title: "Task Created!", description: `${data.title} has been added.` });
+    toast({ title: "Task Created!", description: `${data.title || "Task"} has been added.` });
   };
   
   const handleOpenEditTaskModal = (taskId: string) => {
     const taskFromContext = contextTasks.find(t => t.id === taskId);
     if (taskFromContext) {
-      const modalTask: ModalTask = {
-        id: taskFromContext.id,
-        title: taskFromContext.title,
-        dueDate: taskFromContext.dueDate,
-        priority: taskFromContext.priority,
-        isCompleted: taskFromContext.completed,
-        isRotating: taskFromContext.isRotating,
-        location: taskFromContext.location,
-        coordinates: taskFromContext.coordinates,
-        assignees: taskFromContext.assignees?.map(a => ({id: a.id, name: a.name})) 
-      };
-      setTaskToEdit(modalTask);
+      setTaskToEdit(taskFromContext); 
       setIsEditingTask(true);
+      setTaskModalOpen(true); 
     } else {
       toast({ title: "Error", description: "Task not found.", variant: "destructive" });
     }
   };
   
-  const handleTaskUpdate = (updatedModalTask: ModalTask) => {
+  const handleTaskUpdate = (updatedTaskData: Partial<ContextTask>) => { 
     if (!taskToEdit || !taskToEdit.id) return;
     
-    const taskUpdateForContext: Partial<ContextTask> = {
-        title: updatedModalTask.title,
-        dueDate: updatedModalTask.dueDate,
-        priority: updatedModalTask.priority,
-        completed: updatedModalTask.isCompleted,
-        isRotating: updatedModalTask.isRotating,
-        location: updatedModalTask.location || 'N/A',
-        coordinates: updatedModalTask.coordinates || { lat: 0, lng: 0 },
-        assignees: updatedModalTask.assignees?.map(a => ({ id: a.id, name: a.name, avatar: '' })) 
-    };
+    // Ensure assignees in updatedTaskData have avatars if not provided by modal
+    const finalUpdatedData = {
+      ...updatedTaskData,
+      assignees: updatedTaskData.assignees?.map(a => ({...a, avatar: a.avatar || ''})) || taskToEdit.assignees
+    }
 
-    updateContextTask(taskToEdit.id, taskUpdateForContext);
+    updateContextTask(taskToEdit.id, finalUpdatedData); 
     setIsEditingTask(false);
     setTaskToEdit(null);
-    toast({ title: "Task Updated!", description: `${updatedModalTask.title} has been updated.` });
+    setTaskModalOpen(false); 
+    toast({ title: "Task Updated!", description: `${updatedTaskData.title || "Task"} has been updated.` });
   };
 
   const handleCompleteTask = (taskId: string) => {
@@ -510,12 +497,12 @@ const HomePage = () => {
             </div>
             
             <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 mb-4 premium-card">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="today">Today</TabsTrigger>
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="mine">Mine</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsList className="w-full flex overflow-x-auto no-scrollbar mb-4 premium-card">
+                <TabsTrigger value="all" className="flex-shrink-0">All</TabsTrigger>
+                <TabsTrigger value="today" className="flex-shrink-0">Today</TabsTrigger>
+                <TabsTrigger value="upcoming" className="flex-shrink-0">Upcoming</TabsTrigger>
+                <TabsTrigger value="mine" className="flex-shrink-0">Mine</TabsTrigger>
+                <TabsTrigger value="completed" className="flex-shrink-0">Completed</TabsTrigger>
               </TabsList>
 
               <TabsContent value="all">
