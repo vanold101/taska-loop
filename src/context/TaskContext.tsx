@@ -44,11 +44,19 @@ export interface TripItem {
   quantity: number;
   price?: number;
   unit?: string; // Unit ID (e.g., 'kg', 'lb', 'ea')
+  category?: string; // Added category field
   addedBy: {
     name: string;
     avatar: string;
   };
   checked: boolean;
+
+  // Fields for recurring items
+  isRecurring?: boolean;
+  recurrenceFrequency?: 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | null;
+  nextDueDate?: string; // ISO date string for when it should appear on a list next
+  baseItemId?: string; // Optional: if this item is an instance of a recurring template
+  lastAddedToTripDate?: string; // Optional: ISO date string for when this item was last automatically added to a trip
 }
 
 export interface TripParticipant {

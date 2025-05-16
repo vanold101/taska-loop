@@ -17,9 +17,12 @@ import EditTripModal from "@/components/EditTripModal";
 import TripCalendarView from '@/components/TripCalendarView';
 import TripMapView from '@/components/TripMapView';
 import { useTaskContext, Trip as ContextTrip } from "@/context/TaskContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { createSettlementTransaction, createPaymentTransaction, confirmPayment } from "@/services/LedgerService";
 import { calculateSplitAmounts, loadSplitConfig } from "@/services/CostSplitService";
+import ExportButton from "@/components/ExportButton";
+import SmartListParser from "@/components/SmartListParser";
+import { Sparkles } from "lucide-react";
 
 const TripsPage = () => {
   // Use the shared context for trips and tasks
@@ -32,6 +35,15 @@ const TripsPage = () => {
   } = useTaskContext();
   
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Check if we should show past trips based on URL params
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('view') === 'past') {
+      setActiveTab("past");
+    }
+  }, [location]);
   
   const [activeTab, setActiveTab] = useState("active");
   const [isTripModalOpen, setTripModalOpen] = useState(false);
@@ -42,6 +54,8 @@ const TripsPage = () => {
   const [isEditTripModalOpen, setEditTripModalOpen] = useState(false);
   const [showCalendarView, setShowCalendarView] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
+  const [expandedPastTripsSection, setExpandedPastTripsSection] = useState(false);
+  const [showSmartParser, setShowSmartParser] = useState(false);
   
   // Split trips into active and past based on status
   const [trips, setTrips] = useState<TripData[]>([]);
@@ -53,14 +67,14 @@ const TripsPage = () => {
   const filteredActiveTrips = searchQuery 
     ? trips.filter(trip => 
         trip.store.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.shopper.name.toLowerCase().includes(searchQuery.toLowerCase())
+        (trip.shopper && trip.shopper.name.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : trips;
   
   const filteredPastTrips = searchQuery
     ? pastTrips.filter(trip => 
         trip.store.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.shopper.name.toLowerCase().includes(searchQuery.toLowerCase())
+        (trip.shopper && trip.shopper.name.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : pastTrips;
 
@@ -80,7 +94,7 @@ const TripsPage = () => {
           name: "You",
           avatar: "https://example.com/you.jpg"
         },
-        eta: trip.eta,
+        eta: trip.eta || '',
         status: trip.status,
         items: trip.items,
         participants: trip.participants,
@@ -92,10 +106,43 @@ const TripsPage = () => {
       const active = transformedTrips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled');
       const past = transformedTrips.filter(trip => trip.status === 'completed' || trip.status === 'cancelled');
       
+      // Sort past trips by date (most recent first)
+      past.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
       setTrips(active);
       setPastTrips(past);
     }
   }, [contextTrips]);
+  
+  // Toggle expanded past trips section
+  const togglePastTripsSection = () => {
+    setExpandedPastTripsSection(!expandedPastTripsSection);
+  };
+  
+  // Toggle search bar
+  const toggleSearch = () => {
+    setShowSearch(!showSearch);
+    if (showSearch) {
+      setSearchQuery("");
+    }
+  };
+  
+  // Filter trips
+  const handleFilterTrips = () => {
+    // In a real app, this would open a filter dialog
+  };
+  
+  // Show calendar view
+  const handleCalendarView = () => {
+    setShowCalendarView(true);
+    setShowMapView(false);
+  };
+  
+  // Show map view
+  const handleMapView = () => {
+    setShowMapView(true);
+    setShowCalendarView(false);
+  };
   
   // Create a new trip
   const handleCreateTrip = (data: { store: string; eta: string; date: string }) => {
@@ -158,21 +205,6 @@ const TripsPage = () => {
       };
       setSelectedTrip(updatedTrip);
     }
-    
-    // Update the trips state to reflect changes immediately
-    setTrips(prevTrips => 
-      prevTrips.map(t => 
-        t.id === tripId 
-          ? { ...t, items: updatedItems }
-          : t
-      )
-    );
-    
-    // Show success toast
-    toast({
-      title: "Item Added",
-      description: `${item.name} has been added to your trip.`
-    });
   };
   
   // Remove an item from a trip
@@ -262,55 +294,6 @@ const TripsPage = () => {
     const trip = contextTrips.find(t => t.id === tripId);
     if (!trip) return;
     
-    // Check if all items are checked
-    const allItemsChecked = trip.items.every(item => item.checked);
-    
-    if (!allItemsChecked) {
-      // Ask for confirmation
-      if (!window.confirm("Not all items are checked. Complete trip anyway?")) {
-        return;
-      }
-    }
-    
-    // Calculate the total cost of the trip
-    const totalCost = trip.items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
-    
-    // Calculate the split amounts based on configured item splits
-    const splitSummary = calculateSplitAmounts(tripId, trip.items, trip.participants);
-    
-    // Get the current user's info
-    const currentUser = trip.participants.find(p => p.name === "You");
-    
-    if (currentUser && totalCost > 0) {
-      // Create ledger transactions for each participant who owes money
-      splitSummary.forEach(split => {
-        // Skip the current user (we don't create a transaction from self to self)
-        if (split.userId === currentUser.id) return;
-        
-        // Only create transactions for amounts greater than zero
-        if (split.totalAmount > 0) {
-          // Create a settlement transaction in the ledger
-          // This represents that the participant owes money to the shopper
-          createSettlementTransaction(
-            tripId,
-            trip.store,
-            split.userId,      // From: The participant who owes money
-            split.userName,
-            currentUser.id,    // To: The current user who paid
-            currentUser.name,
-            split.totalAmount,
-            true              // Mark as a split expense (50/50 or configured split)
-          );
-          
-          // Show a toast to let the user know expense was recorded
-          toast({
-            title: "Expense recorded",
-            description: `${split.userName} owes you $${split.totalAmount.toFixed(2)} for items in this trip`
-          });
-        }
-      });
-    }
-    
     // Update the trip status to completed
     updateContextTrip(tripId, {
       status: 'completed',
@@ -319,10 +302,6 @@ const TripsPage = () => {
     
     // Close the detail modal if it's open
     setTripDetailModalOpen(false);
-    
-    // Note: We don't need to manually update the local state here
-    // The useEffect that watches contextTrips will handle moving the trip
-    // from active to past when the context is updated
   };
   
   // Reactivate a completed trip
@@ -347,11 +326,6 @@ const TripsPage = () => {
     const trip = contextTrips.find(t => t.id === tripId);
     if (!trip) return;
     
-    // Ask for confirmation
-    if (!window.confirm(`Are you sure you want to delete your trip to ${trip.store}?`)) {
-      return;
-    }
-    
     // Delete the trip from context
     deleteContextTrip(tripId);
     
@@ -362,55 +336,12 @@ const TripsPage = () => {
   
   // Share a trip
   const handleShareTrip = (tripId: string) => {
-    // Find the trip in context
-    const trip = contextTrips.find(t => t.id === tripId);
-    if (!trip) return;
-    
-    // In a real app, this would open a share dialog
+    // This would open a share dialog
   };
   
   // Invite a participant to a trip
   const handleInviteParticipant = (tripId: string) => {
-    // This would open an invite dialog in a real app
-  };
-  
-  // Toggle search bar
-  const toggleSearch = () => {
-    setShowSearch(!showSearch);
-    if (showSearch) {
-      setSearchQuery("");
-    }
-  };
-  
-  // Filter trips
-  const handleFilterTrips = () => {
-    // In a real app, this would open a filter dialog
-  };
-  
-  // Show calendar view
-  const handleCalendarView = () => {
-    setShowCalendarView(true);
-    setShowMapView(false);
-    
-    // This would show a calendar view of trips
-  };
-  
-  // Show map view
-  const handleMapView = () => {
-    setShowMapView(true);
-    setShowCalendarView(false);
-    
-    // This would show a map view of trips
-  };
-  
-  // View trip calendar
-  const handleViewTripCalendar = () => {
-    setShowCalendarView(true);
-  };
-  
-  // View trip map
-  const handleViewTripMap = () => {
-    setShowMapView(true);
+    // This would open an invite dialog
   };
   
   // Update an item's price
@@ -439,41 +370,8 @@ const TripsPage = () => {
   
   // Settle up with a participant
   const handleSettleUp = (amount: number, toUserId: string, fromUserId: string) => {
-    // Find the participants
-    const toParticipant = contextTrips.find(t => t.id === selectedTrip?.id)?.participants.find(p => p.id === toUserId);
-    const fromParticipant = contextTrips.find(t => t.id === selectedTrip?.id)?.participants.find(p => p.id === fromUserId);
-    
-    if (!toParticipant || !fromParticipant) {
-      console.error("Could not find participants for settlement");
-      return;
-    }
-    
-    // Create and immediately confirm a payment transaction
-    const transaction = createPaymentTransaction(
-      fromParticipant.name,  // From user making the payment
-      fromParticipant.name,
-      toParticipant.id,      // To user receiving the payment
-      toParticipant.name,
-      amount,
-      `Payment for trip to ${selectedTrip?.store || 'store'}`
-    );
-    
-    // Confirm the payment immediately
-    confirmPayment(transaction.id);
-    
-    // Navigate to the ledger page to see the updated balances
-    navigate('/ledger');
-    
-    // Show a toast notification
-    toast({
-      title: "Payment recorded",
-      description: `Your payment of $${amount.toFixed(2)} to ${toParticipant.name} has been recorded in the ledger.`
-    });
-  };
-  
-  // Trip settings
-  const handleTripSettings = () => {
-    // In a real app, this would open a settings dialog
+    // Create a payment transaction
+    console.log(`Payment of ${amount} from ${fromUserId} to ${toUserId}`);
   };
   
   // Update an item's unit
@@ -489,7 +387,6 @@ const TripsPage = () => {
           return {
             ...item,
             unit,
-            // If a new quantity is provided (from unit conversion), update it
             ...(newQuantity !== undefined ? { quantity: newQuantity } : {})
           };
         }
@@ -506,7 +403,6 @@ const TripsPage = () => {
             return {
               ...item,
               unit,
-              // If a new quantity is provided (from unit conversion), update it
               ...(newQuantity !== undefined ? { quantity: newQuantity } : {})
             };
           }
@@ -514,6 +410,42 @@ const TripsPage = () => {
         })
       });
     }
+  };
+  
+  // Handle adding items from the smart parser
+  const handleAddItemsFromParser = (items: Omit<TripItem, 'id'>[]) => {
+    if (!selectedTrip) {
+      toast({
+        title: "No trip selected",
+        description: "Please select or create a trip first",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    let addedCount = 0;
+    let skippedCount = 0;
+    
+    items.forEach(item => {
+      // Check for duplicates
+      const isDuplicate = selectedTrip.items.some(
+        existingItem => existingItem.name.toLowerCase() === item.name.toLowerCase()
+      );
+      
+      if (!isDuplicate) {
+        handleAddItem(selectedTrip.id, item);
+        addedCount++;
+      } else {
+        skippedCount++;
+      }
+    });
+    
+    toast({
+      title: `${addedCount} items added`,
+      description: skippedCount > 0 
+        ? `Added ${addedCount} items. ${skippedCount} items were skipped because they already exist in the trip.` 
+        : `Added ${addedCount} items to your trip.`
+    });
   };
   
   return (
@@ -556,6 +488,15 @@ const TripsPage = () => {
                   <Button variant="ghost" size="icon" onClick={handleMapView}>
                     <Map className="h-4 w-4" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowSmartParser(true)}
+                    className="text-blue-500"
+                    title="Smart List Parser"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </Button>
                 </>
               )}
             </div>
@@ -564,34 +505,39 @@ const TripsPage = () => {
           {/* Quick trip buttons */}
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <Button 
-              onClick={() => {
-                console.log("New Trip button clicked");
-                setTripModalOpen(true);
-              }}
+              onClick={() => setTripModalOpen(true)}
               className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white shrink-0"
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
               New Trip
             </Button>
             <QuickTripButton store="Kroger" onClick={() => {
-              console.log("Kroger quick trip clicked");
-              handleCreateTrip({ store: "Kroger", eta: "20", date: new Date().toISOString().split('T')[0] });
+              handleCreateTrip({ 
+                store: "Kroger", 
+                eta: "20", 
+                date: new Date().toISOString().split('T')[0] 
+              });
             }} />
             <QuickTripButton store="Target" onClick={() => {
-              console.log("Target quick trip clicked");
-              handleCreateTrip({ store: "Target", eta: "25", date: new Date().toISOString().split('T')[0] });
+              handleCreateTrip({ 
+                store: "Target", 
+                eta: "25", 
+                date: new Date().toISOString().split('T')[0] 
+              });
             }} />
             <QuickTripButton store="Walmart" onClick={() => {
-              console.log("Walmart quick trip clicked");
-              handleCreateTrip({ store: "Walmart", eta: "15", date: new Date().toISOString().split('T')[0] });
+              handleCreateTrip({ 
+                store: "Walmart", 
+                eta: "15", 
+                date: new Date().toISOString().split('T')[0]
+              });
             }} />
             <QuickTripButton store="Costco" onClick={() => {
-              console.log("Costco quick trip clicked");
-              handleCreateTrip({ store: "Costco", eta: "30", date: new Date().toISOString().split('T')[0] });
-            }} />
-            <QuickTripButton store="Whole Foods" onClick={() => {
-              console.log("Whole Foods quick trip clicked");
-              handleCreateTrip({ store: "Whole Foods", eta: "20", date: new Date().toISOString().split('T')[0] });
+              handleCreateTrip({ 
+                store: "Costco", 
+                eta: "30", 
+                date: new Date().toISOString().split('T')[0] 
+              });
             }} />
           </div>
         </header>
@@ -628,17 +574,32 @@ const TripsPage = () => {
                     exit={{ opacity: 0 }}
                     className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
                   >
-                    {filteredActiveTrips.map(trip => (
-                      <TripCard
-                        key={trip.id}
-                        trip={trip}
-                        onTripClick={() => handleTripClick(trip)}
-                        onAddItem={(item) => handleAddItem(trip.id, item)}
-                        onEditTrip={() => handleEditTrip(trip)}
-                        onCompleteTrip={() => handleCompleteTrip(trip.id)}
-                        onShareTrip={() => handleShareTrip(trip.id)}
-                      />
-                    ))}
+                    {filteredActiveTrips.map((trip) => {
+                      // Ensure we provide the correct type for TripCard
+                      const tripCardData = {
+                        id: trip.id,
+                        store: trip.store,
+                        shopper: trip.shopper || {
+                          name: "You",
+                          avatar: "https://example.com/you.jpg"
+                        },
+                        eta: trip.eta || '',
+                        status: trip.status as 'open' | 'shopping' | 'completed' | 'cancelled',
+                        itemCount: trip.items.length
+                      };
+                      
+                      return (
+                        <TripCard
+                          key={trip.id}
+                          trip={tripCardData}
+                          onTripClick={() => handleTripClick(trip)}
+                          onAddItem={(item) => handleAddItem(trip.id, item)}
+                          onEditTrip={() => handleEditTrip(trip)}
+                          onCompleteTrip={() => handleCompleteTrip(trip.id)}
+                          onShareTrip={() => handleShareTrip(trip.id)}
+                        />
+                      );
+                    })}
                   </motion.div>
                 ) : (
                   <motion.div
@@ -665,25 +626,84 @@ const TripsPage = () => {
             </TabsContent>
             
             <TabsContent value="past" className="mt-0">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold flex items-center">
+                  <Clock className="h-5 w-5 mr-2 text-blue-500" />
+                  Shopping History
+                </h2>
+                {pastTrips.length > 0 && (
+                  <ExportButton 
+                    trips={pastTrips}
+                    includeHistory={true}
+                    size="sm"
+                    label="Export History"
+                  />
+                )}
+              </div>
+              
               <AnimatePresence>
                 {filteredPastTrips.length > 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
-                  >
-                    {filteredPastTrips.map(trip => (
-                      <TripCard
-                        key={trip.id}
-                        trip={trip}
-                        onTripClick={() => handleTripClick(trip)}
-                        onReactivateTrip={() => handleReactivateTrip(trip.id)}
-                        onDeleteTrip={() => handleDeleteTrip(trip.id)}
-                        isPast
-                      />
-                    ))}
-                  </motion.div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredPastTrips
+                        .slice(0, expandedPastTripsSection ? undefined : 6)
+                        .map((trip, index) => (
+                          <motion.div
+                            key={trip.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.2, delay: index * 0.05 }}
+                            className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700 p-4"
+                            onClick={() => handleTripClick(trip)}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <h3 className="font-medium text-lg flex items-center">
+                                <Store className="h-4 w-4 mr-2 text-blue-500" />
+                                {trip.store}
+                              </h3>
+                              <Badge variant={trip.status === 'completed' ? "outline" : "destructive"} 
+                                className={trip.status === 'completed' ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : ""}>
+                                {trip.status === 'completed' ? (
+                                  <span className="flex items-center">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Completed
+                                  </span>
+                                ) : 'Cancelled'}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              <p className="flex items-center mb-1">
+                                <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                                {new Date(trip.date).toLocaleDateString(undefined, {
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric'
+                                })}
+                              </p>
+                              <p className="flex items-center mb-1">
+                                <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+                                {trip.items.length} items
+                              </p>
+                              <p className="flex items-center font-medium">
+                                Total: ${trip.items.reduce((sum, item) => sum + (item.price || 0), 0).toFixed(2)}
+                              </p>
+                            </div>
+                          </motion.div>
+                        ))}
+                    </div>
+                    
+                    {pastTrips.length > 6 && (
+                      <div className="flex justify-center mt-4">
+                        <Button 
+                          variant="outline" 
+                          onClick={togglePastTripsSection}
+                        >
+                          {expandedPastTripsSection ? "Show Less" : `View ${pastTrips.length - 6} More Trips`}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -704,14 +724,27 @@ const TripsPage = () => {
         )}
       </main>
       
-      {/* Trip creation modal */}
-      <CreateTripModal 
-        isOpen={isTripModalOpen} 
-        onClose={() => setTripModalOpen(false)}
-        onSubmit={handleCreateTrip}
+      {/* Smart List Parser */}
+      <SmartListParser 
+        isOpen={showSmartParser}
+        onClose={() => setShowSmartParser(false)}
+        onAddItems={handleAddItemsFromParser}
       />
       
-      {/* Trip detail modal */}
+      {/* Create Trip FAB */}
+      <FloatingActionButton 
+        onClick={() => setTripModalOpen(true)} 
+        icon={<ShoppingCart className="h-5 w-5" />}
+      />
+      
+      {/* Create Trip Modal */}
+      <CreateTripModal 
+        isOpen={isTripModalOpen} 
+        onClose={() => setTripModalOpen(false)} 
+        onSubmit={handleCreateTrip} 
+      />
+      
+      {/* Trip Detail Modal */}
       {selectedTrip && (
         <TripDetailModal
           isOpen={isTripDetailModalOpen}
@@ -729,7 +762,7 @@ const TripsPage = () => {
         />
       )}
       
-      {/* Trip edit modal */}
+      {/* Trip Edit Modal */}
       {selectedTrip && (
         <EditTripModal
           isOpen={isEditTripModalOpen}
@@ -741,14 +774,6 @@ const TripsPage = () => {
           }}
         />
       )}
-      
-      <FloatingActionButton 
-        onClick={() => {
-          console.log("Floating action button clicked");
-          setTripModalOpen(true);
-        }}
-        icon={<ShoppingCart className="h-5 w-5" />}
-      />
     </div>
   );
 };

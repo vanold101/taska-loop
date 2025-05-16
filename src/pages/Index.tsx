@@ -138,6 +138,21 @@ const HomePage = () => {
   const [selectedTripForDetail, setSelectedTripForDetail] = useState<ContextTrip | null>(null);
   const [isTripDetailModalOpen, setIsTripDetailModalOpen] = useState(false);
 
+  // Effect to update selectedTripForDetail if the modal is open and the trip data changes in context
+  useEffect(() => {
+    if (isTripDetailModalOpen && selectedTripForDetail) {
+      const updatedTripFromContext = contextTrips.find(t => t.id === selectedTripForDetail.id);
+      // If the trip is found in context and is different from the currently selected one (by reference),
+      // or if its items have changed (deeper check, JSON.stringify is a common way but can be expensive),
+      // update the selectedTripForDetail to trigger a re-render of the modal with fresh data.
+      if (updatedTripFromContext && 
+          (updatedTripFromContext !== selectedTripForDetail || 
+           JSON.stringify(updatedTripFromContext.items) !== JSON.stringify(selectedTripForDetail.items)) ) {
+        setSelectedTripForDetail(updatedTripFromContext);
+      }
+    }
+  }, [contextTrips, isTripDetailModalOpen, selectedTripForDetail]);
+
   // Redirect to login if not authenticated and not loading
   useEffect(() => {
     if (!authIsLoading && !user) {
@@ -356,56 +371,122 @@ const HomePage = () => {
 
   // Function to open TripDetailModal for adding/viewing items
   const handleOpenTripDetailModal = (tripId: string) => {
-    const trip = contextTrips.find(t => t.id === tripId);
-    if (trip) {
-      setSelectedTripForDetail(trip);
+    const tripFromContext = contextTrips.find(t => t.id === tripId);
+    if (tripFromContext) {
+      setSelectedTripForDetail(tripFromContext);
       setIsTripDetailModalOpen(true);
     } else {
       toast({ title: "Error", description: "Trip not found.", variant: "destructive" });
     }
   };
 
-  // Function to add an item to a trip in context
-  const handleAddItemToContextTrip = (tripId: string, itemData: Omit<TripItem, 'id' | 'addedBy' | 'checked'>) => {
+  const handleCloseTripDetailModal = () => {
+    setIsTripDetailModalOpen(false);
+    setSelectedTripForDetail(null);
+  };
+
+  // Handler for adding an item to a trip (passed to TripDetailModal)
+  const handleAddItemToTripInModal = (tripId: string, itemData: Omit<TripItem, 'id'>) => {
     const trip = contextTrips.find(t => t.id === tripId);
     if (trip) {
-      const newItem: TripItem = {
+      const newItemWithId: TripItem = {
         ...itemData,
-        id: Date.now().toString(), // Generate unique ID
-        addedBy: { name: "You", avatar: "" }, // Assuming current user adds item
-        checked: false,
+        id: Date.now().toString(), // Generate ID here or ensure it is passed correctly
       };
-      const updatedItems = [...trip.items, newItem];
+      const updatedItems = [...trip.items, newItemWithId];
+      
+      // Create updatedTrip with new items
+      const updatedTrip = { ...trip, items: updatedItems };
+      
+      // Update context
       updateContextTrip(tripId, { items: updatedItems });
-      toast({ title: "Item Added", description: `${itemData.name} added to ${trip.store}.` });
+      
+      // Directly update selectedTripForDetail to immediately reflect changes in UI
+      setSelectedTripForDetail(updatedTrip);
     } else {
-      toast({ title: "Error", description: "Could not add item, trip not found.", variant: "destructive" });
+      toast({ title: "Error", description: "Trip not found while adding item.", variant: "destructive" });
     }
   };
-  
-  // Placeholder for updating item in context (price, unit, etc.)
-  const handleUpdateTripItemContext = (tripId: string, itemId: string, itemUpdates: Partial<Omit<TripItem, 'id' | 'addedBy'>>) => {
-    const trip = contextTrips.find(t => t.id === tripId);
-    if (trip) {
-      const updatedItems = trip.items.map(item => 
-        item.id === itemId ? { ...item, ...itemUpdates } : item
-      );
-      updateContextTrip(tripId, { items: updatedItems });
-      toast({ title: "Item Updated", description: `Item details updated in ${trip.store}.`});
-    } else {
-      toast({ title: "Error", description: "Could not update item, trip not found.", variant: "destructive" });
-    }
-  };
-  
-  // Placeholder for deleting item from context
-  const handleDeleteTripItemContext = (tripId: string, itemId: string) => {
+
+  // Handler for removing an item from a trip (passed to TripDetailModal)
+  const handleRemoveItemFromTripInModal = (tripId: string, itemId: string) => {
     const trip = contextTrips.find(t => t.id === tripId);
     if (trip) {
       const updatedItems = trip.items.filter(item => item.id !== itemId);
+      
+      // Create updatedTrip with new items
+      const updatedTrip = { ...trip, items: updatedItems };
+      
+      // Update context
       updateContextTrip(tripId, { items: updatedItems });
-      toast({ title: "Item Deleted", description: `Item removed from ${trip.store}.`, variant: "destructive"});
+      
+      // Directly update selectedTripForDetail to immediately reflect changes in UI
+      setSelectedTripForDetail(updatedTrip);
     } else {
-      toast({ title: "Error", description: "Could not delete item, trip not found.", variant: "destructive" });
+      toast({ title: "Error", description: "Trip not found while removing item.", variant: "destructive" });
+    }
+  };
+
+  // Handler for toggling item check status (passed to TripDetailModal)
+  const handleToggleItemCheckInModal = (tripId: string, itemId: string) => {
+    const trip = contextTrips.find(t => t.id === tripId);
+    if (trip) {
+      const updatedItems = trip.items.map(item =>
+        item.id === itemId ? { ...item, checked: !item.checked } : item
+      );
+      
+      // Create updatedTrip with new items
+      const updatedTrip = { ...trip, items: updatedItems };
+      
+      // Update context
+      updateContextTrip(tripId, { items: updatedItems });
+      
+      // Directly update selectedTripForDetail to immediately reflect changes in UI
+      setSelectedTripForDetail(updatedTrip);
+    } else {
+      toast({ title: "Error", description: "Trip not found while toggling item.", variant: "destructive" });
+    }
+  };
+  
+  // Handler for updating item price (passed to TripDetailModal)
+  const handleUpdateItemPriceInModal = (tripId: string, itemId: string, price: number) => {
+    const trip = contextTrips.find(t => t.id === tripId);
+    if (trip) {
+      const updatedItems = trip.items.map(item =>
+        item.id === itemId ? { ...item, price: price } : item
+      );
+      
+      // Create updatedTrip with new items
+      const updatedTrip = { ...trip, items: updatedItems };
+      
+      // Update context
+      updateContextTrip(tripId, { items: updatedItems });
+      
+      // Directly update selectedTripForDetail to immediately reflect changes in UI
+      setSelectedTripForDetail(updatedTrip);
+    } else {
+      toast({ title: "Error", description: "Trip not found while updating price.", variant: "destructive" });
+    }
+  };
+
+  // Handler for updating item unit (passed to TripDetailModal)
+  const handleUpdateItemUnitInModal = (tripId: string, itemId: string, unit: string, newQuantity?: number) => {
+    const trip = contextTrips.find(t => t.id === tripId);
+    if (trip) {
+      const updatedItems = trip.items.map(item =>
+        item.id === itemId ? { ...item, unit: unit, quantity: newQuantity !== undefined ? newQuantity : item.quantity } : item
+      );
+      
+      // Create updatedTrip with new items
+      const updatedTrip = { ...trip, items: updatedItems };
+      
+      // Update context
+      updateContextTrip(tripId, { items: updatedItems });
+      
+      // Directly update selectedTripForDetail to immediately reflect changes in UI
+      setSelectedTripForDetail(updatedTrip);
+    } else {
+      toast({ title: "Error", description: "Trip not found while updating unit.", variant: "destructive" });
     }
   };
 
@@ -638,55 +719,17 @@ const HomePage = () => {
         isEditing={isEditingTask}
       />
 
-      {selectedTripForDetail && (
+      {isTripDetailModalOpen && selectedTripForDetail && (
         <TripDetailModal
+          key={`trip-modal-${selectedTripForDetail.id}-${JSON.stringify(selectedTripForDetail.items)}`}
           isOpen={isTripDetailModalOpen}
-          onClose={() => {
-            setIsTripDetailModalOpen(false);
-            setSelectedTripForDetail(null);
-          }}
-          trip={selectedTripForDetail ? { 
-              ...selectedTripForDetail, 
-              shopper: selectedTripForDetail.shopper || { name: "Unknown Shopper", avatar: "" } 
-            } : null
-          }
-          onAddItem={handleAddItemToContextTrip}
-          onRemoveItem={(tripId: string, itemId: string) => {
-            handleDeleteTripItemContext(tripId, itemId);
-            const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
-            if (updatedTripFromContext) {
-              setSelectedTripForDetail(updatedTripFromContext);
-            }
-          }}
-          onToggleItemCheck={(tripId: string, itemId: string) => {
-            const currentTrip = contextTrips.find(t => t.id === tripId);
-            const item = currentTrip?.items.find(i => i.id === itemId);
-            if (item && currentTrip) {
-              handleUpdateTripItemContext(tripId, itemId, { checked: !item.checked });
-              const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
-              if (updatedTripFromContext) {
-                setSelectedTripForDetail(updatedTripFromContext);
-              }
-            }
-          }}
-          onUpdateItemPrice={(tripId: string, itemId: string, price: number) => {
-            handleUpdateTripItemContext(tripId, itemId, { price });
-            const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
-            if (updatedTripFromContext) {
-              setSelectedTripForDetail(updatedTripFromContext);
-            }
-          }}
-          onUpdateItemUnit={(tripId: string, itemId: string, unit: string, newQuantity?: number) => {
-            const currentContextTrip = contextTrips.find(t => t.id === tripId);
-            const itemToUpdate = currentContextTrip?.items.find(i => i.id === itemId);
-            const updates = { unit, quantity: newQuantity !== undefined ? newQuantity : itemToUpdate?.quantity };
-
-            handleUpdateTripItemContext(tripId, itemId, updates);
-            const updatedTripFromContext = contextTrips.find(t => t.id === tripId);
-            if (updatedTripFromContext) {
-              setSelectedTripForDetail(updatedTripFromContext);
-            }
-          }}
+          onClose={handleCloseTripDetailModal}
+          trip={selectedTripForDetail} // This will now be the updated trip
+          onAddItem={handleAddItemToTripInModal}
+          onRemoveItem={handleRemoveItemFromTripInModal}
+          onToggleItemCheck={handleToggleItemCheckInModal}
+          onUpdateItemPrice={handleUpdateItemPriceInModal} // Pass handler
+          onUpdateItemUnit={handleUpdateItemUnitInModal} // Pass handler
           onInviteParticipant={(tripId: string) => console.log("Invite participant to trip", tripId)}
           onCompleteTrip={(tripId: string) => updateContextTrip(tripId, { status: 'completed' })}
           onReactivateTrip={(tripId: string) => updateContextTrip(tripId, { status: 'open' })}

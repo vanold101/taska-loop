@@ -96,6 +96,9 @@ const App = () => {
                       <SettingsPage />
                     </ProtectedRoute>
                   } />
+                  <Route path="/history" element={
+                    <Navigate to="/trips?view=past" replace />
+                  } />
                   
                   {/* Catch all route */}
                   <Route path="*" element={<NotFound />} />

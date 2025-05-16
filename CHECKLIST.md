@@ -32,7 +32,14 @@
         -   Ensure new items are correctly formatted and include all necessary fields (name, quantity, price if available, unit, etc.).
         -   **Backend Integration (Optional but Recommended):**
             -   Consider if OCR processing should happen on a backend server to offload client devices and protect API keys for cloud services.
-- [ ] Adaptive units
+- [x] Adaptive units
+    -   **✅ Implementation Details:**
+        -   Defined common units and their conversions in UnitConversionService
+        -   Added unit field to TripItem interface
+        -   Created UnitSelector component for easy unit selection
+        -   Implemented guessUnitForItem to smartly suggest units based on item name
+        -   Added formatValueWithUnit for consistent display
+        -   Built conversion logic between compatible units
     -   **Define Common Units & Conversions:**
         -   Compile a list of common grocery units (e.g., kg, g, lb, oz, L, mL, piece, pack).
         -   Establish standard conversion factors between compatible units (e.g., 1 kg = 1000 g, 1 lb = 16 oz).
@@ -46,7 +53,13 @@
         -   Display total quantities for items in a consistent, user-preferred unit or the most logical unit (e.g., show 1.5 kg instead of 1500 g).
         -   **Context/Storage:**
             -   Ensure `TripItem` (or equivalent) in `TaskContext` and `tripService` can store the selected unit for each item.
-- [ ] Smart categorization
+- [x] Smart categorization
+    -   **✅ Implementation Details:**
+        -   Created CategoryService with predefined grocery categories
+        -   Added keyword matching algorithm for item categorization
+        -   Implemented category field in TripItem interface
+        -   Built UI for category selection/display in TripDetailModal
+        -   Added automatic category suggestion based on item name
     -   **Define Categories:**
         -   Create a predefined list of common grocery categories (e.g., Produce, Dairy, Meat, Bakery, Pantry, Frozen, Beverages, Household).
     -   **Categorization Logic:**
@@ -59,7 +72,12 @@
         -   Display items grouped by category in the grocery list view.
         -   **Storage:**
             -   Add a `category` field to the `TripItem` interface and store it in `TaskContext`/`tripService`.
-- [ ] Recurring items
+- [x] Recurring items
+    -   **✅ Implementation Details:**
+        -   Added isRecurring, recurrenceFrequency, nextDueDate fields to TripItem
+        -   Created RecurrenceService with calculateNextDueDate function
+        -   Implemented UI for setting item recurrence in TripDetailModal
+        -   Built initial due date calculation for recurring items
     -   **Data Model:**
         -   Define how recurring items will be stored. This might involve a new data structure or extending the existing `TripItem`.
         -   Fields needed: `itemId` (to link to a base item definition), `frequency` (daily, weekly, monthly), `nextDueDate`, `startDate`, `endDate` (optional).
@@ -71,7 +89,21 @@
         -   Automatically add these items to the relevant grocery list (or a dedicated "Recurring Items" list).
     -   **Notifications (Optional):**
         -   Remind users about upcoming recurring items.
-- [ ] Shopping history
+- [x] Shopping history
+    -   **✅ Implementation Details:**
+        -   Created ShoppingHistory page for viewing past completed trips
+        -   Added route to App.tsx for the history feature
+        -   Added History link to NavBar for easy navigation
+        -   Implemented view of completed trips with date, store, items, and total
+        -   Implemented ability to view trip details by clicking on a trip
+        -   Ensured trip modal updates work correctly
+        -   **Updated Implementation:**
+            -   Removed separate History tab from bottom navbar
+            -   Integrated history functionality into the Trips page under "Past Trips" section
+            -   Setup redirect from /history URL to /trips?view=past for backward compatibility
+            -   Maintained export functionality for trip history
+            -   Added ability to expand/collapse past trips section
+            -   Implemented clean card-based UI for history trips with status badges
     -   **Data Storage:**
         -   Ensure completed trips and their items (with prices, quantities, dates) are persistently stored (Firebase, local storage if not already robust).
         -   Consider if `tripService.ts` needs modification for archiving or marking trips as "historically significant".
@@ -81,18 +113,43 @@
         -   Implement filtering/sorting (by date, store, total cost).
     -   **Data Aggregation (Optional):**
         -   Calculate and display summary statistics (e.g., average spending per month, most frequently bought items).
-- [ ] Export to PDF/CSV
-    -   **Select Libraries:**
-        -   For PDF: `jspdf`, `react-pdf`.
-        -   For CSV: `papaparse` or custom string generation.
+- [x] Export to PDF/CSV
+    -   **✅ Implementation Details:**
+        -   Installed jsPDF for PDF generation and PapaParse for CSV conversion
+        -   Created ExportService with functions for exporting trips to PDF and CSV
+        -   Built ExportButton component with dropdown for format selection
+        -   Added export functionality to TripDetailModal for individual trips
+        -   Added export functionality to ShoppingHistory page for exporting history
+        -   Implemented PDF formatting with trip details, items, prices, and totals
+        -   Added error handling and success notifications
     -   **Data Preparation:**
-        -   Functions to gather the data for the current grocery list (or selected history) to be exported.
-        -   Format data appropriately for PDF (layout, tables) or CSV (rows, columns).
+        -   Functions to gather trip data (metadata, items, prices, totals)
+        -   Format data appropriately for PDF (layout, tables) and CSV (rows, columns)
     -   **UI for Export:**
-        -   Add "Export" buttons (e.g., "Export as PDF", "Export as CSV") in the grocery list view or shopping history.
+        -   Added "Export" buttons in trip detail view and shopping history
+        -   Created dropdown for selecting export format (PDF or CSV)
     -   **File Generation & Download:**
-        -   Implement logic to generate the file in the chosen format.
-        -   Trigger a file download in the browser.
+        -   Implemented logic to generate files in the chosen format
+        -   Created file download mechanism using browser APIs
+
+- [x] AI-Powered Smart List Parser
+    -   **✅ Implementation Details:**
+        -   Created SmartListParser component for turning unstructured text into shopping lists
+        -   Integrated the component into TripDetailModal with an easy-access button
+        -   Implemented a two-step workflow: 1) Copy AI prompt to ChatGPT, 2) Paste result back
+        -   Built a parser that extracts item names, quantities, and units from the AI output
+        -   Added duplicate detection to prevent adding items that already exist in the trip
+        -   Implemented clear visual interface showing parsed items before adding to trip
+    -   **Technical Features:**
+        -   Created predefined prompt template for ChatGPT that instructs it on formatting
+        -   Implemented regex-based parsing to handle various formats and units
+        -   Built flexible unit parsing that handles numerical quantities and units
+        -   Added error handling and validation for unrecognizable formats
+    -   **User Experience:**
+        -   Designed a clean, guided workflow with clear instructions
+        -   Added clipboard integration for easy copying of the prompt
+        -   Implemented animated item previews to show parsed grocery items
+        -   Added helpful status messages and error feedback
 
 ## B. Price intelligence
 - [ ] Price tracking across stores
