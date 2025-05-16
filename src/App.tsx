@@ -1,7 +1,7 @@
 import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider } from "./context/AuthContext";
@@ -14,7 +14,7 @@ import TripsPage from "./pages/Trips";
 import MapPage from "./pages/Map";
 import PantryPage from "./pages/Pantry";
 import ProfilePage from "./pages/Profile";
-import SettingsPage from "./pages/Settings";
+import SettingsPage from "./pages/SettingsPage";
 import LedgerPage from "./pages/Ledger";
 import NotFound from "./pages/NotFound";
 import DashboardPage from "./pages/Dashboard";
@@ -40,22 +40,25 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <Router>
-          <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-500/5 via-green-500/5 to-blue-500/5 dark:from-blue-900/20 dark:via-green-900/20 dark:to-blue-900/20">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/home" element={<HomePage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/map" element={<MapPage />} />
-              <Route path="/trips" element={<TripsPage />} />
-              <Route path="/ledger" element={<LedgerPage />} />
-              <Route path="/pantry" element={<PantryPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-        </Router>
+        <AuthProvider>
+          <Router>
+            <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
+              <div className="pattern-overlay"></div>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/home" element={<HomePage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/map" element={<MapPage />} />
+                <Route path="/trips" element={<TripsPage />} />
+                <Route path="/ledger" element={<LedgerPage />} />
+                <Route path="/pantry" element={<PantryPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+          </Router>
+        </AuthProvider>
       </TooltipProvider>
     </TaskProvider>
   );
