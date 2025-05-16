@@ -41,23 +41,25 @@ const App = () => {
         <Toaster />
         <Sonner />
         <AuthProvider>
-          <Router>
-            <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
-              <div className="pattern-overlay"></div>
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/home" element={<HomePage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/map" element={<MapPage />} />
-                <Route path="/trips" element={<TripsPage />} />
-                <Route path="/ledger" element={<LedgerPage />} />
-                <Route path="/pantry" element={<PantryPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
-          </Router>
+          <TripProvider>
+            <Router>
+              <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
+                <div className="pattern-overlay"></div>
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/home" element={<HomePage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/map" element={<MapPage />} />
+                  <Route path="/trips" element={<TripsPage />} />
+                  <Route path="/ledger" element={<LedgerPage />} />
+                  <Route path="/pantry" element={<PantryPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </div>
+            </Router>
+          </TripProvider>
         </AuthProvider>
       </TooltipProvider>
     </TaskProvider>
