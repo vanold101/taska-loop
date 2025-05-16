@@ -63,40 +63,55 @@ ${input}`;
   };
 
   const parseOutput = (output: string) => {
-    // Simple parser for the expected format
-    // This can be enhanced for more robust parsing
+    // Enhanced parser that can handle both formatted and simple text input
     try {
       const lines = output.split('\n');
       const items: Omit<TripItem, 'id'>[] = [];
       
-      let inList = false;
+      // Process each line
       for (const line of lines) {
-        if (line.includes('🛒 Grocery List')) {
-          inList = true;
+        const trimmedLine = line.trim();
+        
+        // Skip empty lines
+        if (!trimmedLine) continue;
+        
+        // Check for grocery list marker or bullet point format
+        const isGroceryListHeader = trimmedLine.includes('🛒 Grocery List');
+        const isBulletPoint = trimmedLine.startsWith('-');
+        
+        if (isGroceryListHeader) {
+          // This is just a header line, skip it
           continue;
         }
         
-        if (inList && line.trim().startsWith('-')) {
-          const itemText = line.trim().substring(1).trim();
-          const quantityMatch = itemText.match(/\(([^)]+)\)$/);
+        // Handle simple format: "item name 123" (name followed by quantity)
+        // or structured format: "- item name (123 unit)"
+        let itemText = trimmedLine;
+        if (isBulletPoint) {
+          // Remove the bullet point for structured format
+          itemText = trimmedLine.substring(1).trim();
+        }
+        
+        // Try to parse item with parenthesized quantity first (structured format)
+        const structuredMatch = itemText.match(/^(.*?)\s*\(([^)]+)\)$/);
+        
+        if (structuredMatch) {
+          // Handle structured format: "item name (123 unit)"
+          const name = structuredMatch[1].trim();
+          const quantityString = structuredMatch[2].trim();
           
-          let name = itemText;
+          // Try to extract number and unit from quantity string
+          const numericMatch = quantityString.match(/^(\d+(?:\.\d+)?)/);
+          
           let quantity = 1;
           let unit = '';
           
-          if (quantityMatch) {
-            name = itemText.substring(0, itemText.lastIndexOf('(')).trim();
-            const quantityString = quantityMatch[1];
-            
-            // Try to extract number and unit
-            const numericMatch = quantityString.match(/^(\d+(?:\.\d+)?)/);
-            if (numericMatch) {
-              quantity = parseFloat(numericMatch[1]);
-              unit = quantityString.substring(numericMatch[0].length).trim();
-            } else {
-              // If no number, use the whole string as unit
-              unit = quantityString;
-            }
+          if (numericMatch) {
+            quantity = parseFloat(numericMatch[1]);
+            unit = quantityString.substring(numericMatch[0].length).trim();
+          } else {
+            // If no number in parentheses, use the whole string as unit
+            unit = quantityString;
           }
           
           items.push({
@@ -111,6 +126,65 @@ ${input}`;
               avatar: "https://example.com/you.jpg"
             }
           });
+        } else {
+          // Try simple format: "item name 123" (name followed by quantity)
+          // Look for numbers at the end of the string
+          const simpleMatch = itemText.match(/^(.*?)\s+(\d+(?:\.\d+)?)(?:\s+(\w+))?$/);
+          
+          if (simpleMatch) {
+            const name = simpleMatch[1].trim();
+            const quantity = parseFloat(simpleMatch[2]);
+            const unit = simpleMatch[3] ? simpleMatch[3].trim() : '';
+            
+            items.push({
+              name,
+              quantity,
+              unit,
+              price: 0,
+              checked: false,
+              category: 'uncategorized',
+              addedBy: {
+                name: "You",
+                avatar: "https://example.com/you.jpg"
+              }
+            });
+          } else {
+            // Try "item name - 5" format with dash
+            const dashMatch = itemText.match(/^(.*?)\s+-\s+(\d+(?:\.\d+)?)(?:\s+(\w+))?$/);
+            
+            if (dashMatch) {
+              const name = dashMatch[1].trim();
+              const quantity = parseFloat(dashMatch[2]);
+              const unit = dashMatch[3] ? dashMatch[3].trim() : '';
+              
+              items.push({
+                name,
+                quantity,
+                unit,
+                price: 0,
+                checked: false,
+                category: 'uncategorized',
+                addedBy: {
+                  name: "You",
+                  avatar: "https://example.com/you.jpg"
+                }
+              });
+            } else {
+              // No quantity found, just add the item with quantity 1
+              items.push({
+                name: itemText,
+                quantity: 1,
+                unit: '',
+                price: 0,
+                checked: false,
+                category: 'uncategorized',
+                addedBy: {
+                  name: "You",
+                  avatar: "https://example.com/you.jpg"
+                }
+              });
+            }
+          }
         }
       }
       
@@ -223,13 +297,13 @@ ${input}`;
               <div className="space-y-2">
                 <Label htmlFor="output" className="flex items-center">
                   <Clipboard className="h-4 w-4 mr-2 text-blue-500" />
-                  Step 2: Paste AI-generated grocery list here
+                  Step 2: Paste AI-generated grocery list here or type items directly (e.g., milk 21, bread - 2)
                 </Label>
                 <Textarea
                   id="output"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Paste your AI-generated grocery list here..."
+                  placeholder="Paste list here or type items directly (e.g., milk 21, bread - 2)"
                   className="min-h-[150px]"
                 />
               </div>
@@ -237,7 +311,8 @@ ${input}`;
               <Alert className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-900">
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  Use ChatGPT to convert recipes, meal plans, or any food-related text into a structured grocery list, then paste it here.
+                  Use ChatGPT to convert recipes, meal plans, or any food-related text into a structured grocery list, then paste it here. 
+                  Or simply type items directly, one per line, like "milk 21" or "bread - 2" to add with quantities.
                 </AlertDescription>
               </Alert>
               
