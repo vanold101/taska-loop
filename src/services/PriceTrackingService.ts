@@ -5,9 +5,16 @@ import {
   where, 
   getDocs, 
   orderBy,
-  limit
+  limit,
+  serverTimestamp,
+  QuerySnapshot,
+  DocumentData,
+  DocumentSnapshot,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+
+const PRICE_ENTRIES_COLLECTION = 'priceEntries';
 
 export interface PriceEntry {
   id?: string;
@@ -24,17 +31,21 @@ export interface PriceEntry {
     userName: string;
   };
   notes?: string;
+  createdAt?: any; // Firebase timestamp
+  updatedAt?: any; // Firebase timestamp
 }
 
 // Add a new price entry
-export const addPriceEntry = async (entry: Omit<PriceEntry, "dateRecorded">): Promise<string> => {
+export const addPriceEntry = async (entry: Omit<PriceEntry, "dateRecorded" | "id" | "createdAt" | "updatedAt">): Promise<string> => {
   try {
     const priceData = {
       ...entry,
       dateRecorded: new Date().toISOString(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     };
     
-    const docRef = await addDoc(collection(db, "priceEntries"), priceData);
+    const docRef = await addDoc(collection(db, PRICE_ENTRIES_COLLECTION), priceData);
     return docRef.id;
   } catch (error) {
     console.error("Error adding price entry:", error);
@@ -46,7 +57,7 @@ export const addPriceEntry = async (entry: Omit<PriceEntry, "dateRecorded">): Pr
 export const getPriceHistoryForItem = async (itemName: string, limitCount = 10): Promise<PriceEntry[]> => {
   try {
     const q = query(
-      collection(db, "priceEntries"),
+      collection(db, PRICE_ENTRIES_COLLECTION),
       where("itemName", "==", itemName),
       orderBy("dateRecorded", "desc"),
       limit(limitCount)
@@ -63,11 +74,36 @@ export const getPriceHistoryForItem = async (itemName: string, limitCount = 10):
   }
 };
 
+// Get real-time price history for a specific item (with listener)
+export const watchPriceHistoryForItem = (
+  itemName: string, 
+  callback: (entries: PriceEntry[]) => void,
+  limitCount = 10
+) => {
+  const q = query(
+    collection(db, PRICE_ENTRIES_COLLECTION),
+    where("itemName", "==", itemName),
+    orderBy("dateRecorded", "desc"),
+    limit(limitCount)
+  );
+  
+  return onSnapshot(q, (querySnapshot: QuerySnapshot) => {
+    const entries: PriceEntry[] = [];
+    querySnapshot.forEach((doc) => {
+      entries.push({
+        id: doc.id,
+        ...doc.data()
+      } as PriceEntry);
+    });
+    callback(entries);
+  });
+};
+
 // Get the best (lowest) price for an item across stores
 export const getBestPriceForItem = async (itemName: string): Promise<PriceEntry | null> => {
   try {
     const q = query(
-      collection(db, "priceEntries"),
+      collection(db, PRICE_ENTRIES_COLLECTION),
       where("itemName", "==", itemName),
       orderBy("price", "asc"),
       limit(1)
@@ -92,7 +128,7 @@ export const getBestPriceForItem = async (itemName: string): Promise<PriceEntry 
 export const getPricesAtStore = async (storeName: string, limitCount = 20): Promise<PriceEntry[]> => {
   try {
     const q = query(
-      collection(db, "priceEntries"),
+      collection(db, PRICE_ENTRIES_COLLECTION),
       where("storeName", "==", storeName),
       orderBy("dateRecorded", "desc"),
       limit(limitCount)
@@ -106,6 +142,52 @@ export const getPricesAtStore = async (storeName: string, limitCount = 20): Prom
   } catch (error) {
     console.error("Error getting store prices:", error);
     return [];
+  }
+};
+
+// Get all stored prices (for debugging and admin features)
+export const getAllPriceEntries = async (limitCount = 100): Promise<PriceEntry[]> => {
+  try {
+    const q = query(
+      collection(db, PRICE_ENTRIES_COLLECTION),
+      orderBy("dateRecorded", "desc"),
+      limit(limitCount)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data()
+    } as PriceEntry));
+  } catch (error) {
+    console.error("Error getting all price entries:", error);
+    return [];
+  }
+};
+
+// Find price comparison across stores
+export const getItemPriceComparisonAcrossStores = async (
+  itemName: string
+): Promise<{ itemName: string, pricesByStore: Record<string, PriceEntry> }> => {
+  try {
+    const entries = await getPriceHistoryForItem(itemName, 50);
+    const storeMap: Record<string, PriceEntry> = {};
+    
+    // Get the most recent price entry for each store
+    entries.forEach(entry => {
+      if (!storeMap[entry.storeName] || 
+          new Date(entry.dateRecorded) > new Date(storeMap[entry.storeName].dateRecorded)) {
+        storeMap[entry.storeName] = entry;
+      }
+    });
+    
+    return {
+      itemName,
+      pricesByStore: storeMap
+    };
+  } catch (error) {
+    console.error("Error comparing prices across stores:", error);
+    return { itemName, pricesByStore: {} };
   }
 };
 
