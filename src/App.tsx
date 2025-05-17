@@ -2,10 +2,11 @@ import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider } from "./context/AuthContext";
 import { TripProvider } from "./context/TripContext";
+import NotificationProvider from "./context/NotificationContext";
 
 // Import pages
 import Landing from "./pages/Landing";
@@ -47,64 +48,66 @@ const App = () => {
         <Sonner />
         <AuthProvider>
           <TripProvider>
-            <Router>
-              <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
-                <div className="pattern-overlay"></div>
-                <Routes>
-                  {/* Public routes */}
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  
-                  {/* Protected routes */}
-                  <Route path="/home" element={
-                    <ProtectedRoute>
-                      <HomePage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/dashboard" element={
-                    <ProtectedRoute>
-                      <DashboardPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/map" element={
-                    <ProtectedRoute>
-                      <MapPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/trips" element={
-                    <ProtectedRoute>
-                      <TripsPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/ledger" element={
-                    <ProtectedRoute>
-                      <LedgerPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/pantry" element={
-                    <ProtectedRoute>
-                      <PantryPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/profile" element={
-                    <ProtectedRoute>
-                      <ProfilePage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/settings" element={
-                    <ProtectedRoute>
-                      <SettingsPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/history" element={
-                    <Navigate to="/trips?view=past" replace />
-                  } />
-                  
-                  {/* Catch all route */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </div>
-            </Router>
+            <NotificationProvider>
+              <Router>
+                <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
+                  <div className="pattern-overlay"></div>
+                  <Routes>
+                    {/* Public routes */}
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    
+                    {/* Protected routes */}
+                    <Route path="/home" element={
+                      <ProtectedRoute>
+                        <HomePage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/dashboard" element={
+                      <ProtectedRoute>
+                        <DashboardPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/map" element={
+                      <ProtectedRoute>
+                        <MapPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/trips" element={
+                      <ProtectedRoute>
+                        <TripsPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/ledger" element={
+                      <ProtectedRoute>
+                        <LedgerPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/pantry" element={
+                      <ProtectedRoute>
+                        <PantryPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/profile" element={
+                      <ProtectedRoute>
+                        <ProfilePage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/settings" element={
+                      <ProtectedRoute>
+                        <SettingsPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/history" element={
+                      <Navigate to="/trips?view=past" replace />
+                    } />
+                    
+                    {/* Catch all route */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </div>
+              </Router>
+            </NotificationProvider>
           </TripProvider>
         </AuthProvider>
       </TooltipProvider>

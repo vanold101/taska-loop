@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScanLine, Camera, X } from "lucide-react";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import { useToast } from "@/hooks/use-toast";
+import { isCameraSupported as checkCameraSupport, requestCameraAccess, stopMediaStream } from "@/utils/cameraUtils";
 
 // Define the structure for the scanned item data
 export interface ScannedItem {
@@ -62,24 +63,25 @@ const BarcodeScannerButton = ({
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [hasFlash, setHasFlash] = useState(false);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [isCameraSupported, setIsCameraSupported] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
 
+  // Clean up camera on unmount
   useEffect(() => {
     return () => {
       if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+        stopMediaStream(videoRef.current.srcObject as MediaStream);
       }
     };
   }, []);
 
+  // Handle camera activation when dialog opens
   useEffect(() => {
     if (isOpen && !cameraActive) {
       const timer = setTimeout(() => {
         setCameraActive(true);
-        checkFlashAvailability();
       }, 100);
       return () => clearTimeout(timer);
     } else if (!isOpen && cameraActive) {
@@ -87,29 +89,6 @@ const BarcodeScannerButton = ({
       setTorchEnabled(false);
     }
   }, [isOpen]);
-
-  const checkFlashAvailability = async () => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cameras = devices.filter(device => device.kind === 'videoinput');
-      if (cameras.length > 0) {
-        // Attempt to get a stream to check capabilities, then stop it.
-        // This is a bit heavy just to check flash.
-        // The `react-qr-barcode-scanner` might not expose the track for this easily.
-        // For now, we'll assume if toggleTorch works, flash is available.
-        // This part needs careful testing with how `react-qr-barcode-scanner` manages the stream.
-        // The library might have its own torch controls.
-        // The original code had a `videoRef.current.srcObject` which this library might not populate directly.
-        // Let's assume the library handles torch if supported.
-        // The component seems to handle torch via constraints.
-        // setHasFlash(true); // Optimistically assume or test later.
-        // The original `toggleTorch` will implicitly test this.
-      }
-    } catch (error) {
-      console.error('Error checking flash availability:', error);
-      setHasFlash(false);
-    }
-  };
 
   const handleScanResult = async (error: any, result: any) => {
     if (isProcessingScan) return;
@@ -160,12 +139,21 @@ const BarcodeScannerButton = ({
   const handleCameraError = (error: any) => {
     console.error("Camera error:", error);
     let errorMessage = "Failed to access camera";
-    if (error.name === "NotAllowedError") errorMessage = "Camera access denied. Please enable camera permissions.";
-    else if (error.name === "NotFoundError") errorMessage = "No camera found on your device.";
-    else if (error.name === "NotReadableError") errorMessage = "Camera is already in use.";
-    else if (error.name === "OverconstrainedError") errorMessage = "Could not find a suitable camera.";
-    else if (error.name === "StreamApiNotSupportedError") errorMessage = "Browser doesn't support camera access.";
-    else if (error.message && error.message.includes("Requested device not found")) errorMessage = "Requested camera not found. It might be disconnected or unavailable.";
+    
+    if (error.name === "NotAllowedError") {
+      errorMessage = "Camera access denied. Please enable camera permissions in your browser settings and try again.";
+    } else if (error.name === "NotFoundError") {
+      errorMessage = "No camera found on your device.";
+    } else if (error.name === "NotReadableError") {
+      errorMessage = "Camera is already in use by another application or tab.";
+    } else if (error.name === "OverconstrainedError") {
+      errorMessage = "Could not find a suitable camera.";
+    } else if (error.name === "SecurityError") {
+      errorMessage = "Camera access is blocked by browser security settings.";
+    } else if (error.name === "StreamApiNotSupportedError" || !isCameraSupported) {
+      errorMessage = "Your browser doesn't support camera access. Try using a modern browser.";
+      setIsCameraSupported(false);
+    }
 
     setCameraError(errorMessage);
     setCameraActive(false);
@@ -185,11 +173,23 @@ const BarcodeScannerButton = ({
   };
 
   const toggleTorch = async () => {
-    toast({ title: "Torch Control", description: "Torch control is not currently supported with this scanner library.", variant: "default" });
-    setHasFlash(false);
+    toast({ 
+      title: "Torch Control", 
+      description: "Torch control is not available with the current scanner.", 
+      variant: "default" 
+    });
   };
 
-  const handleOpenScanner = () => {
+  const handleOpenScanner = async () => {
+    // First check if camera is supported at all
+    const cameraSupported = checkCameraSupport();
+    if (!cameraSupported) {
+      setIsCameraSupported(false);
+      setCameraError("Your browser doesn't support camera access. Try using a modern browser like Chrome, Firefox, or Safari.");
+      setIsOpen(true);
+      return;
+    }
+    
     setIsOpen(true);
     setCameraActive(false);
     setIsProcessingScan(false);
@@ -243,28 +243,34 @@ const BarcodeScannerButton = ({
               <div className="bg-red-50 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-300 rounded-md text-center">
                 <p className="font-medium mb-2">Camera Error</p>
                 <p className="text-sm mt-1 mb-3">{cameraError}</p>
-                <Button 
-                  size="sm" 
-                  onClick={() => {
-                    setCameraError(null);
-                    setCameraActive(false);
-                    setTimeout(() => setCameraActive(true), 50);
-                  }}
-                >
-                  Retry Camera
-                </Button>
+                {isCameraSupported && (
+                  <Button 
+                    size="sm" 
+                    onClick={() => {
+                      setCameraError(null);
+                      setCameraActive(false);
+                      setTimeout(() => setCameraActive(true), 50);
+                    }}
+                  >
+                    Retry Camera
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="aspect-video bg-black relative rounded-md overflow-hidden">
-                {isOpen && cameraActive && (
+                {isOpen && cameraActive && isCameraSupported && (
                   <BarcodeScannerComponent
                     width={"100%"}
                     height={"100%"}
                     onUpdate={handleScanResult}
                     torch={torchEnabled}
+                    onError={(error) => {
+                      console.error("BarcodeScannerComponent error:", error);
+                      handleCameraError(error);
+                    }}
                   />
                 )}
-                {!cameraActive && isOpen && !cameraError && (
+                {!cameraActive && isOpen && !cameraError && isCameraSupported && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black text-white">
                     Starting camera...
                   </div>
@@ -272,6 +278,10 @@ const BarcodeScannerButton = ({
               </div>
             )}
           </div>
+          
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Position barcode within the frame. Hold the camera steady.
+          </p>
         </DialogContent>
       </Dialog>
     </>

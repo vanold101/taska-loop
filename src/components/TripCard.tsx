@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
-import { ShoppingCart, Clock, User, Plus, Check, Share2, Trash2, Edit, Info, RotateCw } from "lucide-react";
+import { ShoppingCart, Clock, User, Plus, Check, Share2, Trash2, Edit, Info, RotateCw, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type TripCardProps = {
   trip: {
@@ -41,22 +42,23 @@ const TripCard = ({
   const { store, shopper, eta, itemCount, status } = trip;
   const [isActionsVisible, setActionsVisible] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [showActions, setShowActions] = useState(false);
   const startXRef = useRef(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const swipeThreshold = 80; // Pixels required to trigger action
   
-  const getStatusColor = () => {
+  const getStatusVariant = () => {
     switch(status) {
       case 'open':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+        return 'open';
       case 'shopping':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+        return 'shopping';
       case 'completed':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
+        return 'secondary';
       case 'cancelled':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+        return 'danger';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
+        return 'secondary';
     }
   };
 
@@ -176,6 +178,16 @@ const TripCard = ({
     handleTouchStart(e);
   };
 
+  const toggleActions = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowActions(!showActions);
+    
+    // Add haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(20);
+    }
+  };
+
   return (
     <div className="relative">
       {/* Swipe action indicators - only show when actively swiping */}
@@ -196,7 +208,7 @@ const TripCard = ({
       
       <motion.div
         ref={cardRef}
-        className="premium-card overflow-hidden relative"
+        className="premium-card overflow-hidden relative shadow-md dark:shadow-lg"
         style={{ 
           x: swipeOffset,
           touchAction: "pan-y"
@@ -223,145 +235,111 @@ const TripCard = ({
             </div>
             
             <div className="flex flex-col items-end gap-2">
-              <Badge variant="outline" className={cn("text-[clamp(0.75rem,1.8vw,0.875rem)] px-2 py-0.5", getStatusColor())}>
-                {status === 'open' ? 'Open' : 
-                 status === 'shopping' ? 'Shopping' : 
-                 status === 'completed' ? 'Completed' : 'Cancelled'}
-              </Badge>
-              
-              <div 
-                className="flex items-center bg-gloop-accent dark:bg-gloop-dark-accent px-2 py-0.5 rounded-full cursor-pointer hover:bg-gloop-accent/80 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onTripClick) onTripClick();
-                }}
-                aria-label="View trip items"
-              >
-                <ShoppingCart className="h-3 w-3 mr-1 text-gloop-primary" />
-                <span className="text-[clamp(0.75rem,1.8vw,0.875rem)] font-medium">{itemCount ?? 0} items</span>
-              </div>
+              <StatusBadge variant={getStatusVariant()} className="capitalize">
+                {status}
+              </StatusBadge>
             </div>
           </div>
           
-          {/* Quick action buttons - always visible on hover/tap */}
-          <motion.div 
-            className="flex justify-start mt-3 gap-1"
-            initial={{ opacity: 1, y: 0 }}
-            animate={{ 
-              opacity: (status !== 'completed' && status !== 'cancelled') || isActionsVisible ? 1 : 0, 
-              y: (status !== 'completed' && status !== 'cancelled') || isActionsVisible ? 0 : 5 
-            }}
-            transition={{ duration: 0.2 }}
-          >
-            {/* Edit Trip Button - Icon only */}
-            {status !== 'completed' && status !== 'cancelled' && onEditTrip && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-700/30 hover:bg-blue-100 dark:hover:bg-blue-600/40 text-blue-600 dark:text-blue-300 p-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditTrip();
-                }}
-                aria-label="Edit trip"
-              >
-                <Edit className="h-3.5 w-3.5" />
-              </Button>
-            )}
+          {/* Combined action row with primary and secondary actions */}
+          <div className="flex items-center justify-between mt-4">
+            {/* Primary action - View trip items */}
+            <div 
+              className="flex items-center bg-gloop-accent dark:bg-gloop-dark-accent px-3 py-1.5 rounded-full cursor-pointer hover:bg-gloop-accent/80 transition-colors min-h-[40px]"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onTripClick) onTripClick();
+              }}
+              aria-label="View trip items"
+            >
+              <ShoppingCart className="h-4 w-4 mr-2 text-gloop-primary" />
+              <span className="text-[clamp(0.75rem,1.8vw,0.875rem)] font-medium">{itemCount ?? 0} items</span>
+              <ChevronRight className="h-4 w-4 ml-1 text-gloop-primary" />
+            </div>
             
-            {/* Share Trip Button - Icon only */}
-            {onShareTrip && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-purple-300 dark:border-purple-600 bg-purple-50 dark:bg-purple-700/30 hover:bg-purple-100 dark:hover:bg-purple-600/40 text-purple-600 dark:text-purple-300 p-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShareTrip();
-                }}
-                aria-label="Share trip"
+            {/* Secondary actions menu - as a toggle instead of always visible */}
+            <div className="flex items-center gap-2">
+              {/* Show these buttons inline for larger screens or when actions menu is toggled */}
+              {(isActionsVisible || showActions) && (
+                <>
+                  {status !== 'completed' && status !== 'cancelled' && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onAddItem) onAddItem({
+                          name: "New Item",
+                          quantity: 1,
+                          addedBy: {
+                            name: "You",
+                            avatar: "https://example.com/avatar.jpg"
+                          },
+                          checked: false
+                        });
+                      }}
+                      aria-label="Add item"
+                    >
+                      <Plus className="h-5 w-5 text-gloop-primary" />
+                    </motion.button>
+                  )}
+                  
+                  {status !== 'completed' && status !== 'cancelled' && onEditTrip && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1, transition: { delay: 0.05 } }}
+                      className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onEditTrip) onEditTrip();
+                      }}
+                      aria-label="Edit trip"
+                    >
+                      <Edit className="h-5 w-5 text-gloop-primary" />
+                    </motion.button>
+                  )}
+                  
+                  {onShareTrip && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1, transition: { delay: 0.1 } }}
+                      className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onShareTrip) onShareTrip();
+                      }}
+                      aria-label="Share trip"
+                    >
+                      <Share2 className="h-5 w-5 text-gloop-primary" />
+                    </motion.button>
+                  )}
+                </>
+              )}
+              
+              {/* Toggle button for actions menu */}
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent hover:bg-gloop-accent/80 dark:bg-gloop-dark-accent dark:hover:bg-gloop-dark-accent/80"
+                onClick={toggleActions}
+                aria-label={showActions ? "Hide actions" : "Show actions"}
               >
-                <Share2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            
-            {/* Delete Trip Button - Icon only */}
-            {onDeleteTrip && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-700/30 hover:bg-red-100 dark:hover:bg-red-600/40 text-red-600 dark:text-red-300 p-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteTrip();
-                }}
-                aria-label="Delete trip"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            
-            {/* Reactivate Trip Button - Icon only */}
-            {status === 'completed' && onReactivateTrip && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-700/30 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 text-indigo-600 dark:text-indigo-300 p-2"
-                onClick={(e) => { e.stopPropagation(); onReactivateTrip(); }}
-                aria-label="Reactivate trip"
-              >
-                <RotateCw className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </motion.div>
-        </div>
-        
-        {/* Swipe hint - subtle indicator */}
-        <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
-          <motion.div 
-            className="h-1 w-10 rounded-full bg-gloop-outline dark:bg-gloop-dark-outline opacity-30"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.3 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, repeat: 2, repeatType: "reverse" }}
-          />
+                {showActions ? (
+                  <X className="h-5 w-5 text-gloop-primary" />
+                ) : (
+                  <motion.span 
+                    animate={{ rotate: showActions ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-xs font-medium"
+                  >
+                    <Info className="h-5 w-5 text-gloop-primary" />
+                  </motion.span>
+                )}
+              </motion.button>
+            </div>
+          </div>
         </div>
       </motion.div>
-      
-      {/* Only show action buttons for non-past trips */}
-      {!isPast && (
-        <div className="flex border-t border-l border-r border-b border-gray-200 dark:border-gray-700 rounded-b-lg">
-          <Button
-            className="flex-1 rounded-none rounded-bl-lg bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-blue-600 dark:text-blue-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onAddItem) {
-                onAddItem({
-                  name: "New Item",
-                  quantity: 1,
-                  addedBy: {
-                    name: "You",
-                    avatar: "https://example.com/avatar.jpg"
-                  },
-                  checked: false
-                });
-              }
-            }}
-          >
-            <Plus className="h-4 w-4 mr-1" /> Add Item
-          </Button>
-          <div className="w-px bg-gray-200 dark:bg-gray-700" />
-          <Button
-            className="flex-1 rounded-none rounded-br-lg bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-green-600 dark:text-green-400 h-12 text-[clamp(0.875rem,2vw,1rem)]"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCompleteTrip && onCompleteTrip();
-            }}
-          >
-            <Check className="h-4 w-4 mr-1" /> Complete
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

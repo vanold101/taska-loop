@@ -61,7 +61,7 @@ const MobileCardHeader = ({ children, className }: MobileCardHeaderProps) => {
       className={cn(
         "flex flex-col space-y-1.5",
         {
-          "pb-2": isMobile,
+          "pb-3": isMobile,
           "pb-4": !isMobile,
         },
         className
@@ -132,9 +132,9 @@ const MobileCardFooter = ({ children, className }: MobileCardFooterProps) => {
   return (
     <div
       className={cn(
-        "flex items-center",
+        "flex items-center gap-2",
         {
-          "pt-2": isMobile,
+          "pt-3": isMobile,
           "pt-4": !isMobile,
         },
         className
@@ -145,6 +145,33 @@ const MobileCardFooter = ({ children, className }: MobileCardFooterProps) => {
   );
 };
 
+/**
+ * A smaller button component specifically for card actions with minimum touch target of 40px
+ */
+interface MobileCardActionProps {
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+  label: string;
+}
+
+const MobileCardAction = ({ children, className, onClick, label }: MobileCardActionProps) => {
+  return (
+    <motion.button
+      className={cn(
+        "min-w-[40px] min-h-[40px] p-2 rounded-md flex items-center justify-center",
+        "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800",
+        className
+      )}
+      whileTap={{ scale: 0.95 }}
+      onClick={onClick}
+      aria-label={label}
+    >
+      {children}
+    </motion.button>
+  );
+};
+
 export {
   MobileCard,
   MobileCardHeader,
@@ -152,4 +179,5 @@ export {
   MobileCardDescription,
   MobileCardContent,
   MobileCardFooter,
+  MobileCardAction
 }; 

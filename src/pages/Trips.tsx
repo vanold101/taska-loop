@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import CreateTripModal from "@/components/CreateTripModal";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Clock, CheckCircle, Store, ShoppingCart, Map, Calendar, Settings, X } from "lucide-react";
+import { Search, Filter, Clock, CheckCircle, Store, ShoppingCart, Map, Calendar, Settings, X, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import QuickTripButton from "@/components/QuickTripButton";
@@ -22,7 +22,81 @@ import { createSettlementTransaction, createPaymentTransaction, confirmPayment }
 import { calculateSplitAmounts, loadSplitConfig } from "@/services/CostSplitService";
 import ExportButton from "@/components/ExportButton";
 import SmartListParser from "@/components/SmartListParser";
-import { Sparkles } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+// New component for trip selection dialog
+const TripSelectDialog = ({ 
+  isOpen, 
+  onClose, 
+  trips, 
+  onSelect,
+  onCreateTrip
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  trips: TripData[]; 
+  onSelect: (trip: TripData) => void;
+  onCreateTrip: () => void;
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            Select a Trip
+          </DialogTitle>
+          <DialogDescription>
+            Choose which trip to add your items to
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="overflow-y-auto max-h-[60vh] mt-4">
+          {trips.length > 0 ? (
+            <div className="grid gap-2">
+              {trips.map((trip) => (
+                <div 
+                  key={trip.id}
+                  className="p-3 border rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex justify-between items-center"
+                  onClick={() => onSelect(trip)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Store className="h-4 w-4 text-blue-500" />
+                    <span className="font-medium">{trip.store}</span>
+                  </div>
+                  <Badge 
+                    variant="outline" 
+                    className={trip.status === 'open' ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"}
+                  >
+                    {trip.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400 mb-4">No active trips available</p>
+              <Button 
+                onClick={() => {
+                  onClose();
+                  setTimeout(() => onCreateTrip(), 100);
+                }}
+              >
+                Create New Trip
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex justify-end mt-4">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const TripsPage = () => {
   // Use the shared context for trips and tasks
@@ -56,6 +130,8 @@ const TripsPage = () => {
   const [showMapView, setShowMapView] = useState(false);
   const [expandedPastTripsSection, setExpandedPastTripsSection] = useState(false);
   const [showSmartParser, setShowSmartParser] = useState(false);
+  const [showTripSelectDialog, setShowTripSelectDialog] = useState(false);
+  const [parsedItemsForLaterAdd, setParsedItemsForLaterAdd] = useState<Omit<TripItem, 'id'>[]>([]);
   
   // Split trips into active and past based on status
   const [trips, setTrips] = useState<TripData[]>([]);
@@ -412,33 +488,103 @@ const TripsPage = () => {
     }
   };
   
+  // Handle clicking the Smart Parser button
+  const handleSmartParserButtonClick = () => {
+    if (activeTab === "past") {
+      // If viewing past trips, first let the user know
+      toast({
+        title: "Active trips only",
+        description: "You can only add items to active trips. Please switch to the active tab.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // If no trip is selected, show trip selection dialog
+    if (!selectedTrip && filteredActiveTrips.length > 0) {
+      setShowTripSelectDialog(true);
+    } else if (filteredActiveTrips.length === 0) {
+      // No active trips available, prompt to create one
+      toast({
+        title: "No active trips",
+        description: "Please create a trip first before adding items",
+        variant: "destructive"
+      });
+    } else {
+      // Trip is already selected, proceed with opening the parser
+      setShowSmartParser(true);
+    }
+  };
+  
+  // Handle selecting a trip from the dialog
+  const handleTripSelect = (trip: TripData) => {
+    setSelectedTrip(trip);
+    setShowTripSelectDialog(false);
+    
+    // If we have parsed items waiting, add them now
+    if (parsedItemsForLaterAdd.length > 0) {
+      // We'll add the items and then clear the waiting list
+      handleAddItemsFromParser(parsedItemsForLaterAdd);
+      setParsedItemsForLaterAdd([]);
+    } else {
+      // Otherwise, just open the parser
+      setShowSmartParser(true);
+    }
+  };
+  
   // Handle adding items from the smart parser
   const handleAddItemsFromParser = (items: Omit<TripItem, 'id'>[]) => {
     if (!selectedTrip) {
-      toast({
-        title: "No trip selected",
-        description: "Please select or create a trip first",
-        variant: "destructive"
-      });
+      // If no trip is selected, store the items and show the selection dialog
+      setParsedItemsForLaterAdd(items);
+      setShowTripSelectDialog(true);
       return;
     }
     
     let addedCount = 0;
     let skippedCount = 0;
     
-    items.forEach(item => {
-      // Check for duplicates
+    // Filter out duplicates
+    const itemsToAdd = items.filter(item => {
       const isDuplicate = selectedTrip.items.some(
         existingItem => existingItem.name.toLowerCase() === item.name.toLowerCase()
       );
       
-      if (!isDuplicate) {
-        handleAddItem(selectedTrip.id, item);
-        addedCount++;
-      } else {
+      if (isDuplicate) {
         skippedCount++;
+        return false;
+      } else {
+        addedCount++;
+        return true;
       }
     });
+    
+    // If there are items to add, batch add them in one operation
+    if (itemsToAdd.length > 0) {
+      // Find the trip in context
+      const trip = contextTrips.find(t => t.id === selectedTrip.id);
+      if (!trip) return;
+      
+      // Create new items with IDs
+      const newItems = itemsToAdd.map(item => ({
+        ...item,
+        id: Date.now().toString() + Math.random().toString(36).substring(2)
+      }));
+      
+      // Create updated items array including all new items
+      const updatedItems = [...trip.items, ...newItems];
+      
+      // Update the trip with all new items at once
+      updateContextTrip(selectedTrip.id, {
+        items: updatedItems
+      });
+      
+      // Update the selectedTrip immediately with all new items
+      setSelectedTrip({
+        ...selectedTrip,
+        items: updatedItems
+      });
+    }
     
     toast({
       title: `${addedCount} items added`,
@@ -491,7 +637,7 @@ const TripsPage = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setShowSmartParser(true)}
+                    onClick={handleSmartParserButtonClick}
                     className="text-blue-500"
                     title="Smart List Parser"
                   >
@@ -731,10 +877,21 @@ const TripsPage = () => {
         onAddItems={handleAddItemsFromParser}
       />
       
+      {/* Trip Selection Dialog */}
+      <TripSelectDialog
+        isOpen={showTripSelectDialog}
+        onClose={() => setShowTripSelectDialog(false)}
+        trips={filteredActiveTrips}
+        onSelect={handleTripSelect}
+        onCreateTrip={() => setTripModalOpen(true)}
+      />
+      
       {/* Create Trip FAB */}
       <FloatingActionButton 
         onClick={() => setTripModalOpen(true)} 
-        icon={<ShoppingCart className="h-5 w-5" />}
+        tripMode={true}
+        icon={<ShoppingCart className="h-6 w-6" />}
+        label="New Trip"
       />
       
       {/* Create Trip Modal */}
@@ -751,9 +908,9 @@ const TripsPage = () => {
           onClose={() => setTripDetailModalOpen(false)}
           trip={selectedTrip}
           onAddItem={handleAddItem}
-          onRemoveItem={(itemId) => selectedTrip && handleRemoveItem(selectedTrip.id, itemId)}
-          onToggleItemCheck={(itemId) => selectedTrip && handleToggleItemCheck(selectedTrip.id, itemId)}
-          onUpdateItemPrice={(itemId, price) => selectedTrip && handleUpdateItemPrice(selectedTrip.id, itemId, parseInt(price))}
+          onRemoveItem={(tripId, itemId) => handleRemoveItem(tripId, itemId)}
+          onToggleItemCheck={(tripId, itemId) => handleToggleItemCheck(tripId, itemId)}
+          onUpdateItemPrice={(tripId, itemId, price) => handleUpdateItemPrice(tripId, itemId, price)}
           onInviteParticipant={(tripId) => handleInviteParticipant(tripId)}
           onCompleteTrip={(tripId) => handleCompleteTrip(tripId)}
           onReactivateTrip={(tripId) => handleReactivateTrip(tripId)}

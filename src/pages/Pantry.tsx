@@ -107,6 +107,7 @@ const PantryPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [newItem, setNewItem] = useState<Partial<PantryItem>>({
     name: '',
     quantity: 1,
@@ -120,6 +121,15 @@ const PantryPage = () => {
   // Add an effect to ensure components are properly loaded
   useEffect(() => {
     setIsLoaded(true);
+    
+    // Initialize all categories as expanded by default
+    const categories = Array.from(new Set(mockPantryItems.map(item => item.category)));
+    const initialExpandedState = categories.reduce((acc, category) => {
+      acc[category] = true; // Start with all categories expanded
+      return acc;
+    }, {} as Record<string, boolean>);
+    
+    setExpandedCategories(initialExpandedState);
   }, []);
 
   // Get user's location
@@ -294,6 +304,19 @@ const PantryPage = () => {
   console.log("Filtered items:", filteredItems);
   console.log("Grouped items:", groupedItems);
 
+  // Toggle category expansion
+  const toggleCategoryExpansion = (category: string) => {
+    setExpandedCategories({
+      ...expandedCategories,
+      [category]: !expandedCategories[category]
+    });
+    
+    // Add haptic feedback for better user experience
+    if (navigator.vibrate) {
+      navigator.vibrate(20);
+    }
+  };
+
   // Return loading state if not fully loaded
   if (!isLoaded) {
     return (
@@ -407,92 +430,117 @@ const PantryPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="flex items-center gap-2 mb-3">
+            <div 
+              className="flex items-center gap-2 mb-3 p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg shadow-sm cursor-pointer hover:bg-gloop-primary/10 transition-all duration-200"
+              onClick={() => toggleCategoryExpansion(category)}
+              role="button"
+              tabIndex={0}
+              aria-expanded={expandedCategories[category]}
+              style={{ minHeight: '48px' }} // Ensures at least 48px height for better touch targets
+            >
               {categoryIcons[category]}
               <h2 className="text-lg font-medium">{category}</h2>
               <Badge variant="outline" className="ml-auto">{items.length}</Badge>
+              <ChevronRight 
+                className={`h-5 w-5 text-gloop-text-muted transition-transform duration-300 ${
+                  expandedCategories[category] ? 'rotate-90' : ''
+                }`} 
+              />
             </div>
-            <div className="space-y-3">
-              {items.map((item) => {
-                const daysUntilExpiry = getDaysUntilExpiry(item.expiry);
-                const isExpiringSoon = daysUntilExpiry <= 3 && daysUntilExpiry > 0;
-                const isExpired = daysUntilExpiry <= 0;
-                
-                return (
-                  <motion.div 
-                    key={item.id}
-                    whileHover={{ x: 5 }}
-                    className="hover-lift"
-                  >
-                    <Card className="overflow-hidden premium-card">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h3 className="font-medium">{item.name}</h3>
-                            <div className="flex items-center text-sm text-gloop-text-muted mt-1">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              <span>
-                                {isExpired ? (
-                                  <span className="text-red-500">Expired</span>
-                                ) : isExpiringSoon ? (
-                                  <span className="text-amber-500">Expires in {daysUntilExpiry} days</span>
-                                ) : (
-                                  <span>Expires: {new Date(item.expiry).toLocaleDateString()}</span>
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right flex flex-col items-end">
-                            <div className="flex items-center">
-                              <span className="text-lg font-medium">{item.quantity}</span>
-                              {item.lowStock && (
-                                <Badge className="ml-2 bg-gradient-to-r from-amber-400 to-amber-600 text-white border-0">
-                                  Low
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex mt-1 gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0 rounded-full hover:bg-gloop-primary/10"
-                                onClick={() => handleIncreaseQuantity(item.id)}
-                              >
-                                <Plus className="h-3 w-3 text-gloop-primary" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0 rounded-full hover:bg-gloop-primary/10"
-                                onClick={() => handleDecreaseQuantity(item.id)}
-                              >
-                                <Minus className="h-3 w-3 text-gloop-primary" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0 rounded-full hover:bg-gloop-primary/10"
-                                onClick={() => handleAddToShoppingList(item)}
-                              >
-                                <ShoppingCart className="h-3 w-3 text-gloop-primary" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20"
-                                onClick={() => handleDeleteItem(item.id)}
-                              >
-                                <Trash2 className="h-3 w-3 text-red-500" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
+            
+            <AnimatePresence>
+              {expandedCategories[category] && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-3">
+                    {items.map((item) => {
+                      const daysUntilExpiry = getDaysUntilExpiry(item.expiry);
+                      const isExpiringSoon = daysUntilExpiry <= 3 && daysUntilExpiry > 0;
+                      const isExpired = daysUntilExpiry <= 0;
+                      
+                      return (
+                        <motion.div 
+                          key={item.id}
+                          whileHover={{ x: 5 }}
+                          className="hover-lift"
+                        >
+                          <Card className="overflow-hidden premium-card">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h3 className="font-medium">{item.name}</h3>
+                                  <div className="flex items-center text-sm text-gloop-text-muted mt-1">
+                                    <Calendar className="h-3 w-3 mr-1" />
+                                    <span>
+                                      {isExpired ? (
+                                        <span className="text-red-500">Expired</span>
+                                      ) : isExpiringSoon ? (
+                                        <span className="text-amber-500">Expires in {daysUntilExpiry} days</span>
+                                      ) : (
+                                        <span>Expires: {new Date(item.expiry).toLocaleDateString()}</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-right flex flex-col items-end">
+                                  <div className="flex items-center">
+                                    <span className="text-lg font-medium">{item.quantity}</span>
+                                    {item.lowStock && (
+                                      <Badge className="ml-2 bg-gradient-to-r from-amber-400 to-amber-600 text-white border-0">
+                                        Low
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex mt-1 gap-1">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 w-7 p-0 rounded-full hover:bg-gloop-primary/10"
+                                      onClick={() => handleIncreaseQuantity(item.id)}
+                                    >
+                                      <Plus className="h-3 w-3 text-gloop-primary" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 w-7 p-0 rounded-full hover:bg-gloop-primary/10"
+                                      onClick={() => handleDecreaseQuantity(item.id)}
+                                    >
+                                      <Minus className="h-3 w-3 text-gloop-primary" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 w-7 p-0 rounded-full hover:bg-gloop-primary/10"
+                                      onClick={() => handleAddToShoppingList(item)}
+                                    >
+                                      <ShoppingCart className="h-3 w-3 text-gloop-primary" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 w-7 p-0 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20"
+                                      onClick={() => handleDeleteItem(item.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-red-500" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         ))
       ) : (
@@ -511,7 +559,11 @@ const PantryPage = () => {
         </div>
       )}
 
-      <FloatingActionButton onClick={() => setShowAddItemDialog(true)} />
+      <FloatingActionButton 
+        onClick={() => setShowAddItemDialog(true)} 
+        icon={<Plus className="h-6 w-6" />}
+        label="Add Item"
+      />
       
       <Dialog open={showAddItemDialog} onOpenChange={setShowAddItemDialog}>
         <DialogContent className="sm:max-w-[425px] premium-card">

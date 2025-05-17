@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Camera, X, Receipt } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  isCameraSupported as checkCameraSupport, 
+  requestCameraAccess, 
+  stopMediaStream,
+  toggleTorch,
+  checkTorchAvailability 
+} from "@/utils/cameraUtils";
 
 // Add ImageCapture type definition
 declare global {
@@ -32,16 +39,25 @@ const ReceiptScannerButton = ({
 }: ReceiptScannerButtonProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
-  const [stopStream, setStopStream] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [torchEnabled, setTorchEnabled] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
+  const [isCameraSupported, setIsCameraSupported] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
+
+  // Clean up camera on unmount
+  useEffect(() => {
+    return () => {
+      stopMediaStream(cameraStream);
+    };
+  }, [cameraStream]);
 
   // Start camera when dialog opens AND camera should be active
   useEffect(() => {
     // Only start camera when dialog is open AND user has explicitly activated the camera
-    if (isOpen && cameraActive && !stopStream) {
+    if (isOpen && cameraActive && !cameraError) {
       // Small delay to ensure the dialog is fully mounted before accessing camera
       const timer = setTimeout(() => {
         startCamera();
@@ -49,11 +65,11 @@ const ReceiptScannerButton = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isOpen, cameraActive, stopStream]);
+  }, [isOpen, cameraActive, cameraError]);
 
   const handleCapture = async () => {
     try {
-      if (!videoRef.current) return;
+      if (!videoRef.current || !cameraStream) return;
 
       // Create a canvas element
       const canvas = document.createElement('canvas');
@@ -69,6 +85,7 @@ const ReceiptScannerButton = ({
       const blob = await new Promise<Blob>((resolve) => {
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
+          else throw new Error('Failed to create image from canvas');
         }, 'image/jpeg', 0.95);
       });
       
@@ -97,60 +114,102 @@ const ReceiptScannerButton = ({
     }
   };
 
-  const handleCameraError = (error: any) => {
-    console.error("Camera error:", error);
-    let errorMessage = "Failed to access camera";
-    
-    if (error.name === "NotAllowedError") {
-      errorMessage = "Camera access denied. Please enable camera permissions.";
-    } else if (error.name === "NotFoundError") {
-      errorMessage = "No camera found on your device.";
-    } else if (error.name === "NotReadableError") {
-      errorMessage = "Camera is already in use by another application.";
-    }
-    
+  const handleCameraError = (errorMessage: string) => {
+    console.error("Camera error:", errorMessage);
     setCameraError(errorMessage);
+    setCameraActive(false);
+    
+    toast({
+      title: "Camera Error",
+      description: errorMessage,
+      variant: "destructive"
+    });
   };
 
   const handleClose = () => {
-    setStopStream(true);
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-    }
-    setTimeout(() => {
-      setIsOpen(false);
-      setCameraActive(false);
-      setTimeout(() => {
-        setStopStream(false);
-        setCameraError(null);
-      }, 300);
-    }, 100);
+    stopMediaStream(cameraStream);
+    setCameraStream(null);
+    setIsOpen(false);
+    setCameraActive(false);
+    setTorchEnabled(false);
+    setCameraError(null);
   };
 
   const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: "environment",
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } catch (error) {
+    // 1. First check if browser supports camera API
+    const cameraSupported = checkCameraSupport();
+    if (!cameraSupported) {
+      setIsCameraSupported(false);
+      handleCameraError("Your browser doesn't support camera access. Try using a modern browser like Chrome, Firefox, or Safari.");
+      return;
+    }
+    
+    // 2. Request camera access with proper error handling
+    const { stream, error } = await requestCameraAccess({
+      facingMode: 'environment',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    });
+    
+    if (error) {
       handleCameraError(error);
+      return;
+    }
+    
+    if (stream && videoRef.current) {
+      // Save stream to state for later cleanup
+      setCameraStream(stream);
+      
+      // Set video source to camera stream
+      videoRef.current.srcObject = stream;
+      
+      try {
+        // Start playing the video
+        await videoRef.current.play();
+        
+        // Check if torch is available
+        const torchAvailable = await checkTorchAvailability(stream);
+        setHasTorch(torchAvailable);
+      } catch (playError) {
+        console.error("Error playing video:", playError);
+        handleCameraError("Failed to start video stream. Please try again.");
+        stopMediaStream(stream);
+      }
+    }
+  };
+
+  const handleToggleTorch = async () => {
+    if (!hasTorch || !cameraStream) {
+      toast({
+        title: "Torch Unavailable",
+        description: "Torch control is not available on this device or browser.",
+        variant: "default"
+      });
+      return;
+    }
+    
+    const newTorchState = !torchEnabled;
+    const success = await toggleTorch(cameraStream, newTorchState);
+    
+    if (success) {
+      setTorchEnabled(newTorchState);
+      toast({
+        title: `Torch ${newTorchState ? 'On' : 'Off'}`,
+        description: `Camera torch has been turned ${newTorchState ? 'on' : 'off'}.`,
+      });
+    } else {
+      toast({
+        title: "Torch Control Failed",
+        description: "Failed to toggle torch. It may not be supported on this device.",
+        variant: "default"
+      });
     }
   };
 
   // Handler to open dialog and activate camera together
   const handleOpenScanner = () => {
-    // First open the dialog, then activate camera to prevent race conditions
     setIsOpen(true);
+    
     // Short delay to ensure dialog is mounted before camera activation
     setTimeout(() => {
       setCameraActive(true);
@@ -181,19 +240,23 @@ const ReceiptScannerButton = ({
                 Scan Receipt
               </div>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-8 w-8" 
-                  onClick={() => setTorchEnabled(!torchEnabled)}
-                >
-                  <Camera className="h-4 w-4" />
-                </Button>
+                {hasTorch && cameraActive && (
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="h-8 w-8" 
+                    onClick={handleToggleTorch}
+                    aria-label={torchEnabled ? "Turn off torch" : "Turn on torch"}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button 
                   variant="outline" 
                   size="icon" 
                   className="h-8 w-8" 
                   onClick={handleClose}
+                  aria-label="Close scanner"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -206,16 +269,18 @@ const ReceiptScannerButton = ({
               <div className="bg-red-50 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-300 rounded-md">
                 <p className="font-medium">Camera Error</p>
                 <p className="text-sm mt-1">{cameraError}</p>
-                <Button 
-                  className="mt-3" 
-                  size="sm" 
-                  onClick={() => {
-                    setCameraError(null);
-                    setCameraActive(true);
-                  }}
-                >
-                  Retry
-                </Button>
+                {isCameraSupported && (
+                  <Button 
+                    className="mt-3" 
+                    size="sm" 
+                    onClick={() => {
+                      setCameraError(null);
+                      setCameraActive(true);
+                    }}
+                  >
+                    Retry
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="aspect-video bg-black relative rounded-md overflow-hidden">
@@ -234,16 +299,18 @@ const ReceiptScannerButton = ({
                 <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm">
                   Position receipt within the frame
                 </div>
-                <Button
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-                  onClick={handleCapture}
-                >
-                  Capture Receipt
-                </Button>
+                {cameraActive && !cameraError && (
+                  <Button
+                    className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
+                    onClick={handleCapture}
+                  >
+                    Capture Receipt
+                  </Button>
+                )}
               </div>
             )}
           </div>
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-xs text-muted-foreground text-center mt-2">
             Position the receipt clearly within the frame and ensure good lighting
           </p>
         </DialogContent>

@@ -1,6 +1,18 @@
 // Types for ledger transactions
 export type TransactionType = 'expense' | 'payment';
 
+export type TransactionCategory = 
+  | 'food' 
+  | 'utilities' 
+  | 'rent' 
+  | 'entertainment' 
+  | 'transportation' 
+  | 'groceries' 
+  | 'household' 
+  | 'personal'
+  | 'medical'
+  | 'other';
+
 export interface Transaction {
   id: string;
   tripId?: string; // Optional - can be associated with a trip
@@ -15,6 +27,8 @@ export interface Transaction {
   status: 'pending' | 'completed' | 'cancelled';
   // Add a flag to indicate if this is a split payment (50/50)
   isSplit?: boolean;
+  // Category for expenses
+  category?: TransactionCategory;
 }
 
 export interface UserBalance {
@@ -218,7 +232,8 @@ export const createSettlementTransaction = (
   toUserId: string,
   toUserName: string,
   amount: number,
-  isSplit: boolean = true // Default to split payment (50/50)
+  isSplit: boolean = true, // Default to split payment (50/50)
+  category: TransactionCategory = 'other'
 ): Transaction => {
   return addTransaction({
     tripId,
@@ -231,7 +246,8 @@ export const createSettlementTransaction = (
     toUserName,
     description: `Expenses from trip to ${tripName}`,
     status: 'completed',
-    isSplit
+    isSplit,
+    category
   });
 };
 
@@ -242,7 +258,8 @@ export const createPaymentTransaction = (
   toUserId: string,
   toUserName: string,
   amount: number,
-  description: string = 'Payment'
+  description: string = 'Payment',
+  category?: TransactionCategory
 ): Transaction => {
   return addTransaction({
     timestamp: Date.now(),
@@ -253,7 +270,8 @@ export const createPaymentTransaction = (
     toUserId,
     toUserName,
     description,
-    status: 'pending' // Initially pending, needs to be confirmed
+    status: 'pending', // Initially pending, needs to be confirmed
+    category
   });
 };
 
@@ -265,4 +283,28 @@ export const confirmPayment = (transactionId: string): Transaction | null => {
 // Cancel a payment
 export const cancelPayment = (transactionId: string): Transaction | null => {
   return updateTransaction(transactionId, { status: 'cancelled' });
+};
+
+// Get all available transaction categories
+export const getTransactionCategories = (): {id: TransactionCategory, label: string, icon: string}[] => {
+  return [
+    { id: 'food', label: 'Food & Dining', icon: 'utensils' },
+    { id: 'groceries', label: 'Groceries', icon: 'shopping-cart' },
+    { id: 'household', label: 'Household', icon: 'home' },
+    { id: 'utilities', label: 'Utilities', icon: 'bolt' },
+    { id: 'rent', label: 'Rent & Mortgage', icon: 'building' },
+    { id: 'transportation', label: 'Transportation', icon: 'car' },
+    { id: 'entertainment', label: 'Entertainment', icon: 'film' },
+    { id: 'personal', label: 'Personal', icon: 'user' },
+    { id: 'medical', label: 'Medical', icon: 'stethoscope' },
+    { id: 'other', label: 'Other', icon: 'circle' }
+  ];
+};
+
+// Update transaction category
+export const updateTransactionCategory = (
+  transactionId: string,
+  category: TransactionCategory
+): Transaction | null => {
+  return updateTransaction(transactionId, { category });
 }; 

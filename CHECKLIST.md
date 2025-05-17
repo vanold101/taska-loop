@@ -140,6 +140,11 @@
         -   Built a parser that extracts item names, quantities, and units from the AI output
         -   Added duplicate detection to prevent adding items that already exist in the trip
         -   Implemented clear visual interface showing parsed items before adding to trip
+        -   **Bug Fixes:**
+            -   Fixed parser logic to properly handle different formats (parenthesis, dash, simple formats)
+            -   Restructured parsing logic to prevent multiple matches on the same item
+            -   Added enhanced logging for better debugging
+            -   Improved batch processing of multiple items from the parser
     -   **Technical Features:**
         -   Created predefined prompt template for ChatGPT that instructs it on formatting
         -   Implemented regex-based parsing to handle various formats and units
@@ -152,7 +157,13 @@
         -   Added helpful status messages and error feedback
 
 ## B. Price intelligence
-- [ ] Price tracking across stores
+- [x] Price tracking across stores
+    -   **✅ Implementation Details:**
+        -   Created PriceTrackingService.ts with functions to track item prices across stores
+        -   Defined PriceEntry interface with fields for itemName, price, quantity, unit, storeName
+        -   Implemented methods to add price entries, get price history, find best prices
+        -   Added functions to calculate and compare unit prices across stores
+        -   Set up Firebase Firestore integration for persistent storage
     -   **Data Model:**
         -   Define a data structure to store item prices at different stores over time.
         -   Fields: `itemId`, `storeId` (or name), `price`, `dateRecorded`.
@@ -397,4 +408,191 @@
 - Added loading states
 - Added touch feedback
 - Optimized for mobile screens
-- Added spending trends with interactive charts 
+- Added spending trends with interactive charts
+
+## D. UI/UX Improvements
+
+### Global Polish
+- [x] Reduce background noise
+    - **✅ Implementation Details:**
+        - Reduced dotted gradient opacity to 5% in light mode and 8% in dark mode
+        - Improved text contrast by making background patterns more subtle
+- [x] Unify spacing scale
+    - **✅ Implementation Details:**
+        - Added CSS variables for a consistent spacing scale (--space-1 through --space-24)
+        - Mapped existing spacing values to the new scale for backward compatibility
+- [x] Optimize touch targets
+    - **✅ Implementation Details:**
+        - Updated mobile cards with 40px+ touch targets for all interactive elements
+        - Added touch-friendly buttons in TripCard component and improved tap targets
+- [x] Implement motion system
+    - **✅ Implementation Details:**
+        - Added 150-200ms slide/fade transitions for tab switches
+        - Added 75ms scale animation for FAB with haptic feedback
+        - Added springs and subtle animations for better UX feedback
+- [x] Dark-mode parity
+    - **✅ Implementation Details:**
+        - Fixed white card backgrounds in dark theme with surface-2 tones
+        - Implemented proper color handling for both light and dark modes
+- [x] Keyboard-safe areas
+    - **✅ Implementation Details:**
+        - Added bottom padding class (pb-safe-fab) to content below FAB
+        - Added checks to avoid bottom navigation bar overlap with safe areas
+
+### Home (Active Trips & My Tasks)
+- [x] Hierarchy clash fix
+    - **✅ Implementation Details:**
+        - Reorganized TripCard to have a clear hierarchy of actions
+        - Combined and grouped related actions with a toggle menu
+- [x] Status badge colour
+    - **✅ Implementation Details:**
+        - Switched to softer colors with StatusBadge component
+        - Used semantic variant naming (open, shopping, etc.)
+- [x] Card shadows
+    - **✅ Implementation Details:**
+        - Enhanced card shadows for better visibility on retina displays
+        - Used shadow-md for light mode and shadow-lg for dark mode
+- [x] Tasks tab-bar
+    - **✅ Implementation Details:**
+        - Created HorizontalScrollChips component for filter pills
+        - Added scrollable container with hidden scrollbar
+
+### Dashboard
+- [x] NaN% calculation
+    - **✅ Implementation Details:**
+        - Fixed division by zero in SpendingTrends component
+        - Added proper fallback value when total is zero
+- [x] Month abbreviation
+    - **✅ Implementation Details:**
+        - Updated to use consistent 3-letter format (Jan, Feb, Mar) in chart axes
+        - Improved date formatting and sorting for better readability
+        - Added clear month label extraction from date strings
+- [x] Chart labels contrast
+    - **✅ Implementation Details:**
+        - Increased text size from 12px to 13px and added font weight (500)
+        - Changed text color to darker, more readable #112211
+        - Improved tooltip styling with better padding and shadows
+        - Added container backgrounds for better contrast
+        - Added chart titles and empty state indicators
+        - Improved visual elements like dots and bars
+
+### Pantry
+- [x] Fix "Find Best Prices" CTA
+    - **✅ Implementation Details:**
+        - Added disabled state with explanatory tooltip
+        - Added visual feedback when button is clicked or disabled
+- [x] Address FAB overlap
+    - **✅ Implementation Details:**
+        - Added pb-safe-fab utility class with appropriate padding (7-8rem)
+        - Increased FAB bottom position to 32 (128px) for better clearance
+- [x] Add empty state
+    - **✅ Implementation Details:**
+        - Created reusable EmptyState component
+        - Added fallback when pantry is empty with clear add item CTA
+- [x] Improve category navigation
+    - **✅ Implementation Details:**
+        - Made full header row expandable with proper styling
+        - Increased tap target size to 48px minimum height
+        - Added visual indicator (rotating chevron) for expandable state
+        - Added haptic feedback when expanding/collapsing
+        - Added smooth animation for expanding/collapsing
+        - Implemented ARIA attributes for accessibility
+
+### Ledger
+- [x] Polish zero balance
+    - **✅ Implementation Details:**
+        - Added animated success checkmark for zero balance
+        - Used celebratory text "All settled up! 🎉"
+- [x] Improve recommendation cards
+    - **✅ Implementation Details:**
+        - Added clear action buttons with proper states (Pay now, Remind me, Request payment)
+        - Enhanced visual design with colored top border and better spacing
+        - Added badges to clearly indicate incoming vs outgoing payments
+        - Improved payment amount visibility with larger font size
+        - Added descriptive text to make the purpose clearer
+        - Added visual flow with avatar-to-avatar connection
+        - Incorporated toast notifications for secondary actions
+- [x] Pending payments visibility
+    - **✅ Implementation Details:**
+        - Added notification-style counter badge on the Transactions tab
+        - Created prominent banner showing pending payment counts
+        - Implemented separate "Pending Transactions" section at the top of the list
+        - Enhanced styling with yellow highlights, borders and background colors
+        - Added clear action buttons for confirming/declining payments
+- [x] Transaction search and filtering
+    - **✅ Implementation Details:**
+        - Added search bar to find transactions by description, names, or amounts
+        - Created filters for transaction status (pending/completed/cancelled)
+        - Added filters for transaction type (payment/expense) and direction (sent/received)
+        - Implemented collapsible filter panel with reset functionality
+        - Added result counters showing matching transactions
+- [x] Transaction categories
+    - **✅ Implementation Details:**
+        - Added TransactionCategory type and updated interfaces in LedgerService
+        - Created CategoryIcon and CategoryBadge components with appropriate styling
+        - Added category selection to payment forms
+        - Added category filtering to the filter panel
+        - Implemented the ability to categorize transactions after creation
+        - Added dropdown menu for editing transaction categories
+- [x] CSV export functionality
+    - **✅ Implementation Details:**
+        - Implemented transaction export with proper CSV formatting
+        - Added export buttons in strategic locations
+        - Made exports respect current filters and searches
+
+### Profile
+- [x] Image-text contrast
+    - **✅ Implementation Details:**
+        - Enhanced premium badge with better text contrast against gradients
+        - Added backdrop effect and improved hovers on profile elements  
+- [x] Clear touch targets
+    - **✅ Implementation Details:**
+        - Added hover/tap feedback for avatar and banner images
+        - Added clear feedback with opacity transitions for interactive elements
+- [x] Stats readability
+    - **✅ Implementation Details:**
+        - Improved stat cards with bold, larger numbers
+        - Added color coding for positive values (money saved, time saved)
+- [x] Settings feedback
+    - **✅ Implementation Details:**
+        - Added toast notifications for location and dark mode toggles
+        - Added haptic feedback when settings are changed
+        - Used clear success/error states for toggle actions
+
+### Navigation & Interactions
+- [x] Polish bottom-nav animations
+    - **✅ Implementation Details:**
+        - Added scale-up and color fade animations for all navigation states
+        - Implemented hover and tap animations with Framer Motion
+        - Added smooth color transitions between active/inactive states
+        - Added haptic feedback when navigation items are clicked
+        - Improved indicator animation with opacity fade
+        - Enhanced active state with larger scale and font weight changes
+- [x] Integrate notification icons
+    - **✅ Implementation Details:**
+        - Created a NotificationContext for app-wide notification management
+        - Moved notification functionality to dedicated tab in profile page
+        - Added notification counter badge to profile tab
+        - Implemented full notification center with mark as read/clear functions
+        - Added notification settings control in profile page
+        - Used consistent notification UI across the app
+        - Added unread counter display for better visibility
+- [x] Add haptic feedback
+    - **✅ Implementation Details:**
+        - Created comprehensive haptics utility with intensity levels (light, medium, heavy)
+        - Added pattern-based feedback for different states (success, error, warning)
+        - Enhanced FloatingActionButton with multi-level haptic feedback
+        - Implemented long-press detection with haptic confirmation
+        - Added haptic feedback to all interactive components:
+          - Button component with customizable haptic intensity
+          - Switch/toggle components with state-appropriate feedback
+          - Tab selection with subtle feedback
+          - Navigation items with consistent touch response
+        - Used appropriate intensity levels for different interaction types
+        - Ensured consistent haptic patterns across the application
+
+### Implementation Priority
+1. Global contrast & spacing standardization
+2. Empty state improvements & demo data
+3. Motion system & haptic feedback
+4. Error handling & feedback mechanisms 

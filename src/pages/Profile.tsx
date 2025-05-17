@@ -29,6 +29,9 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import SignOutDialog from "@/components/SignOutDialog";
+import { useToast } from "@/hooks/use-toast";
+import NotificationCenter from "@/components/NotificationCenter";
+import { useNotifications } from "@/context/NotificationContext";
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState("account");
@@ -39,6 +42,9 @@ const Profile = () => {
   const [newFriendName, setNewFriendName] = useState("");
   const [newFriendEmail, setNewFriendEmail] = useState("");
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  const { toast } = useToast();
+  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications();
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   // Check system preference for dark mode on initial load
   useEffect(() => {
@@ -132,33 +138,56 @@ const Profile = () => {
 
       <div className="mb-6">
         <Card className="premium-card overflow-hidden">
-          <div className="h-24 bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end"></div>
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="relative h-24 bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end cursor-pointer group"
+          >
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="absolute top-2 right-2 rounded-full h-8 w-8 p-0 
+                bg-white/20 hover:bg-white/40 text-white
+                opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                backdrop-blur-sm"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <span className="text-white/80 text-sm font-medium backdrop-blur-sm bg-black/20 px-3 py-1.5 rounded-full">
+                Update Banner
+              </span>
+            </div>
+          </motion.div>
+          
           <CardContent className="pt-0 relative">
             <div className="flex justify-between items-start">
               <div className="flex flex-col items-center -mt-10">
-                <Avatar className="h-20 w-20 border-4 border-white shadow-md">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="text-xl bg-gradient-to-br from-gloop-premium-gradient-start to-gloop-premium-gradient-end text-white">
-                    {user.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="relative cursor-pointer group"
+                >
+                  <Avatar className="h-20 w-20 border-4 border-white shadow-md">
+                    <AvatarImage src={user.avatar} alt={user.name} />
+                    <AvatarFallback className="text-xl bg-gradient-to-br from-gloop-premium-gradient-start to-gloop-premium-gradient-end text-white">
+                      {user.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full overflow-hidden">
+                    <div className="bg-black/40 backdrop-blur-sm inset-0 absolute"></div>
+                    <Edit className="h-5 w-5 text-white z-10" />
+                  </div>
+                </motion.div>
+                
                 <h2 className="mt-2 font-semibold text-lg">{user.name}</h2>
                 <p className="text-sm text-gloop-text-muted">{user.email}</p>
                 
                 {user.isPremium && (
-                  <Badge className="mt-2 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 border-0">
-                    <Star className="h-3 w-3 mr-1" /> Premium
+                  <Badge className="mt-2 bg-gradient-to-r from-amber-500 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white border border-amber-400/20 shadow-sm dark:border-amber-400/40">
+                    <Star className="h-3 w-3 mr-1 text-amber-100" fill="currentColor" /> Premium
                   </Badge>
                 )}
               </div>
-              
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="absolute top-2 right-4 rounded-full h-8 w-8 p-0 hover:bg-black/10"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
             </div>
             
             <div className="grid grid-cols-3 gap-2 mt-4 text-center">
@@ -167,24 +196,27 @@ const Profile = () => {
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400, damping: 10 }}
               >
-                <p className="text-xs text-gloop-text-muted">Tasks</p>
-                <p className="font-semibold">{user.completedTasks}</p>
+                <p className="text-xs text-gloop-text-muted mb-1">Tasks</p>
+                <p className="font-bold text-lg">{user.completedTasks}</p>
+                <p className="text-[10px] text-gloop-text-muted">completed</p>
               </motion.div>
               <motion.div 
                 className="p-2 rounded-lg bg-gloop-bg/30"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400, damping: 10 }}
               >
-                <p className="text-xs text-gloop-text-muted">Saved</p>
-                <p className="font-semibold">{user.savedMoney}</p>
+                <p className="text-xs text-gloop-text-muted mb-1">Saved</p>
+                <p className="font-bold text-lg text-green-600 dark:text-green-400">{user.savedMoney}</p>
+                <p className="text-[10px] text-gloop-text-muted">total money</p>
               </motion.div>
               <motion.div 
                 className="p-2 rounded-lg bg-gloop-bg/30"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400, damping: 10 }}
               >
-                <p className="text-xs text-gloop-text-muted">Time</p>
-                <p className="font-semibold">{user.savedTime}</p>
+                <p className="text-xs text-gloop-text-muted mb-1">Time</p>
+                <p className="font-bold text-lg text-blue-600 dark:text-blue-400">{user.savedTime}</p>
+                <p className="text-[10px] text-gloop-text-muted">efficiency</p>
               </motion.div>
             </div>
           </CardContent>
@@ -197,6 +229,21 @@ const Profile = () => {
             <User className="h-4 w-4 mr-2" />
             <span>Account</span>
             {activeTab === "account" && (
+              <motion.div 
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end"
+                layoutId="activeTabIndicator"
+              />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex-shrink-0 data-[state=active]:bg-transparent data-[state=active]:text-gloop-primary relative">
+            <Bell className="h-4 w-4 mr-2" />
+            <span>Notifications</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold">
+                {unreadCount}
+              </span>
+            )}
+            {activeTab === "notifications" && (
               <motion.div 
                 className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end"
                 layoutId="activeTabIndicator"
@@ -244,7 +291,24 @@ const Profile = () => {
                 <Switch 
                   id="location-services" 
                   checked={locationEnabled}
-                  onCheckedChange={setLocationEnabled}
+                  onCheckedChange={(enabled) => {
+                    setLocationEnabled(enabled);
+                    
+                    // Show toast/snackbar
+                    const message = enabled ? "Location services enabled" : "Location services disabled";
+                    toast({
+                      title: message,
+                      description: enabled 
+                        ? "You'll now see store recommendations near you" 
+                        : "You won't receive location-based suggestions",
+                      variant: enabled ? "default" : "destructive"
+                    });
+                    
+                    // Haptic feedback
+                    if (navigator.vibrate) {
+                      navigator.vibrate(50);
+                    }
+                  }}
                 />
               </div>
               
@@ -258,7 +322,23 @@ const Profile = () => {
                 <Switch 
                   id="dark-mode" 
                   checked={darkModeEnabled}
-                  onCheckedChange={toggleDarkMode}
+                  onCheckedChange={(enabled) => {
+                    toggleDarkMode(enabled);
+                    
+                    // Haptic feedback
+                    if (navigator.vibrate) {
+                      navigator.vibrate(50);
+                    }
+                    
+                    // Show toast
+                    toast({
+                      title: enabled ? "Dark mode enabled" : "Light mode enabled",
+                      description: enabled 
+                        ? "The app will use dark theme to reduce eye strain" 
+                        : "The app will use light theme for better visibility",
+                      variant: "default"
+                    });
+                  }}
                 />
               </div>
               
@@ -341,6 +421,88 @@ const Profile = () => {
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="notifications" className="space-y-4 mt-4">
+          <Card className="premium-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center">
+                  <Bell className="h-5 w-5 mr-2 text-gloop-primary" />
+                  Notifications
+                </div>
+                {notifications.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={markAllAsRead}
+                      className="text-xs h-7"
+                    >
+                      Mark all read
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={clearAll}
+                      className="text-xs h-7 text-red-500 hover:text-red-600"
+                    >
+                      Clear all
+                    </Button>
+                  </div>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NotificationCenter 
+                notifications={notifications}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onClearAll={clearAll}
+              />
+            </CardContent>
+          </Card>
+          
+          <Card className="premium-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Bell className="h-5 w-5 mr-2 text-gloop-primary" />
+                Notification Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Bell className="h-4 w-4" />
+                  <Label htmlFor="notifications-enabled" className="cursor-pointer">
+                    Enable Notifications
+                  </Label>
+                </div>
+                <Switch 
+                  id="notifications-enabled" 
+                  checked={notificationsEnabled}
+                  onCheckedChange={(enabled) => {
+                    setNotificationsEnabled(enabled);
+                    
+                    // Show toast/snackbar
+                    const message = enabled ? "Notifications enabled" : "Notifications disabled";
+                    toast({
+                      title: message,
+                      description: enabled 
+                        ? "You'll receive notifications about activity in your household" 
+                        : "You won't receive notifications",
+                      variant: enabled ? "default" : "destructive"
+                    });
+                    
+                    // Haptic feedback
+                    if (navigator.vibrate) {
+                      navigator.vibrate(50);
+                    }
+                  }}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

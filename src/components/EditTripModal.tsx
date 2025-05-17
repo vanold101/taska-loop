@@ -107,10 +107,10 @@ const EditTripModal = ({ isOpen, onClose, onUpdateTrip, trip }: EditTripModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md glass-effect">
+      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800/95 border-gray-200 dark:border-gray-700">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">
-            <Edit className="h-5 w-5 text-gloop-primary" />
+          <DialogTitle className="flex items-center gap-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600 dark:from-blue-400 dark:to-green-400">
+            <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             Edit Trip
           </DialogTitle>
           <DialogDescription>
@@ -122,7 +122,7 @@ const EditTripModal = ({ isOpen, onClose, onUpdateTrip, trip }: EditTripModalPro
           <div className="space-y-2 relative">
             <Label htmlFor="store" className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Store className="h-4 w-4 text-gloop-primary" />
+                <Store className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <span>Store</span>
               </div>
               {errors.store && (
@@ -142,13 +142,13 @@ const EditTripModal = ({ isOpen, onClose, onUpdateTrip, trip }: EditTripModalPro
                 // Delay hiding suggestions to allow for clicks
                 setTimeout(() => setShowSuggestions(false), 200);
               }}
-              className={`premium-card ${errors.store ? "border-destructive" : ""}`}
+              className={errors.store ? "border-destructive" : ""}
             />
             
             {/* Store suggestions dropdown */}
             {showSuggestions && filteredSuggestions.length > 0 && (
               <motion.div 
-                className="absolute z-10 w-full mt-1 glass-effect rounded-md shadow-lg border border-gloop-card-border"
+                className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
@@ -157,11 +157,11 @@ const EditTripModal = ({ isOpen, onClose, onUpdateTrip, trip }: EditTripModalPro
                   {filteredSuggestions.map((suggestion, index) => (
                     <motion.li 
                       key={index}
-                      className="px-3 py-2 hover:bg-gloop-primary/10 cursor-pointer text-sm flex items-center"
+                      className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer text-sm flex items-center"
                       onClick={() => selectSuggestion(suggestion)}
                       whileHover={{ x: 5 }}
                     >
-                      <Store className="h-3 w-3 mr-2 text-gloop-primary" />
+                      <Store className="h-3 w-3 mr-2 text-blue-600 dark:text-blue-400" />
                       {suggestion}
                     </motion.li>
                   ))}
@@ -173,7 +173,7 @@ const EditTripModal = ({ isOpen, onClose, onUpdateTrip, trip }: EditTripModalPro
           <div className="space-y-2">
             <Label htmlFor="eta" className="flex items-center justify-between">
               <div className="flex items-center">
-                <Clock className="h-4 w-4 mr-1 text-gloop-primary" />
+                <Clock className="h-4 w-4 mr-1 text-blue-600 dark:text-blue-400" />
                 Time until arrival
               </div>
               {errors.eta && (
@@ -191,20 +191,20 @@ const EditTripModal = ({ isOpen, onClose, onUpdateTrip, trip }: EditTripModalPro
                 max="120"
                 value={eta}
                 onChange={(e) => setEta(e.target.value)}
-                className={`w-24 premium-card ${errors.eta ? "border-destructive" : ""}`}
+                className={`w-24 ${errors.eta ? "border-destructive" : ""}`}
               />
-              <span className="text-gloop-text-muted">minutes</span>
+              <span className="text-gray-500 dark:text-gray-400">minutes</span>
             </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="premium-card">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={!isFormValid}
-              className={`premium-gradient-btn ${!isFormValid ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`bg-gradient-to-r from-blue-500 to-green-500 text-white hover:from-blue-600 hover:to-green-600 ${!isFormValid ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               Update Trip
             </Button>

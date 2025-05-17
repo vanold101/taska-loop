@@ -380,9 +380,25 @@ const TripDetailModal = ({
   const handleAddItemsFromParser = (items: Omit<TripItem, 'id'>[]) => {
     if (!trip) return;
     
+    console.log("Received items from parser:", items);
+    
     let addedCount = 0;
     let skippedCount = 0;
     
+    // Process each item and add to trip if not a duplicate
+    if (items.length === 0) {
+      toast({
+        title: "No items to add",
+        description: "No items were received from the parser.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Create an array to batch-add all non-duplicate items
+    const newItems: Omit<TripItem, 'id'>[] = [];
+    
+    // Check each item for duplicates
     items.forEach(item => {
       // Check for duplicates
       const isDuplicate = trip.items.some(
@@ -390,12 +406,21 @@ const TripDetailModal = ({
       );
       
       if (!isDuplicate) {
-        onAddItem(trip.id, item);
+        // Add to our batch array
+        newItems.push(item);
         addedCount++;
       } else {
         skippedCount++;
       }
     });
+    
+    // Add all new items in one batch if we have any
+    if (newItems.length > 0) {
+      console.log("Adding non-duplicate items to trip:", newItems);
+      newItems.forEach(item => {
+        onAddItem(trip.id, item);
+      });
+    }
     
     toast({
       title: `${addedCount} items added`,
@@ -712,8 +737,14 @@ const TripDetailModal = ({
                             className={`flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 ${
                               item.checked ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' : 'border-gray-300 dark:border-gray-700'
                             }`}
-                            onClick={() => {
+                            onClick={(e) => {
+                              // Add haptic feedback for better user experience
+                              if (navigator.vibrate) {
+                                navigator.vibrate(25);
+                              }
+                              
                               if (trip) {
+                                // Call the toggle function with both tripId and itemId
                                 onToggleItemCheck(trip.id, item.id);
                               }
                             }}
@@ -760,7 +791,22 @@ const TripDetailModal = ({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-gloop-text-muted hover:text-red-500 flex-shrink-0"
-                              onClick={() => onRemoveItem(trip.id, item.id)}
+                              onClick={(e) => {
+                                // Add haptic feedback
+                                if (navigator.vibrate) {
+                                  navigator.vibrate(25);
+                                }
+                                
+                                // Use animation frame for visual feedback before removal
+                                const parentRow = e.currentTarget.closest('.p-2');
+                                if (parentRow instanceof HTMLElement) {
+                                  parentRow.style.opacity = '0.5';
+                                  parentRow.style.transition = 'opacity 0.2s';
+                                }
+                                
+                                // Call the remove function with both tripId and itemId
+                                onRemoveItem(trip.id, item.id);
+                              }}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -809,8 +855,14 @@ const TripDetailModal = ({
                         <div className="flex items-center">
                           <div 
                             className="flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700"
-                            onClick={() => {
+                            onClick={(e) => {
+                              // Add haptic feedback for better user experience
+                              if (navigator.vibrate) {
+                                navigator.vibrate(25);
+                              }
+                              
                               if (trip) {
+                                // Call the toggle function with both tripId and itemId
                                 onToggleItemCheck(trip.id, item.id);
                               }
                             }}
@@ -856,7 +908,22 @@ const TripDetailModal = ({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-gloop-text-muted/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                              onClick={() => onRemoveItem(trip.id, item.id)}
+                              onClick={(e) => {
+                                // Add haptic feedback
+                                if (navigator.vibrate) {
+                                  navigator.vibrate(25);
+                                }
+                                
+                                // Use animation frame for visual feedback before removal
+                                const parentRow = e.currentTarget.closest('.p-2');
+                                if (parentRow instanceof HTMLElement) {
+                                  parentRow.style.opacity = '0.5';
+                                  parentRow.style.transition = 'opacity 0.2s';
+                                }
+                                
+                                // Call the remove function with both tripId and itemId
+                                onRemoveItem(trip.id, item.id);
+                              }}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>

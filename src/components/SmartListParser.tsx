@@ -72,7 +72,10 @@ ${input}`;
   const parseOutput = (output: string) => {
     // Enhanced parser that can handle both formatted and simple text input
     try {
+      console.log("Parsing input:", output);
       const lines = output.split('\n');
+      console.log(`Processing ${lines.length} lines`);
+      
       const items: Omit<TripItem, 'id'>[] = [];
       
       // Process each line
@@ -80,7 +83,12 @@ ${input}`;
         const trimmedLine = line.trim();
         
         // Skip empty lines
-        if (!trimmedLine) continue;
+        if (!trimmedLine) {
+          console.log("Skipping empty line");
+          continue;
+        }
+        
+        console.log("Processing line:", trimmedLine);
         
         // Check for grocery list marker or bullet point format
         const isGroceryListHeader = trimmedLine.includes('🛒 Grocery List');
@@ -88,6 +96,7 @@ ${input}`;
         
         if (isGroceryListHeader) {
           // This is just a header line, skip it
+          console.log("Skipping header line:", trimmedLine);
           continue;
         }
         
@@ -97,13 +106,18 @@ ${input}`;
         if (isBulletPoint) {
           // Remove the bullet point for structured format
           itemText = trimmedLine.substring(1).trim();
+          console.log("Removed bullet point, processing:", itemText);
         }
+        
+        let parsedItem = false;
         
         // Try to parse item with parenthesized quantity first (structured format)
         const structuredMatch = itemText.match(/^(.*?)\s*\(([^)]+)\)$/);
         
         if (structuredMatch) {
+          parsedItem = true;
           // Handle structured format: "item name (123 unit)"
+          console.log("Found structured format match:", structuredMatch);
           const name = structuredMatch[1].trim();
           const quantityString = structuredMatch[2].trim();
           
@@ -116,12 +130,14 @@ ${input}`;
           if (numericMatch) {
             quantity = parseFloat(numericMatch[1]);
             unit = quantityString.substring(numericMatch[0].length).trim();
+            console.log(`Extracted quantity: ${quantity}, unit: ${unit}`);
           } else {
             // If no number in parentheses, use the whole string as unit
             unit = quantityString;
+            console.log(`No numeric quantity found, using as unit: ${unit}`);
           }
           
-          items.push({
+          const newItem = {
             name,
             quantity,
             unit,
@@ -132,18 +148,25 @@ ${input}`;
               name: "You",
               avatar: "https://example.com/you.jpg"
             }
-          });
-        } else {
-          // Try simple format: "item name 123" (name followed by quantity)
-          // Look for numbers at the end of the string
+          };
+          
+          console.log("Adding structured item:", newItem);
+          items.push(newItem);
+        }
+        
+        // Try simple format: "item name 123" (name followed by quantity)
+        // Look for numbers at the end of the string
+        if (!parsedItem) {
           const simpleMatch = itemText.match(/^(.*?)\s+(\d+(?:\.\d+)?)(?:\s+(\w+))?$/);
           
           if (simpleMatch) {
+            parsedItem = true;
+            console.log("Found simple format match:", simpleMatch);
             const name = simpleMatch[1].trim();
             const quantity = parseFloat(simpleMatch[2]);
             const unit = simpleMatch[3] ? simpleMatch[3].trim() : '';
             
-            items.push({
+            const newItem = {
               name,
               quantity,
               unit,
@@ -154,47 +177,65 @@ ${input}`;
                 name: "You",
                 avatar: "https://example.com/you.jpg"
               }
-            });
-          } else {
-            // Try "item name - 5" format with dash
-            const dashMatch = itemText.match(/^(.*?)\s+-\s+(\d+(?:\.\d+)?)(?:\s+(\w+))?$/);
+            };
             
-            if (dashMatch) {
-              const name = dashMatch[1].trim();
-              const quantity = parseFloat(dashMatch[2]);
-              const unit = dashMatch[3] ? dashMatch[3].trim() : '';
-              
-              items.push({
-                name,
-                quantity,
-                unit,
-                price: 0,
-                checked: false,
-                category: 'uncategorized',
-                addedBy: {
-                  name: "You",
-                  avatar: "https://example.com/you.jpg"
-                }
-              });
-            } else {
-              // No quantity found, just add the item with quantity 1
-              items.push({
-                name: itemText,
-                quantity: 1,
-                unit: '',
-                price: 0,
-                checked: false,
-                category: 'uncategorized',
-                addedBy: {
-                  name: "You",
-                  avatar: "https://example.com/you.jpg"
-                }
-              });
-            }
+            console.log("Adding simple format item:", newItem);
+            items.push(newItem);
           }
+        }
+        
+        // Try "item name - 5" format with dash
+        if (!parsedItem) {
+          const dashMatch = itemText.match(/^(.*?)\s+-\s+(\d+(?:\.\d+)?)(?:\s+(\w+))?$/);
+          
+          if (dashMatch) {
+            parsedItem = true;
+            console.log("Found dash format match:", dashMatch);
+            const name = dashMatch[1].trim();
+            const quantity = parseFloat(dashMatch[2]);
+            const unit = dashMatch[3] ? dashMatch[3].trim() : '';
+            
+            const newItem = {
+              name,
+              quantity,
+              unit,
+              price: 0,
+              checked: false,
+              category: 'uncategorized',
+              addedBy: {
+                name: "You",
+                avatar: "https://example.com/you.jpg"
+              }
+            };
+            
+            console.log("Adding dash format item:", newItem);
+            items.push(newItem);
+          }
+        }
+        
+        // No format match, just add as plain item
+        if (!parsedItem) {
+          console.log("No format match, treating as plain item:", itemText);
+          
+          const newItem = {
+            name: itemText,
+            quantity: 1,
+            unit: '',
+            price: 0,
+            checked: false,
+            category: 'uncategorized',
+            addedBy: {
+              name: "You",
+              avatar: "https://example.com/you.jpg"
+            }
+          };
+          
+          console.log("Adding plain item:", newItem);
+          items.push(newItem);
         }
       }
       
+      console.log("Final parsed items:", items);
       return items;
     } catch (error) {
       console.error("Error parsing output:", error);

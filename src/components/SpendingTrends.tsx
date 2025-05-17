@@ -43,7 +43,7 @@ const SpendingTrends = () => {
     // Group transactions by month and calculate totals
     const monthlyData = transactions.reduce((acc: Record<string, number>, transaction) => {
       const date = new Date(transaction.timestamp);
-      const monthKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+      const monthKey = `${new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
       acc[monthKey] = (acc[monthKey] || 0) + transaction.amount;
       return acc;
     }, {});
@@ -55,7 +55,11 @@ const SpendingTrends = () => {
         amount,
         category: 'All' // We'll implement category tracking in a future update
       }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA.getTime() - dateB.getTime();
+      });
 
     setSpendingData(monthlySpendingData);
 
@@ -68,10 +72,11 @@ const SpendingTrends = () => {
 
     const total = Object.values(categories).reduce((sum, amount) => sum + amount, 0);
 
+    // Fix NaN% by handling division by zero and ensuring valid percentages
     const categoryBreakdown = Object.entries(categories).map(([category, amount]) => ({
       category,
       amount,
-      percentage: (amount / total) * 100
+      percentage: total > 0 ? (amount / total) * 100 : 0
     }));
 
     setCategoryData(categoryBreakdown);
@@ -102,90 +107,126 @@ const SpendingTrends = () => {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="trend">
-          <div className="h-[180px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart 
-                data={spendingData} 
-                margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
-              >
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  stroke="#5B674F" 
-                  opacity={0.2}
-                />
-                <XAxis 
-                  dataKey="date"
-                  tick={{ fontSize: 12, fill: '#5B674F' }}
-                  tickFormatter={(date: string) => new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  stroke="#5B674F"
-                />
-                <YAxis 
-                  tick={{ fontSize: 12, fill: '#5B674F' }}
-                  tickFormatter={(value: number) => `$${value}`}
-                  stroke="#5B674F"
-                />
-                <Tooltip 
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
-                  contentStyle={{
-                    backgroundColor: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                  }}
-                  labelStyle={{ color: '#112211' }}
-                  itemStyle={{ color: '#FF9F2F' }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="#FF9F2F"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="p-2 rounded-lg bg-white/80 dark:bg-gray-800/70 backdrop-blur-sm shadow-sm">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2 ml-2">Monthly Spending</h3>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart 
+                  data={spendingData} 
+                  margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                >
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke="#5B674F" 
+                    opacity={0.2}
+                  />
+                  <XAxis 
+                    dataKey="date"
+                    tick={{ fontSize: 13, fill: '#112211', fontWeight: 500 }}
+                    tickFormatter={(date: string) => {
+                      if (date.includes(' ')) {
+                        const parts = date.split(' ');
+                        return parts[0]; // Return just the month abbreviation
+                      }
+                      
+                      // Otherwise convert from date string
+                      return new Date(date).toLocaleDateString('en-US', { month: 'short' });
+                    }}
+                    stroke="#112211"
+                    axisLine={{ strokeWidth: 1.5 }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 13, fill: '#112211', fontWeight: 500 }}
+                    tickFormatter={(value: number) => `$${value}`}
+                    stroke="#112211"
+                    axisLine={{ strokeWidth: 1.5 }}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                    labelStyle={{ color: '#112211', fontWeight: 'bold', marginBottom: '4px' }}
+                    itemStyle={{ color: '#FF9F2F', fontWeight: 'bold' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="#FF9F2F"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#FF9F2F', strokeWidth: 2, stroke: '#FFFFFF' }}
+                    activeDot={{ r: 6, fill: '#FF9F2F', strokeWidth: 2, stroke: '#FFFFFF' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            {spendingData.length === 0 && (
+              <div className="flex justify-center items-center h-24 text-gray-500 dark:text-gray-400">
+                No spending data available
+              </div>
+            )}
           </div>
         </TabsContent>
         <TabsContent value="category">
-          <div className="h-[180px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={categoryData} 
-                margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
-              >
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  stroke="#5B674F"
-                  opacity={0.2}
-                />
-                <XAxis 
-                  dataKey="category"
-                  tick={{ fontSize: 12, fill: '#5B674F' }}
-                  stroke="#5B674F"
-                />
-                <YAxis 
-                  tick={{ fontSize: 12, fill: '#5B674F' }}
-                  tickFormatter={(value: number) => `$${value}`}
-                  stroke="#5B674F"
-                />
-                <Tooltip 
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
-                  contentStyle={{
-                    backgroundColor: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                  }}
-                  labelStyle={{ color: '#112211' }}
-                  itemStyle={{ color: '#5B674F' }}
-                />
-                <Bar 
-                  dataKey="amount" 
-                  fill="#FF9F2F"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="p-2 rounded-lg bg-white/80 dark:bg-gray-800/70 backdrop-blur-sm shadow-sm">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2 ml-2">Spending by Category</h3>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={categoryData} 
+                  margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                >
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke="#5B674F"
+                    opacity={0.2}
+                  />
+                  <XAxis 
+                    dataKey="category"
+                    tick={{ fontSize: 13, fill: '#112211', fontWeight: 500 }}
+                    stroke="#112211"
+                    axisLine={{ strokeWidth: 1.5 }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 13, fill: '#112211', fontWeight: 500 }}
+                    tickFormatter={(value: number) => `$${value}`}
+                    stroke="#112211"
+                    axisLine={{ strokeWidth: 1.5 }}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                    labelStyle={{ color: '#112211', fontWeight: 'bold', marginBottom: '4px' }}
+                    itemStyle={{ color: '#FF9F2F', fontWeight: 'bold' }}
+                  />
+                  <Bar 
+                    dataKey="amount" 
+                    fill="#FF9F2F"
+                    radius={[6, 6, 0, 0]}
+                    barSize={24}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {categoryData.length === 0 && (
+              <div className="flex justify-center items-center h-24 text-gray-500 dark:text-gray-400">
+                No category data available
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
