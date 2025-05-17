@@ -32,21 +32,28 @@ Here's how it works:
 1. I will paste a recipe, list of meals, event plan, or raw text containing food or product needs.
 2. You will:
   - Parse what items I might need.
-  - Ask clarifying questions (e.g., how many servings, specific preferences, vague terms like "snacks" or "drinks").
-  - Then generate a final grocery list formatted clearly for copying back into the Taska app.
+  - Extract quantities if mentioned.
+  - Infer appropriate items from context.
 
-Output Format:
-Please give the final list using this format:
+Output Format Instructions (CRITICAL):
+- Respond ONLY with the formatted grocery list - no introduction, explanation, or additional text.
+- Use EXACTLY this format:
 
 🛒 Grocery List
-- [Item name] ([optional quantity])
+- [Item name] ([quantity] [unit])
 - [Item name]
 - ...
 
+Example of a correct response:
+🛒 Grocery List
+- Milk (1 gallon)
+- Eggs (12)
+- Bread (1 loaf)
+
 Make sure the list is:
 - In plain, copy-friendly text
-- Organized and clean (no duplicates or fluff)
-- Ready for direct copy/paste into a grocery list app
+- Organized and clean (no duplicates)
+- Ready for direct copy/paste into the app
 
 Now, here is the text I want to base my grocery list on:
 
@@ -297,13 +304,13 @@ ${input}`;
               <div className="space-y-2">
                 <Label htmlFor="output" className="flex items-center">
                   <Clipboard className="h-4 w-4 mr-2 text-blue-500" />
-                  Step 2: Paste AI-generated grocery list here or type items directly (e.g., milk 21, bread - 2)
+                  Step 2: Paste AI-generated grocery list here or type items directly (e.g., milk 1 gallon, bread - 2 loaves)
                 </Label>
                 <Textarea
                   id="output"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Paste list here or type items directly (e.g., milk 21, bread - 2)"
+                  placeholder="Paste list here or type items directly (e.g., milk 1 gallon, bread - 2 loaves)"
                   className="min-h-[150px]"
                 />
               </div>
@@ -312,7 +319,7 @@ ${input}`;
                 <Info className="h-4 w-4" />
                 <AlertDescription>
                   Use ChatGPT to convert recipes, meal plans, or any food-related text into a structured grocery list, then paste it here. 
-                  Or simply type items directly, one per line, like "milk 21" or "bread - 2" to add with quantities.
+                  Or simply type items directly, one per line, like "milk 1 gallon" or "bread - 2 loaves" to add with quantities.
                 </AlertDescription>
               </Alert>
               
