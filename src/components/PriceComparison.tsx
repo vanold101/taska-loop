@@ -59,16 +59,27 @@ export default function PriceComparison({ items, userLocation, onStoreDirections
         const results = findBestPrices(items, userLocation);
         setPriceResults(results);
         
-        // Calculate shopping plan
-        const plan = getShoppingPlan(results);
-        setShoppingPlan(plan);
+        // Filter out items with no best price before calculating shopping plan
+        const validResults = results.filter(result => result.bestPrice !== null);
         
-        // Default expand all stores
-        const storeIds = new Set(plan.storeVisits.map(visit => visit.store.id));
-        setExpandedStores(storeIds);
+        // Only calculate shopping plan if there are valid results
+        if (validResults.length > 0) {
+          // Calculate shopping plan
+          const plan = getShoppingPlan(validResults);
+          setShoppingPlan(plan);
+          
+          // Default expand all stores
+          const storeIds = new Set(plan.storeVisits.map(visit => visit.store.id));
+          setExpandedStores(storeIds);
+        } else {
+          // No valid results with prices found
+          setError("No price information found for any of your items");
+          setShoppingPlan(null);
+        }
       } catch (error) {
         console.error("Error finding prices:", error);
         setError(error instanceof Error ? error.message : "An unknown error occurred");
+        setShoppingPlan(null);
       } finally {
         setIsLoading(false);
       }
@@ -202,12 +213,15 @@ export default function PriceComparison({ items, userLocation, onStoreDirections
                                     (result) => result.item.toLowerCase() === item.item.toLowerCase()
                                   );
                                   
+                                  // Default to item price if itemResult or bestPrice is null
+                                  const bestPrice = itemResult?.bestPrice?.price || item.price;
+                                  
                                   const highestPrice = itemResult?.otherStores.reduce(
                                     (max, store) => Math.max(max, store.price),
-                                    itemResult.bestPrice.price
+                                    bestPrice
                                   ) || item.price;
                                   
-                                  const savingsPercent = itemResult?.bestPrice?.savings.percentage || 0;
+                                  const savingsPercent = itemResult?.bestPrice?.savings?.percentage || 0;
                                   
                                   return (
                                     <div 
@@ -276,64 +290,70 @@ export default function PriceComparison({ items, userLocation, onStoreDirections
                     <div key={result.item} className="border-b border-gloop-border pb-3 last:border-0 last:pb-0">
                       <h4 className="font-medium text-sm mb-2">{result.item}</h4>
                       
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-green-600 dark:text-green-400 font-medium">Best Price</span>
-                          <span>Other Stores</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <Badge className="flex items-center gap-1 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-0">
-                            <Store className="h-3 w-3" />
-                            <span>{result.bestPrice.store.name}</span>
-                          </Badge>
-                          
-                          <div className="h-px flex-1 bg-gloop-outline/30"></div>
-                          
-                          <div className="flex flex-wrap gap-1">
-                            {result.otherStores.slice(0, 3).map((store) => (
-                              <Badge 
-                                key={store.store.id} 
-                                variant="outline" 
-                                className="text-slate-600 dark:text-slate-300"
-                              >
-                                {store.store.name}
-                              </Badge>
-                            ))}
-                            
-                            {result.otherStores.length > 3 && (
-                              <Badge variant="outline" className="text-slate-500">
-                                +{result.otherStores.length - 3} more
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-lg font-semibold">
-                              {formatPrice(result.bestPrice.price)}
-                              <span className="text-xs text-gloop-text-muted ml-1">/{result.bestPrice.unit}</span>
-                            </div>
-                            
-                            {result.bestPrice.savings.amount > 0 && (
-                              <div className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                Save up to {formatSavings(result.bestPrice.savings.amount)} ({result.bestPrice.savings.percentage.toFixed(0)}%)
-                              </div>
-                            )}
+                      {result.bestPrice ? (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-green-600 dark:text-green-400 font-medium">Best Price</span>
+                            <span>Other Stores</span>
                           </div>
                           
-                          <div className="text-right">
-                            <div className="text-sm text-gloop-text-muted">
-                              {formatPrice(
-                                result.otherStores.reduce((sum, store) => sum + store.price, result.bestPrice.price) / 
-                                (result.otherStores.length + 1)
+                          <div className="flex items-center gap-3">
+                            <Badge className="flex items-center gap-1 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-0">
+                              <Store className="h-3 w-3" />
+                              <span>{result.bestPrice.store.name}</span>
+                            </Badge>
+                            
+                            <div className="h-px flex-1 bg-gloop-outline/30"></div>
+                            
+                            <div className="flex flex-wrap gap-1">
+                              {result.otherStores.slice(0, 3).map((store) => (
+                                <Badge 
+                                  key={store.store.id} 
+                                  variant="outline" 
+                                  className="text-slate-600 dark:text-slate-300"
+                                >
+                                  {store.store.name}
+                                </Badge>
+                              ))}
+                              
+                              {result.otherStores.length > 3 && (
+                                <Badge variant="outline" className="text-slate-500">
+                                  +{result.otherStores.length - 3} more
+                                </Badge>
                               )}
-                              <span className="text-xs ml-1">avg</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-lg font-semibold">
+                                {formatPrice(result.bestPrice.price)}
+                                <span className="text-xs text-gloop-text-muted ml-1">/{result.bestPrice.unit}</span>
+                              </div>
+                              
+                              {result.bestPrice.savings.amount > 0 && (
+                                <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                  Save up to {formatSavings(result.bestPrice.savings.amount)} ({result.bestPrice.savings.percentage.toFixed(0)}%)
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="text-right">
+                              <div className="text-sm text-gloop-text-muted">
+                                {formatPrice(
+                                  result.otherStores.reduce((sum, store) => sum + store.price, result.bestPrice.price) / 
+                                  (result.otherStores.length + 1)
+                                )}
+                                <span className="text-xs ml-1">avg</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="text-sm text-gloop-text-muted py-2">
+                          No price data available for this item.
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
