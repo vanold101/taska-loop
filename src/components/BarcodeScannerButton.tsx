@@ -5,6 +5,7 @@ import { ScanLine, Camera, X } from "lucide-react";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import { useToast } from "@/hooks/use-toast";
 import { isCameraSupported as checkCameraSupport, requestCameraAccess, stopMediaStream } from "@/utils/cameraUtils";
+import { fetchProductFromOpenFoodFacts } from "@/services/OpenFoodFactsService";
 
 // Define the structure for the scanned item data
 export interface ScannedItem {
@@ -12,6 +13,14 @@ export interface ScannedItem {
   name?: string;
   brand?: string;
   image?: string;
+  // Additional fields from Open Food Facts
+  category?: string;
+  ingredients?: string;
+  quantity?: string;
+  nutriscore?: string;
+  ecoscore?: string;
+  novaGroup?: number;
+  stores?: string;
   // Potentially add other fields like description, category etc. from API
 }
 
@@ -24,14 +33,10 @@ interface BarcodeScannerButtonProps {
   className?: string;
 }
 
-// API integration function (as provided by user, with minor adjustments)
+// Legacy API integration function - keeping as fallback
 async function fetchFromUPCItemDB(upc: string): Promise<Omit<ScannedItem, 'upc'> | null> {
   try {
     const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${upc}`);
-    // if (!res.ok) { // Basic error check for network issues
-    //   console.error(\`API request failed with status: ${res.status}\`);
-    //   return null;
-    // }
     const data = await res.json();
     if (data.code === "OK" && data.items && data.items.length > 0) {
       const item = data.items[0];
@@ -109,23 +114,37 @@ const BarcodeScannerButton = ({
         return;
       }
 
-      // Otherwise, use the UPCItemDB API
+      // Use Open Food Facts API to look up the product
       if (onItemScanned) {
-        const itemDetails = await fetchFromUPCItemDB(scannedCode);
+        // Try Open Food Facts API first
+        const productDetails = await fetchProductFromOpenFoodFacts(scannedCode);
         
-        if (itemDetails) {
-          onItemScanned({ upc: scannedCode, ...itemDetails });
+        if (productDetails) {
+          // Open Food Facts found the product
+          onItemScanned({ upc: scannedCode, ...productDetails });
           toast({
-            title: "Item Found!",
-            description: `${itemDetails.name || 'Product'} details fetched.`,
+            title: "Product Found",
+            description: `${productDetails.name || 'Product'} details fetched from Open Food Facts.`,
           });
         } else {
-          onItemScanned({ upc: scannedCode });
-          toast({
-            title: "Details Not Found",
-            description: `Could not find details for UPC: ${scannedCode}. You can add it manually.`,
-            variant: "default" 
-          });
+          // Fall back to UPCItemDB if Open Food Facts failed
+          const itemDetails = await fetchFromUPCItemDB(scannedCode);
+          
+          if (itemDetails) {
+            onItemScanned({ upc: scannedCode, ...itemDetails });
+            toast({
+              title: "Item Found",
+              description: `${itemDetails.name || 'Product'} details fetched from alternate source.`,
+            });
+          } else {
+            // No data found from either API
+            onItemScanned({ upc: scannedCode });
+            toast({
+              title: "Details Not Found",
+              description: `Could not find details for barcode: ${scannedCode}. You can add it manually.`,
+              variant: "default" 
+            });
+          }
         }
       }
       
