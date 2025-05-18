@@ -35,6 +35,14 @@ export interface PriceEntry {
   updatedAt?: any; // Firebase timestamp
 }
 
+export interface PriceRecommendation {
+  itemName: string;
+  bestPrice: PriceEntry;
+  potentialSavings: number; // Savings compared to average price
+  confidence: 'high' | 'medium' | 'low'; // Confidence based on recency and data points
+  lastUpdated: string; // Date of the most recent price entry
+}
+
 // Add a new price entry
 export const addPriceEntry = async (entry: Omit<PriceEntry, "dateRecorded" | "id" | "createdAt" | "updatedAt">): Promise<string> => {
   try {
@@ -191,7 +199,126 @@ export const getItemPriceComparisonAcrossStores = async (
   }
 };
 
-// Convert price to unit price for comparison (e.g., price per kg, price per liter)
+// Get best price recommendations for a list of items
+export const getBestPriceRecommendations = async (
+  itemNames: string[]
+): Promise<Record<string, PriceRecommendation>> => {
+  try {
+    const recommendations: Record<string, PriceRecommendation> = {};
+    
+    // Process each item to find recommendations
+    for (const itemName of itemNames) {
+      // Get price history for this item
+      const priceHistory = await getPriceHistoryForItem(itemName, 20);
+      
+      if (priceHistory.length === 0) {
+        continue; // Skip items with no price data
+      }
+      
+      // Find the best price entry
+      const bestPriceEntry = priceHistory.reduce((best, current) => {
+        // Calculate unit prices for fair comparison
+        const bestUnitPrice = calculateUnitPrice(best.price, best.quantity, best.unit);
+        const currentUnitPrice = calculateUnitPrice(current.price, current.quantity, current.unit);
+        
+        return currentUnitPrice < bestUnitPrice ? current : best;
+      }, priceHistory[0]);
+      
+      // Calculate average price for comparison
+      const totalUnitPrice = priceHistory.reduce((total, entry) => {
+        return total + calculateUnitPrice(entry.price, entry.quantity, entry.unit);
+      }, 0);
+      const avgUnitPrice = totalUnitPrice / priceHistory.length;
+      
+      // Calculate unit price of best price
+      const bestUnitPrice = calculateUnitPrice(bestPriceEntry.price, bestPriceEntry.quantity, bestPriceEntry.unit);
+      
+      // Calculate potential savings (percentage compared to average)
+      const potentialSavings = avgUnitPrice > 0 ? 
+        ((avgUnitPrice - bestUnitPrice) / avgUnitPrice) * 100 : 0;
+      
+      // Determine confidence level based on data points and recency
+      let confidence: 'high' | 'medium' | 'low' = 'low';
+      const mostRecentDate = new Date(priceHistory[0].dateRecorded);
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      if (priceHistory.length >= 5 && mostRecentDate > oneWeekAgo) {
+        confidence = 'high';
+      } else if (priceHistory.length >= 3 || mostRecentDate > oneWeekAgo) {
+        confidence = 'medium';
+      }
+      
+      // Create recommendation
+      recommendations[itemName] = {
+        itemName,
+        bestPrice: bestPriceEntry,
+        potentialSavings,
+        confidence,
+        lastUpdated: priceHistory[0].dateRecorded
+      };
+    }
+    
+    return recommendations;
+  } catch (error) {
+    console.error("Error getting price recommendations:", error);
+    return {};
+  }
+};
+
+// Get best price recommendations for an entire shopping list
+export const getShoppingListRecommendations = async (
+  items: { name: string; quantity?: number; unit?: string }[]
+): Promise<{
+  recommendations: Record<string, PriceRecommendation>;
+  bestStore: { storeName: string; itemCount: number; potentialSavings: number } | null;
+}> => {
+  try {
+    // Get recommendations for all items
+    const itemNames = items.map(item => item.name);
+    const recommendations = await getBestPriceRecommendations(itemNames);
+    
+    // Calculate which store has the most "best price" items
+    const storeCount: Record<string, { itemCount: number; totalSavings: number }> = {};
+    
+    Object.values(recommendations).forEach(rec => {
+      const storeName = rec.bestPrice.storeName;
+      if (!storeCount[storeName]) {
+        storeCount[storeName] = { itemCount: 0, totalSavings: 0 };
+      }
+      storeCount[storeName].itemCount += 1;
+      storeCount[storeName].totalSavings += rec.potentialSavings;
+    });
+    
+    // Find store with most best-price items
+    let bestStore: { storeName: string; itemCount: number; potentialSavings: number } | null = null;
+    let maxCount = 0;
+    
+    Object.entries(storeCount).forEach(([storeName, data]) => {
+      if (data.itemCount > maxCount) {
+        maxCount = data.itemCount;
+        bestStore = { 
+          storeName, 
+          itemCount: data.itemCount,
+          potentialSavings: data.totalSavings / data.itemCount // Average savings per item
+        };
+      }
+    });
+    
+    return {
+      recommendations,
+      bestStore
+    };
+  } catch (error) {
+    console.error("Error getting shopping list recommendations:", error);
+    return {
+      recommendations: {},
+      bestStore: null
+    };
+  }
+};
+
+// Calculate unit price for comparison (e.g., price per kg, price per liter)
 export const calculateUnitPrice = (price: number, quantity: number, unit: string): number => {
   if (quantity <= 0) return 0;
   return price / quantity;

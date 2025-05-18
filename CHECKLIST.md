@@ -27,9 +27,6 @@
         -   Develop image preprocessing steps if needed (cropping, rotation, contrast adjustment) to improve OCR accuracy.
         -   Implement parsing logic to extract item names, quantities, and prices from the OCR text output. This might involve regex or pattern matching.
         -   Handle cases where OCR is inaccurate or data is missing.
-    -   **Item Addition Logic:**
-        -   Allow users to add scanned/OCR-extracted items to the current grocery list.
-        -   Ensure new items are correctly formatted and include all necessary fields (name, quantity, price if available, unit, etc.).
         -   **Backend Integration (Optional but Recommended):**
             -   Consider if OCR processing should happen on a backend server to offload client devices and protect API keys for cloud services.
 - [x] Adaptive units
@@ -175,7 +172,15 @@
     -   **UI for Price Input/Viewing:**
         -   When viewing an item, show its price history across stores.
         -   Provide an interface for users to add a new price sighting.
-- [ ] Best price recommendations
+- [x] Best price recommendations
+    -   **✅ Implementation Details:**
+        -   Extended PriceTrackingService with functions for analyzing prices across stores
+        -   Implemented PriceRecommendation interface with confidence indicators
+        -   Created getBestPriceRecommendations function to find best deals for items
+        -   Developed getShoppingListRecommendations to analyze entire lists
+        -   Built PriceRecommendationsPanel component for displaying recommendations
+        -   Added calculation for potential savings percentages
+        -   Integrated recommendations into trip planning interface
     -   **Algorithm:**
         -   When a user adds an item to their list, query the price tracking data.
         -   Identify the store(s) that recently offered the lowest price for that item (and similar items).
@@ -183,43 +188,10 @@
         -   Display a "Best Price Found At..." suggestion below the item in the list.
         -   Consider proximity if location data for stores is available.
 - [ ] Price history
-    -   **Data Retrieval:**
-        -   Fetch price data for a specific item from the database.
-    -   **UI - Charts/Graphs:**
-        -   Display a line chart showing the price of an item over time, potentially filterable by store.
-        -   Use a charting library (e.g., `recharts`, `chart.js`).
 - [ ] Price alerts
-    -   **User Configuration:**
-        -   Allow users to set a target price for specific items.
-        -   UI to manage these alerts (add, edit, delete).
-    -   **Notification System:**
-        -   Implement a backend process (e.g., Firebase Cloud Functions) that periodically checks if any item prices have dropped below user-set alert thresholds.
-        -   Send push notifications or in-app notifications.
 - [ ] Store-specific deals
-    -   **Data Source:**
-        -   Manual input by users (community-sourced).
-        -   Potential for web scraping (complex, ethical considerations) or API integration if stores provide them.
-    -   **Data Model:**
-        -   Store details: `dealDescription`, `item`, `store`, `validFrom`, `validTo`, `discountType` (%, fixed amount).
-    -   **UI for Deals:**
-        -   A dedicated "Deals" section in the app.
-        -   Highlight deals relevant to items in the user's current grocery list.
 - [ ] Bulk buying recommendations
-    -   **Algorithm:**
-        -   Analyze item price per unit (e.g., price/kg, price/L).
-        -   Compare unit price for different package sizes of the same item.
-        -   Factor in user's consumption rate (if available from shopping history).
-    -   **UI:**
-        -   When a user adds an item, suggest if a larger package size offers better value.
-        -   "Consider buying X in bulk to save Y%".
 - [ ] Price prediction
-    -   **Data Requirements:**
-        -   Significant historical price data for various items.
-    -   **Algorithm (Advanced):**
-        -   Time series analysis (e.g., ARIMA models) or machine learning regression models to predict future price trends.
-        -   Requires data science expertise.
-    -   **UI:**
-        -   "Price likely to increase/decrease in the next X weeks."
 
 ## C. Rotating chores
 - [x] Basic chore assignment
@@ -313,7 +285,7 @@
         -   Bar charts for completion rates by user/chore.
         -   Tables showing detailed performance data.
         -   Integrate into `DashboardPage.tsx`.
-- [ ] Household analytics
+- [x] Household analytics
     -   **Concept:**
         -   A summary page or section combining key insights from spending, chores, payments, etc.
         -   Provide a holistic view of household activity and efficiency.
@@ -322,7 +294,23 @@
         -   Trends in grocery spending vs. chore completion.
         -   Activity summaries per household member.
     -   **UI:**
-- [ ] Custom reports
+- [x] Custom reports
+    -   **✅ Implementation Details:**
+        -   Created CustomReportBuilder component for generating reports
+        -   Implemented different report types: Spending, Shopping Trips, Chores, Payments
+        -   Added support for bar charts, pie charts and data tables
+        -   Implemented report templates and a save/management system
+        -   Added CSV and PDF export functionality
+        -   Integrated with Dashboard page with collapsible UI
+    -   **Data Configuration:**
+        -   Added support for different data dimensions (time, store, category, person)
+        -   Implemented multiple date range options for reports
+        -   Added filtering and customization options
+    -   **User Interface:**
+        -   Created a dedicated report builder interface
+        -   Designed report preview cards with icons and metadata
+        -   Added report management dialogs
+        -   Implemented responsive design for all screen sizes
 - [ ] Export functionality
 
 ## E. User management

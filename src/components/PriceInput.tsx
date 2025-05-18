@@ -17,14 +17,25 @@ import {
 import { getLastPrice, isPriceHigher } from "@/services/PriceHistoryService";
 import { Button } from "./ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface PriceInputProps {
-  itemName: string;
+  id?: string;
+  itemName?: string;
   value: number | undefined;
   onChange: (value: number) => void;
+  className?: string;
+  placeholder?: string;
 }
 
-const PriceInput = ({ itemName, value, onChange }: PriceInputProps) => {
+const PriceInput = ({ 
+  id,
+  itemName, 
+  value, 
+  onChange, 
+  className,
+  placeholder = "0.00" 
+}: PriceInputProps) => {
   const [priceInput, setPriceInput] = useState(value ? value.toString() : "");
   const [showTooltip, setShowTooltip] = useState(false);
   const [priceHistory, setPriceHistory] = useState<{ lastPrice: number | null, store: string | null, date: Date | null }>();
@@ -70,7 +81,7 @@ const PriceInput = ({ itemName, value, onChange }: PriceInputProps) => {
       onChange(numValue);
       
       // Update price comparison
-      if (priceHistory?.lastPrice) {
+      if (itemName && priceHistory?.lastPrice) {
         const comparison = isPriceHigher(itemName, numValue);
         setPriceComparison({
           isHigher: comparison.isHigher,
@@ -80,10 +91,30 @@ const PriceInput = ({ itemName, value, onChange }: PriceInputProps) => {
     }
   };
 
+  // Simple view when itemName is not provided (used in new implementation)
+  if (!itemName) {
+    return (
+      <div className={cn("relative", className)}>
+        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">$</span>
+        <Input
+          id={id}
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder={placeholder}
+          value={priceInput}
+          onChange={handlePriceChange}
+          className="pl-7"
+        />
+      </div>
+    );
+  }
+
+  // Full view with price history when itemName is provided
   return (
-    <div className="w-full">
+    <div className={cn("w-full", className)}>
       <div className="flex flex-col space-y-1">
-        <Label htmlFor="price" className="text-xs flex items-center justify-between">
+        <Label htmlFor={id || "price"} className="text-xs flex items-center justify-between">
           <span>Price</span>
           
           {priceHistory?.lastPrice && (
@@ -96,7 +127,7 @@ const PriceInput = ({ itemName, value, onChange }: PriceInputProps) => {
                     className="h-5 w-5 p-0"
                     onClick={() => setShowTooltip(!showTooltip)}
                   >
-                    <History className="h-3.5 w-3.5 text-gloop-text-muted" />
+                    <History className="h-3.5 w-3.5 text-muted-foreground" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
@@ -116,13 +147,13 @@ const PriceInput = ({ itemName, value, onChange }: PriceInputProps) => {
         </Label>
         
         <div className="relative">
-          <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gloop-text-muted" />
+          <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            id="price"
+            id={id || "price"}
             type="number"
             step="0.01"
             min="0"
-            placeholder="0.00"
+            placeholder={placeholder}
             value={priceInput}
             onChange={handlePriceChange}
             className="pl-7"
@@ -132,7 +163,7 @@ const PriceInput = ({ itemName, value, onChange }: PriceInputProps) => {
             <div 
               className={`absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center text-xs ${
                 priceComparison.isHigher ? 'text-red-500' : 
-                priceComparison.difference < 0 ? 'text-green-500' : 'text-gloop-text-muted'
+                priceComparison.difference < 0 ? 'text-green-500' : 'text-muted-foreground'
               }`}
             >
               {priceComparison.isHigher && (
@@ -152,7 +183,7 @@ const PriceInput = ({ itemName, value, onChange }: PriceInputProps) => {
         </div>
         
         {priceHistory?.lastPrice && (
-          <div className="text-xs text-gloop-text-muted pl-1 flex items-center">
+          <div className="text-xs text-muted-foreground pl-1 flex items-center">
             <Info className="h-3 w-3 mr-1" />
             Last: {formatPrice(priceHistory.lastPrice)} at {priceHistory.store}
           </div>

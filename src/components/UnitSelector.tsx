@@ -27,7 +27,15 @@ import {
   formatValueWithUnit,
 } from "@/services/UnitConversionService";
 
-interface UnitSelectorProps {
+// Simple version for new modal implementation
+interface SimpleUnitSelectorProps {
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}
+
+// Extended version for backwards compatibility
+interface DetailedUnitSelectorProps {
   itemName: string;
   quantity: number;
   unit?: string;
@@ -38,16 +46,46 @@ interface UnitSelectorProps {
   compact?: boolean;
 }
 
-const UnitSelector = ({
-  itemName,
-  quantity,
-  unit,
-  onQuantityChange,
-  onUnitChange,
-  className = "",
-  showConversion = false,
-  compact = false,
-}: UnitSelectorProps) => {
+type UnitSelectorProps = SimpleUnitSelectorProps | DetailedUnitSelectorProps;
+
+// Type guard to check which prop interface is being used
+function isSimpleProps(props: UnitSelectorProps): props is SimpleUnitSelectorProps {
+  return 'value' in props && 'onChange' in props;
+}
+
+const UnitSelector = (props: UnitSelectorProps) => {
+  // Handle the simple props case (used in new implementation)
+  if (isSimpleProps(props)) {
+    const { value, onChange, className = "" } = props;
+    
+    return (
+      <Select value={value} onValueChange={onChange} className={className}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select unit" />
+        </SelectTrigger>
+        <SelectContent>
+          {units.map((unit) => (
+            <SelectItem key={unit.id} value={unit.id}>
+              {unit.name} ({unit.abbreviation})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+  
+  // Original implementation for backwards compatibility
+  const {
+    itemName,
+    quantity,
+    unit,
+    onQuantityChange,
+    onUnitChange,
+    className = "",
+    showConversion = false,
+    compact = false,
+  } = props;
+  
   // Get the current unit definition, or guess one based on item name
   const [currentUnit, setCurrentUnit] = useState<UnitDefinition>(
     unit ? unitsMap[unit] : guessUnitForItem(itemName)

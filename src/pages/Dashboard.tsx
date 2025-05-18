@@ -10,6 +10,9 @@ import NavBar from "@/components/NavBar";
 import { loadTransactions, calculateUserBalances, Transaction } from "@/services/LedgerService";
 import { useTaskContext, Trip, TripItem } from "@/context/TaskContext";
 import CreateTripModal from "@/components/CreateTripModal";
+import CustomReportBuilder from "@/components/CustomReportBuilder";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface RecentActivity {
   initials: string;
@@ -28,6 +31,7 @@ const DashboardPage = () => {
   const [pendingTrips, setPendingTrips] = useState(0);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [isTripModalOpen, setTripModalOpen] = useState(false);
+  const [showReports, setShowReports] = useState(false);
 
   useEffect(() => {
     // Load real transaction data
@@ -118,6 +122,10 @@ const DashboardPage = () => {
     navigate('/ledger');
   };
 
+  const toggleReports = () => {
+    setShowReports(!showReports);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <NavBar />
@@ -181,6 +189,25 @@ const DashboardPage = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
               <StoreAnalytics />
             </div>
+          </div>
+
+          {/* Custom Reports Section */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div 
+              className="p-4 cursor-pointer flex justify-between items-center"
+              onClick={toggleReports}
+            >
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Custom Reports</h2>
+              <Button variant="ghost" size="sm">
+                {showReports ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </Button>
+            </div>
+            
+            {showReports && (
+              <div className="p-4 pt-0 border-t border-gray-200 dark:border-gray-700">
+                <CustomReportBuilder />
+              </div>
+            )}
           </div>
 
           {/* Quick Actions */}

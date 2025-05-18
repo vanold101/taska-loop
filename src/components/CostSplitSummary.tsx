@@ -53,8 +53,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { createSettlementTransaction } from "@/services/LedgerService";
 
 interface CostSplitSummaryProps {
-  tripId: string;
-  tripName: string;
+  tripId?: string;
+  tripName?: string;
   items: {
     id: string;
     name: string;
@@ -71,8 +71,8 @@ interface CostSplitSummaryProps {
 }
 
 const CostSplitSummary = ({
-  tripId,
-  tripName,
+  tripId = `trip-${Date.now()}`, // Generate a fallback ID if not provided
+  tripName = "Shopping Trip",  // Use default name if not provided
   items,
   participants,
   onSettleUp,
@@ -417,378 +417,273 @@ const CostSplitSummary = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center">
-            <DollarSign className="h-5 w-5 mr-2 text-blue-500" />
-            Cost Split Summary
-          </div>
-          <Badge variant="secondary" className="ml-2 bg-gradient-to-r from-blue-500 to-green-500 text-white">
-            <DollarSign className="h-3 w-3 mr-1" />
-            ${totalCost.toFixed(2)}
-          </Badge>
-        </CardTitle>
-        <CardDescription>
-          {hasCustomSplits ? (
-            <span className="flex items-center text-amber-500">
-              <AlertCircle className="h-3.5 w-3.5 mr-1" />
-              Custom splits applied
-            </span>
-          ) : (
-            <span>Equal split among {participants.length} participants</span>
-          )}
-        </CardDescription>
-      </CardHeader>
-      
-      {/* Trip total cost */}
-      <Card className="border-gloop-outline dark:border-gloop-outline">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex justify-between items-center">
-            <span>{tripName}</span>
-            <Badge variant="secondary" className="ml-2 bg-gradient-to-r from-blue-500 to-green-500 text-white">
-              <DollarSign className="h-3 w-3 mr-1" />
-              ${totalCost.toFixed(2)}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg">Split Summary</CardTitle>
+            <Badge variant={hasCustomSplits ? "secondary" : "outline"}>
+              {hasCustomSplits ? "Custom Split" : "Equal Split"}
             </Badge>
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {itemsWithPrice} item{itemsWithPrice !== 1 ? 's' : ''} with prices
+          </div>
+          <CardDescription>
+            {items.length} items with a total of ${totalCost.toFixed(2)}
           </CardDescription>
         </CardHeader>
-        
-        {/* Paid by information */}
-        <CardContent className="pt-0">
-          <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-            <div className="flex items-center">
-              <Wallet className="h-4 w-4 mr-2 text-gloop-primary" />
-              <span className="text-sm font-medium">Paid by:</span>
-            </div>
-            <span className="text-sm font-semibold">{getPaidByText()}</span>
-          </div>
-        </CardContent>
-        
-        <CardContent className="space-y-4">
-          {/* Trip paid notification */}
-          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg flex items-start">
-            <AlertCircle className="h-5 w-5 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+        <CardContent className="pb-3">
+          {/* Total cost and split info */}
+          <div className="mb-4 flex justify-between items-center">
             <div>
-              <p className="text-sm text-green-800 dark:text-green-300 font-medium">
-                Trip expenses added to ledger
-              </p>
-              <p className="text-xs text-green-700 dark:text-green-400 mt-1">
-                When you complete the trip, all expenses will be added to the ledger automatically.
-                Participants will be notified of their share based on the splits configured below.
-              </p>
+              <div className="text-sm text-muted-foreground">Total Trip Cost</div>
+              <div className="text-xl font-bold flex items-center">
+                <DollarSign className="h-4 w-4 mr-1" />
+                {totalCost.toFixed(2)}
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">Items with prices</div>
+              <div className="text-base">
+                {itemsWithPrice} of {items.length} items
+              </div>
             </div>
           </div>
           
-          {/* Bulk Split Dialog */}
-          <Dialog open={bulkSplitDialogOpen} onOpenChange={setBulkSplitDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                className="w-full flex items-center justify-center gap-2"
-                variant="outline"
+          {/* Split details */}
+          <div className="space-y-3">
+            {splitSummary.map((participant) => (
+              <div 
+                key={participant.userId} 
+                className="flex justify-between items-center p-3 rounded-lg border bg-card"
               >
-                <SplitSquareVertical className="h-4 w-4" />
-                Split Entire Trip
-              </Button>
-            </DialogTrigger>
-            
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Split entire trip</DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-4 pt-2">
-                {/* Trip total display */}
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Trip total:</span>
-                  <Badge variant="secondary" className="ml-2 bg-gradient-to-r from-blue-500 to-green-500 text-white">
-                    <DollarSign className="h-3 w-3 mr-1" />
-                    ${totalCost.toFixed(2)}
-                  </Badge>
-                </div>
-                
-                {/* Split type selector */}
-                <div className="space-y-2">
-                  <Label htmlFor="splitType">Split method:</Label>
-                  <Select 
-                    value={bulkSplitType} 
-                    onValueChange={handleSplitTypeChange}
-                  >
-                    <SelectTrigger id="splitType">
-                      <SelectValue placeholder="Select split method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="equal" className="flex items-center">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2" />
-                          Equal split
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="percentage">
-                        <div className="flex items-center">
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          Percentage split
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="person">
-                        <div className="flex items-center">
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          Fixed amounts
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <p className="text-xs text-muted-foreground">
-                    {bulkSplitType === 'equal' && "Cost will be divided equally among selected participants"}
-                    {bulkSplitType === 'percentage' && "Specify percentage of the total cost for each participant"}
-                    {bulkSplitType === 'person' && "Specify exact amount each participant will pay"}
-                  </p>
-                </div>
-                
-                {/* Participant selection */}
-                <div className="space-y-2 pt-2">
-                  <Label>Who's splitting this trip?</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {participants.map(participant => (
-                      <div 
-                        key={participant.id}
-                        className={`flex items-center space-x-2 p-2 rounded-md border ${
-                          selectedParticipants.includes(participant.id) 
-                            ? 'border-primary bg-primary/5' 
-                            : 'border-muted'
-                        }`}
-                        onClick={() => handleParticipantToggle(participant.id)}
-                      >
-                        <Checkbox 
-                          id={`participant-${participant.id}`}
-                          checked={selectedParticipants.includes(participant.id)}
-                          onCheckedChange={() => handleParticipantToggle(participant.id)}
-                        />
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback>
-                            {participant.name.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <Label 
-                          htmlFor={`participant-${participant.id}`}
-                          className="flex-1 cursor-pointer"
-                        >
-                          {participant.name}
-                        </Label>
-                      </div>
-                    ))}
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-xs">
+                      {participant.userName.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">{participant.userName}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {participant.itemCount} items
+                    </div>
                   </div>
                 </div>
                 
-                {/* Share inputs - shown for percentage and person splits */}
-                {(bulkSplitType === 'percentage' || bulkSplitType === 'person') && selectedParticipants.length > 0 && (
-                  <div className="space-y-2 border-t pt-4">
-                    <div className="flex justify-between items-center">
-                      <Label>Adjust shares:</Label>
-                      {bulkSplitType === 'percentage' && (
-                        <Badge 
-                          variant={Math.abs(totalPercentage - 100) < 0.01 ? "outline" : "destructive"}
-                          className="font-mono"
-                        >
-                          Total: {totalPercentage.toFixed(1)}%
-                        </Badge>
-                      )}
-                      {bulkSplitType === 'person' && (
-                        <Badge 
-                          variant={amountMatchesPrice ? "outline" : "destructive"}
-                          className="font-mono"
-                        >
-                          Total: ${totalAmount.toFixed(2)} / ${totalCost.toFixed(2)}
-                        </Badge>
-                      )}
-                    </div>
+                <div className="text-right">
+                  <div className="font-medium">
+                    ${participant.totalAmount.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {(participant.totalAmount / totalCost * 100).toFixed(0)}% of total
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* No participants message */}
+          {participants.length === 0 && (
+            <div className="text-center py-4 text-muted-foreground">
+              <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+              <p>No participants added yet.</p>
+            </div>
+          )}
+          
+          {/* Buttons for bulk operations */}
+          <div className="mt-4 space-y-2">
+            <Dialog open={bulkSplitDialogOpen} onOpenChange={setBulkSplitDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <SplitSquareVertical className="h-4 w-4 mr-2" />
+                  Customize Split
+                </Button>
+              </DialogTrigger>
+              
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Customize Cost Split</DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4 py-2">
+                  {/* Split type selection */}
+                  <div className="space-y-2">
+                    <Label>Split Type</Label>
+                    <Select 
+                      value={bulkSplitType} 
+                      onValueChange={(value: string) => handleSplitTypeChange(value as SplitType)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select split type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="equal">Equal Split</SelectItem>
+                        <SelectItem value="percentage">Percentage</SelectItem>
+                        <SelectItem value="custom">Custom Amount</SelectItem>
+                      </SelectContent>
+                    </Select>
                     
-                    <div className="space-y-2">
-                      {bulkSplitDetails
-                        .filter(detail => selectedParticipants.includes(detail.userId))
-                        .map(detail => (
-                          <div key={detail.userId} className="flex items-center space-x-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback>
-                                {detail.userName.charAt(0)}
+                    <p className="text-xs text-muted-foreground">
+                      {bulkSplitType === 'equal' && "Split the cost equally among selected participants"}
+                      {bulkSplitType === 'percentage' && "Assign a percentage of the total to each participant"}
+                      {bulkSplitType === 'custom' && "Specify exact amounts for each participant"}
+                    </p>
+                  </div>
+                  
+                  {/* Participant selection */}
+                  <div className="space-y-2">
+                    <Label>Select Participants</Label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {participants.map((participant) => (
+                        <div key={participant.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`participant-${participant.id}`}
+                            checked={selectedParticipants.includes(participant.id)}
+                            onCheckedChange={() => handleParticipantToggle(participant.id)}
+                          />
+                          <Label 
+                            htmlFor={`participant-${participant.id}`}
+                            className="flex items-center cursor-pointer"
+                          >
+                            <Avatar className="h-6 w-6 mr-2">
+                              <AvatarFallback className="text-xs">
+                                {participant.name.charAt(0)}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm flex-1">{detail.userName}</span>
-                            <div className="relative">
+                            <span>{participant.name}</span>
+                          </Label>
+                          
+                          {selectedParticipants.includes(participant.id) && (
+                            <div className="ml-auto flex items-center space-x-2">
                               <Input
-                                type="number"
-                                value={detail.share}
-                                min={0}
-                                step={bulkSplitType === 'percentage' ? 1 : 0.01}
-                                max={bulkSplitType === 'percentage' ? 100 : undefined}
-                                onChange={(e) => handleShareChange(detail.userId, e.target.value)}
-                                className="w-20 text-right"
+                                type={bulkSplitType === 'custom' ? 'number' : 'text'}
+                                step={bulkSplitType === 'custom' ? '0.01' : undefined}
+                                min="0"
+                                placeholder={
+                                  bulkSplitType === 'percentage' ? '%'
+                                  : bulkSplitType === 'custom' ? '$'
+                                  : 'Equal'
+                                }
+                                className="w-20 h-8 text-sm"
+                                value={
+                                  bulkSplitType === 'equal' 
+                                    ? (100 / selectedParticipants.length).toFixed(0) + '%'
+                                    : bulkSplitDetails.find(d => d.userId === participant.id)?.share.toFixed(
+                                        bulkSplitType === 'percentage' ? 0 : 2
+                                      ) + (bulkSplitType === 'percentage' ? '%' : '')
+                                }
+                                onChange={(e) => handleShareChange(participant.id, e.target.value)}
+                                disabled={bulkSplitType === 'equal'}
                               />
-                              <span className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                                {bulkSplitType === 'percentage' ? '%' : '$'}
-                              </span>
                             </div>
-                          </div>
-                      ))}
-                    </div>
-                    
-                    {/* Quick equalizer button */}
-                    {selectedParticipants.length > 1 && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2 w-full" 
-                        onClick={() => {
-                          let equalShare: number;
-                          
-                          if (bulkSplitType === 'percentage') {
-                            equalShare = 100 / selectedParticipants.length;
-                          } else if (bulkSplitType === 'person') {
-                            equalShare = totalCost / selectedParticipants.length;
-                          } else {
-                            return;
-                          }
-                          
-                          const newDetails = bulkSplitDetails.map(d => 
-                            selectedParticipants.includes(d.userId) 
-                              ? { ...d, share: equalShare } 
-                              : d
-                          );
-                          
-                          setBulkSplitDetails(newDetails);
-                        }}
-                      >
-                        Equalize Selected
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setBulkSplitDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleApplyBulkSplit}>
-                  Apply to All Items
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          
-          {/* Individual Item Splitting Message */}
-          <div className="text-center text-sm text-muted-foreground border-t border-b py-2">
-            <p>You can also split individual items by clicking the "Split" button on each item in the items tab.</p>
-          </div>
-          
-          {itemsWithPrice === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p>No items with prices yet</p>
-              <p className="text-sm">Add prices to items to see the cost split</p>
-            </div>
-          ) : (
-            <>
-              {/* Current user summary */}
-              {currentUserSummary && (
-                <div className="border rounded-lg p-3 bg-primary/5">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center">
-                      <Avatar className="h-8 w-8 mr-2">
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          {currentUserSummary.userName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{currentUserSummary.userName}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {currentUserSummary.itemCount} items
-                        </div>
-                      </div>
-                    </div>
-                    <Badge className="font-mono bg-primary/20 text-primary border-primary/30 text-base">
-                      ${currentUserSummary.totalAmount.toFixed(2)}
-                    </Badge>
-                  </div>
-                </div>
-              )}
-              
-              {/* Other participants */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium flex items-center">
-                  <Users className="h-4 w-4 mr-1" />
-                  Other participants
-                </h3>
-                
-                <div className="space-y-2">
-                  {otherParticipants.map(participant => (
-                    <div key={participant.userId} className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <Avatar className="h-8 w-8 mr-2">
-                            <AvatarFallback>
-                              {participant.userName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{participant.userName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {participant.itemCount} items
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <Badge className="font-mono mb-1">
-                            ${participant.totalAmount.toFixed(2)}
-                          </Badge>
-                          
-                          {/* Settle up button */}
-                          {onSettleUp && (
-                            <Button 
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => handleSettleUp(participant.userId)}
-                            >
-                              <Wallet className="h-3 w-3 mr-1" />
-                              Pay
-                            </Button>
                           )}
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+                
+                <DialogFooter>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setBulkSplitDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleApplyBulkSplit}>
+                    Apply Split
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={handleShare}
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Split Summary
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={handleExport}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export as CSV
+            </Button>
+          </div>
         </CardContent>
       </Card>
       
-      <CardFooter className="flex justify-between border-t pt-4">
-        <Button 
-          variant="outline"
-          size="sm"
-          onClick={handleShare}
-          className="flex items-center"
-        >
-          <Share2 className="h-4 w-4 mr-1" />
-          Share
-        </Button>
-        <Button 
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          className="flex items-center"
-        >
-          <Download className="h-4 w-4 mr-1" />
-          Export CSV
-        </Button>
-      </CardFooter>
-    </Card>
+      {/* Current user summary and settlement options */}
+      {currentUserSummary && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Your Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-3">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <div className="text-sm text-muted-foreground">You owe</div>
+                <div className="text-xl font-bold">
+                  ${currentUserSummary.totalAmount.toFixed(2)}
+                </div>
+              </div>
+              
+              <Badge variant="outline" className="text-xs">
+                {currentUserSummary.itemCount} items
+              </Badge>
+            </div>
+            
+            {/* Settlement options */}
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Settle up with:</div>
+              
+              {otherParticipants.map((participant) => (
+                <div
+                  key={participant.userId}
+                  className="flex justify-between items-center p-3 rounded-lg border bg-card"
+                >
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">
+                        {participant.userName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="font-medium">{participant.userName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {getPaidByText() === participant.userName ? "Paid for this trip" : "Sharing cost"}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSettleUp(participant.userId)}
+                    disabled={!onSettleUp}
+                  >
+                    <Wallet className="h-3.5 w-3.5 mr-2" />
+                    Pay ${participant.totalAmount.toFixed(2)}
+                  </Button>
+                </div>
+              ))}
+              
+              {otherParticipants.length === 0 && (
+                <div className="text-center py-4 text-muted-foreground">
+                  <Users className="h-8 w-8 mx-auto mb-2" />
+                  <p>No other participants to settle with.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 };
 

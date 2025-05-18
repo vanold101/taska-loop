@@ -17,7 +17,8 @@ import {
   Check,
   DollarSign,
   SplitSquareVertical,
-  Sparkles
+  Sparkles,
+  BarChart2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,15 @@ import { Switch } from "@/components/ui/switch";
 import { calculateNextDueDate, RecurrenceFrequency } from "@/services/RecurrenceService";
 import ExportButton from "./ExportButton";
 import SmartListParser from "./SmartListParser";
+import PriceRecommendationsPanel from "./PriceRecommendation";
+import { Link } from "react-router-dom";
+
+// Add success variant to BadgeProps
+declare module "@/components/ui/badge" {
+  interface BadgeProps {
+    variant?: "default" | "destructive" | "secondary" | "outline" | "success";
+  }
+}
 
 // Types for trip data
 export type TripItem = {
@@ -443,623 +453,448 @@ const TripDetailModal = ({
   }, 0);
   
   return (
-    <>
-      <Dialog 
-        open={isOpen} 
-        onOpenChange={onClose}
-        modal={true}
-      >
-        <DialogContent 
-          className="sm:max-w-md premium-card"
-          style={{ 
-            position: 'fixed', 
-            top: '50%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)',
-            maxHeight: '85vh', /* Slightly reduced to ensure it doesn't touch screen edges */
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: 'var(--padding, 1.5rem)',
-            width: 'calc(100% - 2rem)' /* Ensure margin on smaller screens */
-          }}
-        >
-          <DialogHeader className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Badge className={cn(
-                "capitalize flex items-center text-xs",
-                trip.status === 'open' ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800" :
-                trip.status === 'shopping' ? "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800" :
-                trip.status === 'completed' ? "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800" :
-                "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-              )}>
-                {trip.status === 'open' && <Clock className="h-3 w-3 mr-1" />}
-                {trip.status === 'shopping' && <ShoppingCart className="h-3 w-3 mr-1" />}
-                {trip.status === 'completed' && <CheckCircle className="h-3 w-3 mr-1" />}
-                {trip.status === 'cancelled' && <AlertCircle className="h-3 w-3 mr-1" />}
-                {trip.status}
-              </Badge>
-              
-              <div className="flex items-center space-x-2">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 flex-shrink-0"
-                  onClick={() => onInviteParticipant(trip.id)}
-                >
-                  <UserPlus className="h-4 w-4 text-gloop-primary" />
-                </Button>
-                
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 flex-shrink-0"
-                >
-                  <Share2 className="h-4 w-4 text-gloop-primary" />
-                </Button>
-                
-                <ExportButton 
-                  trip={trip}
-                  size="sm"
-                  variant="ghost"
-                  label=""
-                  className="h-8 w-8 p-0 flex-shrink-0"
-                />
-              </div>
-            </div>
-            
-            <DialogTitle className="text-xl flex items-center">
-              <ShoppingCart className="h-5 w-5 mr-2 text-gloop-primary" />
-              Trip to {trip.store}
-            </DialogTitle>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Avatar className="h-6 w-6 border-2 border-white dark:border-gloop-dark-surface">
-                  <AvatarImage src={trip.shopper?.avatar} />
-                  <AvatarFallback className="bg-gloop-primary text-white text-xs">
-                    {trip.shopper?.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm text-gloop-text-muted">
-                  Shopper: <span className="font-medium text-gloop-text-main dark:text-gloop-dark-text-main">{trip.shopper?.name}</span>
-                </span>
-              </div>
-              
-              <div className="text-sm text-gloop-text-muted flex items-center">
-                <Clock className="h-3 w-3 mr-1" />
-                ETA: {trip.eta}
-              </div>
-            </div>
-            
-            {/* Participants row - updated to prevent overlapping */}
-            {trip.participants.length > 0 && (
-              <div className="mt-2">
-                <p className="text-xs text-gloop-text-muted mb-1">Participants:</p>
-                <div className="flex flex-wrap gap-2">
-                  {trip.participants.map((participant, index) => (
-                    <div key={index} className="flex items-center bg-gloop-accent/50 dark:bg-gloop-dark-accent/50 rounded-full pl-1 pr-2 py-0.5">
-                      <Avatar className="h-5 w-5 mr-1">
-                        <AvatarImage src={participant.avatar} />
-                        <AvatarFallback className="bg-gloop-primary text-white text-[10px]">
-                          {participant.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-xs">{participant.name}</span>
-                    </div>
-                  ))}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-6 rounded-full px-2 text-xs flex items-center gap-1"
-                    onClick={() => onInviteParticipant(trip.id)}
-                  >
-                    <UserPlus className="h-3 w-3" />
-                    Add
-                  </Button>
-                </div>
-              </div>
-            )}
-            
-            {/* Total price display */}
-            {totalPrice > 0 && (
-              <div className="mt-2 flex items-center justify-end">
-                <div className="bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-full flex items-center">
-                  <DollarSign className="h-3.5 w-3.5 mr-1 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                    Total: ${totalPrice.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" /> 
+            <span>{trip?.store || "Trip"}</span>
+            <Badge variant={trip?.status === 'completed' ? 'success' : trip?.status === 'shopping' ? 'default' : 'outline'}>
+              {trip?.status === 'completed' ? 'Completed' : trip?.status === 'shopping' ? 'Shopping' : 'Planning'}
+            </Badge>
+          </DialogTitle>
           
-          {/* Tabs for items and cost splitting */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-            <TabsList className="flex w-full premium-card">
-              <TabsTrigger value="items" className="flex-1 flex items-center gap-1">
-                <ShoppingCart className="h-3.5 w-3.5" />
-                Items
-              </TabsTrigger>
-              <TabsTrigger value="splits" className="flex-1 flex items-center gap-1">
-                <SplitSquareVertical className="h-3.5 w-3.5" />
-                Cost Split
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground py-1">
+            <span className="flex items-center">
+              <Clock className="h-4 w-4 mr-1" /> 
+              {new Date(trip?.date || "").toLocaleDateString()} | {trip?.eta}
+            </span>
             
-            {/* Items tab content */}
-            <TabsContent value="items" className="space-y-2 mt-4 overflow-y-auto pb-16">
-              {/* Add item form */}
-              {(trip.status === 'open' || trip.status === 'shopping') && (
-                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-md">
-                  <h3 className="font-medium mb-2">Add Item</h3>
-                  <form onSubmit={handleAddItem}>
-                    <div className="flex gap-2 mb-3">
-                      <Input
-                        placeholder="Item name"
-                        value={newItemName}
-                        onChange={(e) => setNewItemName(e.target.value)}
-                        className="flex-1"
-                      />
-                      <div className="flex gap-2 flex-shrink-0">
-                        {/* Lazy load barcode scanner when button is clicked to prevent automatic camera activation */}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <BarcodeScannerButton
-                            onScan={handleBarcodeScan}
-                            buttonText=""
-                            buttonSize="icon"
-                            className="h-10 w-10"
-                          />
-                        </div>
-                        
-                        {/* Lazy load receipt scanner when button is clicked to prevent automatic camera activation */}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <ReceiptScannerButton
-                            onScan={handleReceiptScan}
-                            buttonText=""
-                            buttonSize="icon"
-                            className="h-10 w-10"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Add improved barcode scanner with product lookup */}
-                    <div className="mb-3">
-                      <BarcodeItemAdder
-                        tripId={trip.id}
-                        onAddItem={onAddItem}
-                      />
-                    </div>
-                    
-                    {/* Quantity and Price Row */}
-                    <div className="flex flex-wrap gap-3 mb-3">
-                      {/* Quantity Input with Unit Selector */}
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="quantity" className="text-sm whitespace-nowrap">Quantity:</Label>
-                        <div className="flex">
-                          <Input
-                            id="quantity"
-                            type="number"
-                            min="1"
-                            step="1"
-                            value={newItemQuantity}
-                            onChange={(e) => setNewItemQuantity(Number(e.target.value))}
-                            className="w-16 rounded-r-none"
-                          />
-                          <UnitSelector
-                            itemName={newItemName}
-                            quantity={newItemQuantity}
-                            unit={newItemUnit}
-                            onUnitChange={setNewItemUnit}
-                            onQuantityChange={setNewItemQuantity}
-                            className="h-10 rounded-l-none border-l-0"
-                            compact={true}
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Price Input */}
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="price" className="text-sm whitespace-nowrap">Price:</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                          <Input
-                            id="price"
-                            type="number"
-                            min="0.00"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={newItemPrice === undefined ? '' : newItemPrice}
-                            onChange={(e) => setNewItemPrice(e.target.value === '' ? undefined : Number(e.target.value))}
-                            className="pl-7 w-24"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Category Selector */}
-                    <div className="mb-3">
-                      <Label htmlFor="category" className="text-sm">Category:</Label>
-                      <Select value={newItemCategory} onValueChange={setNewItemCategory}>
-                        <SelectTrigger id="category" className="w-full">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {groceryCategories.map(category => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Recurrence Options - Added */}
-                    <div className="mb-3 space-y-3 p-3 border rounded-md bg-muted/30 dark:bg-gloop-dark-surface/30">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="isRecurring" className="text-sm flex-grow">Make this item recurring?</Label>
-                        <Switch
-                          id="isRecurring"
-                          checked={newItemIsRecurring}
-                          onCheckedChange={setNewItemIsRecurring}
-                        />
-                      </div>
-                      {newItemIsRecurring && (
-                        <div>
-                          <Label htmlFor="recurrenceFrequency" className="text-xs text-gloop-text-muted">How often?</Label>
-                          <Select 
-                            value={newItemRecurrenceFrequency || ''} 
-                            onValueChange={(value) => setNewItemRecurrenceFrequency(value as 'daily' | 'weekly' | 'bi-weekly' | 'monthly')}
-                          >
-                            <SelectTrigger id="recurrenceFrequency" className="w-full mt-1">
-                              <SelectValue placeholder="Select frequency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="daily">Daily</SelectItem>
-                              <SelectItem value="weekly">Weekly</SelectItem>
-                              <SelectItem value="bi-weekly">Bi-weekly (Every 2 weeks)</SelectItem>
-                              <SelectItem value="monthly">Monthly</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button type="submit" size="sm" className="px-4">
-                        Add Item
-                      </Button>
-                    </div>
-                  </form>
-                </div>
-              )}
-              
-              {uncheckedItems.length > 0 && (
-                <div>
-                  <h3 className="font-medium text-sm mb-2">Items to get ({uncheckedItems.length})</h3>
-                  <div className="space-y-1">
-                    {uncheckedItems.map(item => (
-                      <div key={item.id} className="p-2 bg-background dark:bg-gloop-dark-surface/50 rounded-md">
-                        <div className="flex items-center">
-                          <div 
-                            className={`flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 ${
-                              item.checked ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' : 'border-gray-300 dark:border-gray-700'
-                            }`}
-                            onClick={(e) => {
-                              // Add haptic feedback for better user experience
-                              if (navigator.vibrate) {
-                                navigator.vibrate(25);
-                              }
-                              
-                              if (trip) {
-                                // Call the toggle function with both tripId and itemId
-                                onToggleItemCheck(trip.id, item.id);
-                              }
-                            }}
-                          >
-                            {item.checked && <Check className="h-3 w-3 text-green-600 dark:text-green-400 transition-transform duration-200 transform scale-100" />}
-                          </div>
-                          <div className="flex-1 ml-3">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium text-sm">{item.name}</span>
-                              <PriceInput 
-                                itemName={item.name} 
-                                value={item.price} 
-                                onChange={(newPrice) => handleItemPriceChange(item.id, newPrice)} 
-                              />
-                            </div>
-                            <div className="text-xs text-gloop-text-muted flex items-center flex-wrap">
-                              <span>{formatValueWithUnit(item.quantity, item.unit || 'ea')}</span>
-                              {item.category && categoriesMap[item.category] && (
-                                <><span className="mx-1">·</span><span>{categoriesMap[item.category].name}</span></>
-                              )}
-                              <span className="mx-1">·</span>
-                              <span>Added by {item.addedBy.name}</span>
-                              {item.price && <span className="mx-1">·</span>}
-                              {item.price && (
-                                <span className="font-semibold text-gloop-text-main dark:text-gloop-dark-text-main">
-                                  ${item.price.toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="flex space-x-2 flex-shrink-0 ml-2">
-                            {/* Split button */}
-                            <ItemSplitSelector
-                              tripId={trip.id}
-                              itemId={item.id}
-                              itemName={item.name}
-                              itemPrice={item.price}
-                              participants={trip?.participants?.filter(p => p && p.name) || []}
-                              onSplitUpdated={handleSplitUpdate}
-                            />
-                            
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-gloop-text-muted hover:text-red-500 flex-shrink-0"
-                              onClick={(e) => {
-                                // Add haptic feedback
-                                if (navigator.vibrate) {
-                                  navigator.vibrate(25);
-                                }
-                                
-                                // Use animation frame for visual feedback before removal
-                                const parentRow = e.currentTarget.closest('.p-2');
-                                if (parentRow instanceof HTMLElement) {
-                                  parentRow.style.opacity = '0.5';
-                                  parentRow.style.transition = 'opacity 0.2s';
-                                }
-                                
-                                // Call the remove function with both tripId and itemId
-                                onRemoveItem(trip.id, item.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        {/* Price input for existing item */}
-                        {(trip.status === 'shopping' || trip.status === 'completed') && onUpdateItemPrice && (
-                          <div className="mt-3 pl-8 pt-2 border-t border-gloop-outline/30 dark:border-gloop-dark-outline/30">
-                            <div className="flex flex-col gap-3">
-                              <PriceInput 
-                                itemName={item.name}
-                                value={item.price}
-                                onChange={(price) => handleItemPriceChange(item.id, price)}
-                              />
-                              
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs text-gloop-text-muted">Unit:</span>
-                                <UnitSelector
-                                  itemName={item.name}
-                                  quantity={item.quantity}
-                                  unit={item.unit}
-                                  onQuantityChange={(qty) => handleItemUnitChange(item.id, item.unit || 'ea', qty)}
-                                  onUnitChange={(unit) => handleItemUnitChange(item.id, unit)}
-                                  showConversion={true}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+            {trip?.status !== 'completed' && (
+              <div className="flex ml-auto gap-2">
+                <Button
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => onInviteParticipant(trip?.id || "")}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" /> Invite
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => onCompleteTrip(trip?.id || "")}
+                  disabled={!trip?.items.some(item => item.checked)}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" /> Complete
+                </Button>
+              </div>
+            )}
+            
+            {trip?.status === 'completed' && onReactivateTrip && (
+              <div className="flex ml-auto gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onReactivateTrip(trip?.id || "")}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" /> Reactivate
+                </Button>
+                <ExportButton tripData={trip} />
+              </div>
+            )}
+          </div>
+        </DialogHeader>
+        
+        {/* Tabs for different sections */}
+        <Tabs defaultValue="items" value={activeTab} onValueChange={setActiveTab} className="mt-2">
+          <TabsList className="grid grid-cols-3">
+            <TabsTrigger value="items">Items ({trip?.items.length || 0})</TabsTrigger>
+            <TabsTrigger value="people">People ({trip?.participants.length || 0})</TabsTrigger>
+            <TabsTrigger value="costs">Costs</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="items" className="space-y-4">
+            {/* Show price recommendations if trip is in planning phase */}
+            {trip?.status === 'open' && (
+              <PriceRecommendationsPanel items={trip?.items || []} currentStore={trip?.store} />
+            )}
+            
+            {/* Item Input Form */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Add Item</h3>
+              <form onSubmit={handleAddItem} className="space-y-3">
+                {/* Item Name */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Label htmlFor="item-name">Item</Label>
+                    <Input
+                      id="item-name"
+                      placeholder="e.g., Milk, Apples, Bread"
+                      value={newItemName}
+                      onChange={(e) => setNewItemName(e.target.value)}
+                    />
+                  </div>
+                  
+                  {/* Smart List Parser Button */}
+                  <div className="pt-6">
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setShowSmartParser(true)}
+                      title="Open smart list parser"
+                    >
+                      <Sparkles className="h-5 w-5 text-amber-500" />
+                    </Button>
+                  </div>
+                  
+                  {/* Barcode Scanner Button */}
+                  <div className="pt-6">
+                    <BarcodeScannerButton onScan={handleBarcodeScan} />
+                  </div>
+                  
+                  {/* Receipt Scanner Button */}
+                  <div className="pt-6">
+                    <ReceiptScannerButton onScan={handleReceiptScan} />
                   </div>
                 </div>
-              )}
+                
+                {/* Bottom row with quantity, unit, and price */}
+                <div className="grid grid-cols-4 gap-3">
+                  {/* Quantity */}
+                  <div>
+                    <Label htmlFor="item-quantity">Quantity</Label>
+                    <Input
+                      id="item-quantity"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="1"
+                      value={newItemQuantity}
+                      onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                    />
+                  </div>
+                  
+                  {/* Unit */}
+                  <div>
+                    <Label htmlFor="item-unit">Unit</Label>
+                    <UnitSelector
+                      value={newItemUnit}
+                      onChange={setNewItemUnit}
+                    />
+                  </div>
+                  
+                  {/* Price */}
+                  <div>
+                    <Label htmlFor="item-price">Price (optional)</Label>
+                    <PriceInput
+                      id="item-price"
+                      value={newItemPrice}
+                      onChange={setNewItemPrice}
+                    />
+                  </div>
+                  
+                  {/* Category */}
+                  <div>
+                    <Label htmlFor="item-category">Category</Label>
+                    <Select value={newItemCategory} onValueChange={setNewItemCategory}>
+                      <SelectTrigger id="item-category">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(categoriesMap).map(([id, category]) => (
+                          <SelectItem key={id} value={id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {/* Recurring item options */}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="recurring-item"
+                    checked={newItemIsRecurring}
+                    onCheckedChange={setNewItemIsRecurring}
+                  />
+                  <Label htmlFor="recurring-item">Make this a recurring item</Label>
+                  
+                  {newItemIsRecurring && (
+                    <Select 
+                      value={newItemRecurrenceFrequency || ''} 
+                      onValueChange={(val) => setNewItemRecurrenceFrequency(val as RecurrenceFrequency)}
+                    >
+                      <SelectTrigger className="w-[130px] ml-2">
+                        <SelectValue placeholder="Frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                
+                <Button type="submit">
+                  <Plus className="h-4 w-4 mr-2" /> Add to Trip
+                </Button>
+              </form>
+            </div>
+            
+            {/* List of items */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Items</h3>
               
-              {checkedItems.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="font-medium text-sm mb-2 flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                    Checked items ({checkedItems.length})
-                  </h3>
-                  <div className="space-y-1">
-                    {checkedItems.map(item => (
-                      <div key={item.id} className="p-2 bg-muted/50 dark:bg-gloop-dark-surface/20 rounded-md group">
-                        <div className="flex items-center">
-                          <div 
-                            className="flex-shrink-0 w-5 h-5 rounded-md border cursor-pointer flex items-center justify-center transition-all duration-200 bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700"
-                            onClick={(e) => {
-                              // Add haptic feedback for better user experience
-                              if (navigator.vibrate) {
-                                navigator.vibrate(25);
-                              }
-                              
-                              if (trip) {
-                                // Call the toggle function with both tripId and itemId
-                                onToggleItemCheck(trip.id, item.id);
-                              }
-                            }}
+              {trip?.items.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                  <p>No items added yet. Add some items above.</p>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  <AnimatePresence initial={false}>
+                    {trip?.items.map((item) => (
+                      <motion.li
+                        key={item.id}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className={cn(
+                          "flex items-center justify-between p-3 border rounded-lg",
+                          item.checked && "bg-muted border-muted"
+                        )}
+                      >
+                        <div className="flex items-center flex-1">
+                          {/* Checkbox for marking item */}
+                          <button 
+                            className={cn(
+                              "w-6 h-6 border rounded-md mr-3 flex items-center justify-center",
+                              item.checked ? "bg-primary border-primary text-primary-foreground" : "border-input"
+                            )}
+                            onClick={() => onToggleItemCheck(trip.id, item.id)}
                           >
-                            <Check className="h-3 w-3 text-green-600 dark:text-green-400 transition-transform duration-200 transform scale-100" />
-                          </div>
+                            {item.checked && <Check className="h-4 w-4" />}
+                          </button>
                           
-                          <div className="ml-3 flex-1 overflow-hidden">
-                            <div className="font-medium text-sm text-gloop-text-muted line-through truncate">{item.name}</div>
-                            <div className="text-xs text-gloop-text-muted/70 gap-1 flex items-center flex-wrap">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <span className={cn("font-medium", item.checked && "line-through text-muted-foreground")}>
+                                {item.name}
+                              </span>
+                              
+                              {/* Display category if available */}
+                              {item.category && categoriesMap[item.category] && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  {categoriesMap[item.category].name}
+                                </Badge>
+                              )}
+                              
+                              {/* Show recurring indicator */}
+                              {item.isRecurring && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  {item.recurrenceFrequency}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="text-sm text-muted-foreground flex gap-4">
                               <span>
                                 {formatValueWithUnit(item.quantity, item.unit || 'ea')}
                               </span>
-                              {item.category && categoriesMap[item.category] && (
-                                <><span className="mx-1">·</span><span>{categoriesMap[item.category].name}</span></>
-                              )}
-                              <span className="mx-1">·</span>
-                              <span className="truncate">Added by: {item.addedBy?.name || 'Unknown User'}</span>
+                              
                               {item.price && (
-                                <>
-                                  <span>•</span>
-                                  <span className="flex items-center">
-                                    <DollarSign className="h-3 w-3 mr-0.5" />
-                                    {item.price.toFixed(2)}
-                                  </span>
-                                </>
+                                <span className="text-primary">
+                                  ${item.price.toFixed(2)}
+                                </span>
                               )}
+                              
+                              <span>
+                                Added by {item.addedBy.name}
+                              </span>
                             </div>
-                          </div>
-                          
-                          <div className="flex space-x-2 flex-shrink-0 ml-2">
-                            {/* Split button */}
-                            <ItemSplitSelector
-                              tripId={trip.id}
-                              itemId={item.id}
-                              itemName={item.name}
-                              itemPrice={item.price}
-                              participants={trip?.participants?.filter(p => p && p.name) || []}
-                              onSplitUpdated={handleSplitUpdate}
-                            />
-                            
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-gloop-text-muted/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                              onClick={(e) => {
-                                // Add haptic feedback
-                                if (navigator.vibrate) {
-                                  navigator.vibrate(25);
-                                }
-                                
-                                // Use animation frame for visual feedback before removal
-                                const parentRow = e.currentTarget.closest('.p-2');
-                                if (parentRow instanceof HTMLElement) {
-                                  parentRow.style.opacity = '0.5';
-                                  parentRow.style.transition = 'opacity 0.2s';
-                                }
-                                
-                                // Call the remove function with both tripId and itemId
-                                onRemoveItem(trip.id, item.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
                           </div>
                         </div>
                         
-                        {/* Price display for checked items */}
-                        {item.price === undefined && trip.status === 'completed' && onUpdateItemPrice && (
-                          <div className="mt-2 pl-8">
-                            <div className="flex flex-col gap-2">
-                              <PriceInput 
-                                itemName={item.name}
-                                value={item.price}
-                                onChange={(price) => handleItemPriceChange(item.id, price)}
-                              />
-                              
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gloop-text-muted">Unit:</span>
-                                <UnitSelector
-                                  itemName={item.name}
-                                  quantity={item.quantity}
-                                  unit={item.unit}
-                                  onQuantityChange={(qty) => handleItemUnitChange(item.id, item.unit || 'ea', qty)}
-                                  onUnitChange={(unit) => handleItemUnitChange(item.id, unit)}
-                                  showConversion={true}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        <div className="flex items-center gap-1">
+                          {/* Price input for items without price */}
+                          {!item.price && trip.status !== 'completed' && (
+                            <PriceInput
+                              value={item.price}
+                              onChange={(value) => handleItemPriceChange(item.id, value)}
+                              className="w-24 mr-2"
+                              placeholder="Add price"
+                            />
+                          )}
+                          
+                          {/* Unit selector for changing units */}
+                          {trip.status !== 'completed' && (
+                            <UnitSelector
+                              value={item.unit || 'ea'}
+                              onChange={(value) => handleItemUnitChange(item.id, value)}
+                              className="w-20 mr-2"
+                            />
+                          )}
+                          
+                          {/* Remove item button */}
+                          {trip.status !== 'completed' && (
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => onRemoveItem(trip.id, item.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </motion.li>
                     ))}
-                  </div>
+                  </AnimatePresence>
+                </ul>
+              )}
+            </div>
+          </TabsContent>
+          
+          {/* People tab content */}
+          <TabsContent value="people">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Participants</h3>
+              
+              {trip?.participants.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                  <p>No participants added yet.</p>
                 </div>
+              ) : (
+                <ul className="grid grid-cols-2 gap-3">
+                  {trip?.participants.map((participant) => (
+                    <li 
+                      key={participant.id}
+                      className="flex items-center p-3 border rounded-lg"
+                    >
+                      <Avatar className="h-10 w-10 mr-3">
+                        <AvatarImage src={participant.avatar} alt={participant.name} />
+                        <AvatarFallback>{participant.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{participant.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {participant.id === '123' ? 'Owner' : 'Participant'}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
               
-              {trip.items.length === 0 && (
-                <div className="text-center py-6">
-                  <p className="text-gloop-text-muted">No items added yet</p>
-                  <p className="text-sm mt-1">
-                    Add items for {trip.shopper ? trip.shopper.name : 'the shopper'} to pick up
-                  </p>
+              <div className="pt-4">
+                <Button onClick={() => onInviteParticipant(trip?.id || "")}>
+                  <UserPlus className="h-4 w-4 mr-2" /> Invite Participant
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+          
+          {/* Costs tab content */}
+          <TabsContent value="costs">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">Cost Summary</h3>
+                {trip?.status === 'completed' && (
+                  <Badge variant="success" className="px-2 py-1">
+                    <CheckCircle className="h-3 w-3 mr-1" /> Trip Completed
+                  </Badge>
+                )}
+              </div>
+              
+              {trip?.items.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                  <p>No items added yet.</p>
                 </div>
+              ) : (
+                <>
+                  {/* Items with costs */}
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Items</h4>
+                    <ul className="space-y-2">
+                      {trip?.items.map((item) => (
+                        <li
+                          key={item.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div className="flex items-center">
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-sm text-muted-foreground ml-2">
+                              {formatValueWithUnit(item.quantity, item.unit || 'ea')}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center">
+                            {item.price ? (
+                              <span className="font-medium">${item.price.toFixed(2)}</span>
+                            ) : (
+                              <span className="text-muted-foreground">No price</span>
+                            )}
+                            
+                            {/* Split indicator */}
+                            {item.price && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="ml-2"
+                              >
+                                <SplitSquareVertical className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  
+                  <div className="pt-4">
+                    <CostSplitSummary 
+                      items={trip?.items || []} 
+                      participants={trip?.participants || []} 
+                      onSettleUp={onSettleUp}
+                    />
+                  </div>
+                </>
               )}
-            </TabsContent>
-            
-            {/* Cost split tab content */}
-            <TabsContent value="splits" className="mt-4 overflow-y-auto pb-16">
-              <CostSplitSummary
-                tripId={trip.id}
-                tripName={trip.store}
-                items={trip.items}
-                participants={trip.participants}
-                onSettleUp={onSettleUp}
-                onSplitUpdated={() => {
-                  // Force a refresh of the split summary when splits are updated
-                  setActiveTab("splits");
-                }}
-              />
-            </TabsContent>
-          </Tabs>
-          
-          {isUserShopper && trip.status !== 'completed' && trip.status !== 'cancelled' && (
-            <div className="mt-4 pt-4 border-t border-gloop-outline dark:border-gloop-dark-surface sticky bottom-0 bg-background dark:bg-gloop-dark-background pb-4 z-10">
-              <Button 
-                className="w-full premium-gradient-btn h-10"
-                onClick={() => onCompleteTrip(trip.id)}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                {trip.status === 'open' ? 'Start Shopping' : 'Complete Trip'}
-              </Button>
             </div>
-          )}
-          
-          {/* Reactivate button for completed trips */}
-          {trip.status === 'completed' && onReactivateTrip && (
-            <div className="mt-4 pt-4 border-t border-gloop-outline dark:border-gloop-dark-surface sticky bottom-0 bg-background dark:bg-gloop-dark-background pb-4 z-10">
-              <Button 
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={() => onReactivateTrip(trip.id)}
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Reactivate Trip
-              </Button>
-            </div>
-          )}
-          
-          {/* Duplicate Item Dialog */}
-          <DuplicateItemDialog
-            suggestion={duplicateSuggestion}
-            isOpen={showDuplicateDialog}
-            onClose={() => setShowDuplicateDialog(false)}
-            onAddAnyway={handleAddAnyway}
-            onMergeItems={handleMergeItems}
-            onUpdate={handleUpdateExisting}
-          />
-          
-          {/* Product save dialog */}
-          <BarcodeProductSaveDialog
-            barcode={scannedBarcode}
-            isOpen={showSaveProductDialog}
-            onClose={() => setShowSaveProductDialog(false)}
-            onSave={handleProductSave}
-          />
-          
-          {/* Smart List Parser Button */}
-          <div className="mt-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowSmartParser(true)}
-              className="flex items-center gap-1"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-              <span className="hidden sm:inline">Smart Parser</span>
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
       
-      {/* Smart List Parser Dialog */}
-      <SmartListParser 
+      {/* Product Save Dialog */}
+      <BarcodeProductSaveDialog
+        isOpen={showSaveProductDialog}
+        onClose={() => setShowSaveProductDialog(false)}
+        barcode={scannedBarcode}
+        onSave={handleProductSave}
+      />
+      
+      {/* Duplicate Item Dialog */}
+      <DuplicateItemDialog
+        isOpen={showDuplicateDialog}
+        onClose={() => setShowDuplicateDialog(false)}
+        suggestion={duplicateSuggestion}
+        onAddAnyway={handleAddAnyway}
+        onMergeItems={handleMergeItems}
+        onUpdate={handleUpdateExisting}
+      />
+      
+      {/* Smart List Parser */}
+      <SmartListParser
         isOpen={showSmartParser}
         onClose={() => setShowSmartParser(false)}
         onAddItems={handleAddItemsFromParser}
       />
-    </>
+    </Dialog>
   );
 };
 

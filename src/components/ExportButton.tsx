@@ -21,10 +21,12 @@ import {
   exportTripsHistoryToCSV 
 } from '@/services/ExportService';
 import { useToast } from "@/hooks/use-toast";
+import { TripData } from './TripDetailModal';
 
 interface ExportButtonProps {
   trip?: Trip;
   trips?: Trip[];
+  tripData?: TripData;
   label?: string;
   variant?: 'default' | 'outline' | 'ghost';
   size?: 'default' | 'sm' | 'lg' | 'icon';
@@ -35,6 +37,7 @@ interface ExportButtonProps {
 
 const ExportButton = ({ 
   trip,
+  tripData,
   trips = [],
   label = 'Export',
   variant = 'outline',
@@ -46,8 +49,20 @@ const ExportButton = ({
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
+  // Convert TripData to Trip if needed
+  const exportableTripData = tripData ? {
+    id: tripData.id,
+    name: tripData.store,
+    store: tripData.store,
+    items: tripData.items,
+    participants: tripData.participants,
+    status: tripData.status,
+    date: tripData.date,
+    eta: tripData.eta
+  } as Trip : trip;
+
   const handleExportPDF = () => {
-    if (!trip) {
+    if (!exportableTripData) {
       toast({
         title: 'Export Error',
         description: 'No trip data available to export',
@@ -58,7 +73,7 @@ const ExportButton = ({
 
     try {
       setIsExporting(true);
-      exportTripToPDF(trip);
+      exportTripToPDF(exportableTripData);
       toast({
         title: 'PDF Export Successful',
         description: 'Your shopping trip has been exported as a PDF file'
@@ -76,7 +91,7 @@ const ExportButton = ({
   };
 
   const handleExportCSV = () => {
-    if (!trip) {
+    if (!exportableTripData) {
       toast({
         title: 'Export Error',
         description: 'No trip data available to export',
@@ -87,7 +102,7 @@ const ExportButton = ({
 
     try {
       setIsExporting(true);
-      exportTripToCSV(trip);
+      exportTripToCSV(exportableTripData);
       toast({
         title: 'CSV Export Successful',
         description: 'Your shopping trip has been exported as a CSV file'
@@ -148,7 +163,7 @@ const ExportButton = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-56">
-        {trip && (
+        {exportableTripData && (
           <>
             <DropdownMenuItem onClick={handleExportPDF}>
               <FileText className="mr-2 h-4 w-4 text-blue-500" />
@@ -163,7 +178,7 @@ const ExportButton = ({
         
         {includeHistory && trips.length > 0 && (
           <>
-            {trip && <DropdownMenuSeparator />}
+            {exportableTripData && <DropdownMenuSeparator />}
             <DropdownMenuItem onClick={handleExportHistoryCSV}>
               <FileSpreadsheet className="mr-2 h-4 w-4 text-purple-500" />
               <span>Export All History</span>
