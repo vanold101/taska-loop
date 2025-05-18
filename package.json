@@ -6,14 +6,15 @@
   "homepage": "https://vanold101.github.io/taska-loop/",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/generate-sw.js && vite build",
     "start": "vite preview",
     "lint": "eslint .",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "generate-sw": "node scripts/generate-sw.js"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.1.2",
@@ -80,6 +81,7 @@
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
+    "dotenv": "^16.5.0",
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",

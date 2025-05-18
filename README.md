@@ -65,7 +65,7 @@ Maintain a fair and efficient home:
 | 🌓 Dark Mode          | Battery-efficient and easy on the eyes |
 | 🔄 Real-Time Sync     | All lists and ledgers update instantly across all devices |
 | 📥 Shared Receipts    | Everyone sees every purchase — no disputes |
-| 💬 In-App Chat        | Quick item requests and “Did you already buy this?” answers |
+| 💬 In-App Chat        | Quick item requests and "Did you already buy this?" answers |
 | 📊 Household Dashboard| See weekly spend, chore completion, and XP earned |
 | 🧠 AI Smart Suggestions| Automatically suggest reordering staples or missed tasks |
 | 🏆 Gamification       | Earn XP, level up your streaks, and track household fairness |
@@ -107,6 +107,71 @@ TaskaLoop isn't just feature-rich — it's thoughtfully designed:
 4. Watch your dashboard update live  
 
 👉 Visit the live application: **[TaskaLoop on GitHub Pages](https://vanold101.github.io/taska-loop)**
+
+---
+
+## 👨‍💻 Development Setup
+
+### Option 1: Automatic Setup (Recommended)
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/vanold101/taska-loop.git
+   cd taska-loop
+   ```
+
+2. Run the setup script:
+   ```
+   ./scripts/setup.sh
+   ```
+   This will guide you through creating a `.env` file, install dependencies, and generate the necessary service worker files.
+
+3. Run the development server:
+   ```
+   npm run dev
+   ```
+
+### Option 2: Manual Setup
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/vanold101/taska-loop.git
+   cd taska-loop
+   ```
+
+2. Install dependencies:
+   ```
+   npm install --legacy-peer-deps
+   ```
+
+3. Create a `.env` file in the root directory with your Firebase configuration:
+   ```
+   # Firebase Configuration
+   NEXT_PUBLIC_FIREBASE_API_KEY="YOUR_API_KEY"
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="YOUR_AUTH_DOMAIN"
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID="YOUR_PROJECT_ID"
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="YOUR_STORAGE_BUCKET"
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
+   NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_APP_ID"
+   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="YOUR_MEASUREMENT_ID"
+   ```
+
+4. Generate the Firebase messaging service worker:
+   ```
+   npm run generate-sw
+   ```
+
+5. Run the development server:
+   ```
+   npm run dev
+   ```
+
+### Deployment
+
+To build and deploy to GitHub Pages:
+```
+npm run deploy
+```
 
 ---
 
