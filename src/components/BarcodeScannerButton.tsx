@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScanLine, Camera, X } from "lucide-react";
+import { ScanLine, Camera, X, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import { useToast } from "@/hooks/use-toast";
 import { isCameraSupported as checkCameraSupport, requestCameraAccess, stopMediaStream } from "@/utils/cameraUtils";
 import { fetchProductFromOpenFoodFacts } from "@/services/OpenFoodFactsService";
+import { fetchWithProxy } from "@/services/ProxyService";
 
 // Define the structure for the scanned item data
 export interface ScannedItem {
@@ -31,25 +32,50 @@ interface BarcodeScannerButtonProps {
   buttonVariant?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive";
   buttonSize?: "default" | "sm" | "lg" | "icon";
   className?: string;
+  tripId?: string; // Add tripId prop to know which trip to add the item to
 }
+
+// Add proxy support for UPC lookups to avoid CORS issues
+const PROXY_ENABLED = true; // Set to true if you're experiencing CORS issues
+const PROXY_URL = "https://cors-anywhere.herokuapp.com/";
 
 // Legacy API integration function - keeping as fallback
 async function fetchFromUPCItemDB(upc: string): Promise<Omit<ScannedItem, 'upc'> | null> {
   try {
-    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${upc}`);
-    const data = await res.json();
+    console.log(`[UPCItemDB] Fetching data for barcode: ${upc}`);
+    
+    // Use our proxy service instead of direct fetch
+    const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${upc}`;
+    console.log(`[UPCItemDB] API URL: ${url}`);
+    
+    // Try with our new proxy service, using allOrigins as preferred strategy
+    const data = await fetchWithProxy<any>(url, {}, 'allOrigins');
+    
+    if (!data) {
+      console.error(`[UPCItemDB] Failed to fetch data`);
+      return null;
+    }
+    
+    console.log(`[UPCItemDB] API response code: ${data.code}`);
+    
     if (data.code === "OK" && data.items && data.items.length > 0) {
       const item = data.items[0];
-      return {
+      console.log(`[UPCItemDB] Product found: ${item.title || 'Unknown title'}`);
+      
+      const result = {
         name: item.title,
         brand: item.brand,
         image: item.images && item.images.length > 0 ? item.images[0] : undefined,
       };
+      
+      console.log(`[UPCItemDB] Successfully extracted product details:`, result);
+      return result;
     }
-    console.log("UPCItemDB: No items found or error in response", data);
+    
+    console.log("[UPCItemDB] No items found or error in response", data);
     return null;
   } catch (error) {
-    console.error("Error fetching from UPCItemDB:", error);
+    console.error("[UPCItemDB] Error fetching from UPCItemDB:", error);
     return null;
   }
 }
@@ -60,7 +86,8 @@ const BarcodeScannerButton = ({
   buttonText = "Scan Barcode",
   buttonVariant = "outline",
   buttonSize = "sm",
-  className = ""
+  className = "",
+  tripId
 }: BarcodeScannerButtonProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -69,15 +96,25 @@ const BarcodeScannerButton = ({
   const [hasFlash, setHasFlash] = useState(false);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [isCameraSupported, setIsCameraSupported] = useState(true);
+  const [scanStatus, setScanStatus] = useState<string>("Waiting for barcode...");
+  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<"none" | "detected" | "not_in_db" | "error">("none");
+  const [lastScanTime, setLastScanTime] = useState<number>(0);
+  const [scanAttempts, setScanAttempts] = useState<number>(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  // Clean up camera on unmount
+  // Clean up camera and intervals on unmount
   useEffect(() => {
     return () => {
       if (videoRef.current?.srcObject) {
         stopMediaStream(videoRef.current.srcObject as MediaStream);
+      }
+      
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
       }
     };
   }, []);
@@ -87,20 +124,61 @@ const BarcodeScannerButton = ({
     if (isOpen && !cameraActive) {
       const timer = setTimeout(() => {
         setCameraActive(true);
+        setScanStatus("Waiting for barcode...");
+        
+        // Set up periodic scan attempts feedback
+        if (scanIntervalRef.current) {
+          clearInterval(scanIntervalRef.current);
+        }
+        
+        scanIntervalRef.current = setInterval(() => {
+          setScanAttempts(prev => {
+            const newValue = prev + 1;
+            // Provide feedback every 5 attempts
+            if (newValue % 5 === 0) {
+              setScanStatus("Still searching for barcode... Please ensure good lighting and hold steady.");
+            }
+            return newValue;
+          });
+        }, 2000); // Check every 2 seconds
       }, 100);
-      return () => clearTimeout(timer);
+      
+      return () => {
+        clearTimeout(timer);
+        if (scanIntervalRef.current) {
+          clearInterval(scanIntervalRef.current);
+        }
+      };
     } else if (!isOpen && cameraActive) {
       setCameraActive(false);
       setTorchEnabled(false);
+      setScanAttempts(0);
+      
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+      }
     }
   }, [isOpen]);
 
   const handleScanResult = async (error: any, result: any) => {
     if (isProcessingScan) return;
 
-    if (result) {
+    const currentTime = Date.now();
+    // Allow new scan only after 3 seconds to prevent duplicates
+    if (result && (currentTime - lastScanTime > 3000)) {
+      setLastScanTime(currentTime);
       setIsProcessingScan(true);
+      setScanStatus("Barcode detected! Processing...");
+      setDetectedBarcode(result.text);
+      setScanResult("detected");
+      
+      // Stop the scan attempts indicator
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+      }
+      
       const scannedCode = result.text;
+      console.log(`[Scanner] Barcode detected: ${scannedCode}`);
       
       toast({
         title: "Barcode Detected",
@@ -109,6 +187,7 @@ const BarcodeScannerButton = ({
 
       // If onScan prop is provided, call it directly with the raw barcode
       if (onScan) {
+        console.log(`[Scanner] Using onScan callback with barcode: ${scannedCode}`);
         onScan(scannedCode);
         handleClose();
         return;
@@ -116,11 +195,17 @@ const BarcodeScannerButton = ({
 
       // Use Open Food Facts API to look up the product
       if (onItemScanned) {
+        console.log(`[Scanner] Looking up product details for UPC: ${scannedCode}`);
+        
         // Try Open Food Facts API first
+        console.log(`[Scanner] Attempting Open Food Facts API lookup`);
         const productDetails = await fetchProductFromOpenFoodFacts(scannedCode);
         
         if (productDetails) {
           // Open Food Facts found the product
+          console.log(`[Scanner] Product found in Open Food Facts:`, productDetails);
+          setScanStatus("Product found in database!");
+          setScanResult("detected");
           onItemScanned({ upc: scannedCode, ...productDetails });
           toast({
             title: "Product Found",
@@ -128,9 +213,13 @@ const BarcodeScannerButton = ({
           });
         } else {
           // Fall back to UPCItemDB if Open Food Facts failed
+          console.log(`[Scanner] Open Food Facts lookup failed, trying UPCItemDB`);
           const itemDetails = await fetchFromUPCItemDB(scannedCode);
           
           if (itemDetails) {
+            console.log(`[Scanner] Product found in UPCItemDB:`, itemDetails);
+            setScanStatus("Product found in alternate database!");
+            setScanResult("detected");
             onItemScanned({ upc: scannedCode, ...itemDetails });
             toast({
               title: "Item Found",
@@ -138,6 +227,9 @@ const BarcodeScannerButton = ({
             });
           } else {
             // No data found from either API
+            console.log(`[Scanner] Product not found in any database for UPC: ${scannedCode}`);
+            setScanStatus("Barcode detected but not in database");
+            setScanResult("not_in_db");
             onItemScanned({ upc: scannedCode });
             toast({
               title: "Details Not Found",
@@ -148,9 +240,13 @@ const BarcodeScannerButton = ({
         }
       }
       
-      handleClose();
+      // Keep the dialog open for a moment so the user can see the status
+      setTimeout(() => {
+        handleClose();
+      }, 1500);
     } else if (error && error.name !== 'NotFoundException' && error.name !== 'NotFoundException2') {
-      console.error("Barcode scanning error:", error);
+      console.error("[Scanner] Barcode scanning error:", error);
+      setScanResult("error");
       handleCameraError(error);
     }
   };
@@ -189,12 +285,22 @@ const BarcodeScannerButton = ({
     setTorchEnabled(false);
     setIsProcessingScan(false);
     setCameraError(null);
+    setScanStatus("Waiting for barcode...");
+    setScanAttempts(0);
+    setDetectedBarcode(null);
+    setScanResult("none");
+    
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
   };
 
   const toggleTorch = async () => {
+    setTorchEnabled(!torchEnabled);
     toast({ 
-      title: "Torch Control", 
-      description: "Torch control is not available with the current scanner.", 
+      title: "Torch " + (!torchEnabled ? "Enabled" : "Disabled"), 
+      description: "Camera light has been " + (!torchEnabled ? "turned on" : "turned off"), 
       variant: "default" 
     });
   };
@@ -213,6 +319,8 @@ const BarcodeScannerButton = ({
     setCameraActive(false);
     setIsProcessingScan(false);
     setCameraError(null);
+    setScanStatus("Waiting for barcode...");
+    setScanAttempts(0);
   };
 
   // Don't render if neither callback is provided
@@ -244,6 +352,15 @@ const BarcodeScannerButton = ({
                 Scan Product Barcode
               </div>
               <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-8 w-8" 
+                  onClick={toggleTorch}
+                  aria-label="Toggle flashlight"
+                >
+                  <Camera className="h-4 w-4" />
+                </Button>
                 <Button 
                   variant="outline" 
                   size="icon" 
@@ -283,6 +400,7 @@ const BarcodeScannerButton = ({
                     height={"100%"}
                     onUpdate={handleScanResult}
                     torch={torchEnabled}
+                    // The scanRate prop is not supported, so we'll use the default scanning rate
                     onError={(error) => {
                       console.error("BarcodeScannerComponent error:", error);
                       handleCameraError(error);
@@ -294,13 +412,36 @@ const BarcodeScannerButton = ({
                     Starting camera...
                   </div>
                 )}
+                {/* Add scanning animation overlay */}
+                {cameraActive && !cameraError && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 opacity-70 animate-pulse"></div>
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 border-2 border-white/30 rounded-lg"></div>
+                  </div>
+                )}
               </div>
             )}
           </div>
           
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            Position barcode within the frame. Hold the camera steady.
-          </p>
+          <div className={`mt-4 p-3 rounded-md text-sm ${
+            scanResult === "none" ? "bg-gray-100 dark:bg-gray-800" : 
+            scanResult === "detected" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" :
+            scanResult === "not_in_db" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300" :
+            "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+          }`}>
+            <div className="flex items-center gap-2 mb-1">
+              {scanResult === "none" && <AlertCircle className="h-4 w-4" />}
+              {scanResult === "detected" && <CheckCircle2 className="h-4 w-4" />}
+              {scanResult === "not_in_db" && <AlertCircle className="h-4 w-4" />}
+              {scanResult === "error" && <XCircle className="h-4 w-4" />}
+              <p className="font-medium">{scanStatus}</p>
+            </div>
+            {detectedBarcode && (
+              <div className="text-xs mt-1 font-mono bg-black/10 dark:bg-white/10 p-1 rounded">
+                UPC: {detectedBarcode}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>

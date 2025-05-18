@@ -28,6 +28,7 @@ import ItemSplitSelector from "./ItemSplitSelector";
 import CostSplitSummary from "./CostSplitSummary";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BarcodeScannerButton from "./BarcodeScannerButton";
+import BarcodeItemAdder from "./BarcodeItemAdder";
 import { findProductByBarcode, Product } from "@/services/ProductService";
 import BarcodeProductSaveDialog from "./BarcodeProductSaveDialog";
 import { detectDuplicateOrSimilar, ItemSuggestion } from "@/services/DuplicateDetectionService";
@@ -621,6 +622,14 @@ const TripDetailModal = ({
                           />
                         </div>
                       </div>
+                    </div>
+                    
+                    {/* Add improved barcode scanner with product lookup */}
+                    <div className="mb-3">
+                      <BarcodeItemAdder
+                        tripId={trip.id}
+                        onAddItem={onAddItem}
+                      />
                     </div>
                     
                     {/* Quantity and Price Row */}

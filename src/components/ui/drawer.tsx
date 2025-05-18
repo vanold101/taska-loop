@@ -41,13 +41,15 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-[85vh] flex-col rounded-t-[10px] border bg-background overflow-hidden",
         className
       )}
       {...props}
     >
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
-      {children}
+      <div className="flex-1 overflow-auto">
+        {children}
+      </div>
     </DrawerPrimitive.Content>
   </DrawerPortal>
 ))
@@ -69,7 +71,7 @@ const DrawerFooter = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+    className={cn("flex flex-col gap-2 p-4 border-t", className)}
     {...props}
   />
 )
