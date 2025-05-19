@@ -10,52 +10,49 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { X } from "lucide-react";
 
-interface BarcodeItemAdderProps {
-  tripId: string;
-  onAddItem: (tripId: string, item: Omit<TripItem, 'id'>) => void;
+interface PantryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  expiry: string;
+  category: string;
+  lowStock: boolean;
 }
 
-// Import TripItem interface from TripDetailModal instead of redefining it
-import { TripItem } from "./TripDetailModal";
+interface PantryBarcodeAdderProps {
+  onAddPantryItem: (item: PantryItem) => void;
+}
 
-const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
+const PantryBarcodeAdder = ({ onAddPantryItem }: PantryBarcodeAdderProps) => {
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<ScannedItem | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [price, setPrice] = useState<string>("");
-  const [unit, setUnit] = useState<string>("ea");
-  const [category, setCategory] = useState<string>("other");
+  const [expiry, setExpiry] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [category, setCategory] = useState<string>('Pantry');
   const { toast } = useToast();
 
   const handleBarcodeScan = (item: ScannedItem) => {
     setScannedProduct(item);
     setIsProductDrawerOpen(true);
     setQuantity(1);
-    setPrice("");
-    setUnit(item.quantity || "ea");
-    setCategory(item.category || "other");
+    setExpiry(new Date().toISOString().split('T')[0]);
+    setCategory('Pantry');
   };
 
-  const handleAddToTrip = () => {
-    if (!scannedProduct || !tripId) return;
-    const newItem: Omit<TripItem, 'id'> = {
+  const handleAddToPantry = () => {
+    if (!scannedProduct) return;
+    const newItem: PantryItem = {
+      id: Date.now().toString(),
       name: scannedProduct.name || scannedProduct.upc,
-      quantity: quantity,
-      price: price ? parseFloat(price) : undefined,
-      unit: unit,
-      category: category,
-      checked: false,
-      addedBy: {
-        name: "You",
-        avatar: "https://example.com/you.jpg"
-      },
-      isRecurring: false,
-      recurrenceFrequency: null
+      quantity,
+      expiry,
+      category,
+      lowStock: quantity <= 1
     };
-    onAddItem(tripId, newItem);
+    onAddPantryItem(newItem);
     toast({
       title: "Item Added",
-      description: `${newItem.name} has been added to your trip.`,
+      description: `${newItem.name} has been added to your pantry.`,
     });
     resetForm();
   };
@@ -63,9 +60,8 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
   const resetForm = () => {
     setScannedProduct(null);
     setQuantity(1);
-    setPrice("");
-    setUnit("ea");
-    setCategory("other");
+    setExpiry(new Date().toISOString().split('T')[0]);
+    setCategory('Pantry');
     setIsProductDrawerOpen(false);
   };
 
@@ -73,17 +69,16 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
     <>
       <BarcodeScannerButton
         onItemScanned={handleBarcodeScan}
-        buttonText="Scan & Add Item"
+        buttonText="Scan & Add to Pantry"
         buttonVariant="default"
         buttonSize="default"
         className="w-full mb-2"
-        tripId={tripId}
       />
       <Drawer open={isProductDrawerOpen} onOpenChange={setIsProductDrawerOpen}>
         <DrawerContent className="max-h-[90vh] overflow-hidden">
           <DrawerHeader className="px-4 py-3 sm:px-6">
             <DrawerTitle className="flex items-center justify-between">
-              <span>Add Scanned Product</span>
+              <span>Add Scanned Product to Pantry</span>
               <Button
                 variant="outline"
                 size="icon"
@@ -94,7 +89,7 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
               </Button>
             </DrawerTitle>
             <DrawerDescription>
-              Review and add the scanned product to your trip
+              Review and add the scanned product to your pantry
             </DrawerDescription>
           </DrawerHeader>
           {scannedProduct && (
@@ -105,15 +100,6 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
                   <CardTitle className="text-base">Item Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 py-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      type="text"
-                      value={scannedProduct.name || scannedProduct.upc}
-                      onChange={e => setScannedProduct({ ...scannedProduct, name: e.target.value })}
-                    />
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="quantity">Quantity</Label>
                     <div className="flex items-center space-x-2">
@@ -144,24 +130,12 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="price">Price (optional)</Label>
+                    <Label htmlFor="expiry">Expiry Date</Label>
                     <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unit">Unit</Label>
-                    <Input
-                      id="unit"
-                      type="text"
-                      value={unit}
-                      onChange={e => setUnit(e.target.value)}
-                      placeholder="ea, pack, bottle, etc."
+                      id="expiry"
+                      type="date"
+                      value={expiry}
+                      onChange={(e) => setExpiry(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -170,7 +144,7 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
                       id="category"
                       type="text"
                       value={category}
-                      onChange={e => setCategory(e.target.value)}
+                      onChange={(e) => setCategory(e.target.value)}
                       placeholder="Pantry, Dairy, Produce, etc."
                     />
                   </div>
@@ -185,9 +159,9 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
                   </Button>
                   <Button
                     className="w-full"
-                    onClick={handleAddToTrip}
+                    onClick={handleAddToPantry}
                   >
-                    Add to Trip
+                    Add to Pantry
                   </Button>
                 </CardFooter>
               </Card>
@@ -204,4 +178,4 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
   );
 };
 
-export default BarcodeItemAdder; 
+export default PantryBarcodeAdder; 

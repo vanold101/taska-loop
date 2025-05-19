@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PriceComparison from "@/components/PriceComparison";
 import { GroceryStore } from "@/services/priceService";
+import PantryBarcodeAdder from "@/components/PantryBarcodeAdder";
 
 // Define the PantryItem type
 interface PantryItem {
@@ -332,6 +333,11 @@ const PantryPage = () => {
         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">My Pantry</h1>
       </header>
       
+      {/* Barcode Scanner Button for Pantry */}
+      <div className="mb-4">
+        <PantryBarcodeAdder onAddPantryItem={(item) => setPantryItems([...pantryItems, item])} />
+      </div>
+
       <div className="mb-4 relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-gloop-text-muted" />
         <Input

@@ -37,7 +37,7 @@ const ComingSoonFeature: React.FC<ComingSoonFeatureProps> = ({
       {/* Badge */}
       <div className="coming-soon-badge">Coming Soon</div>
     </div>
-  );
+  ); 
 };
 
 export default ComingSoonFeature;

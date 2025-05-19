@@ -29,7 +29,7 @@ import ItemSplitSelector from "./ItemSplitSelector";
 import CostSplitSummary from "./CostSplitSummary";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BarcodeScannerButton from "./BarcodeScannerButton";
-import BarcodeItemAdder from "./BarcodeItemAdder";
+import TripBarcodeAdder from "./TripBarcodeAdder";
 import { findProductByBarcode, Product } from "@/services/ProductService";
 import BarcodeProductSaveDialog from "./BarcodeProductSaveDialog";
 import { detectDuplicateOrSimilar, ItemSuggestion } from "@/services/DuplicateDetectionService";
@@ -549,7 +549,17 @@ const TripDetailModal = ({
                   
                   {/* Barcode Scanner Button */}
                   <div className="pt-6">
-                    <BarcodeScannerButton onScan={handleBarcodeScan} />
+                    {trip && (
+                      <TripBarcodeAdder
+                        tripId={trip.id}
+                        onAddItem={onAddItem}
+                        buttonSize="icon"
+                        buttonVariant="ghost"
+                        buttonText=""
+                        iconOnly={true}
+                        className="h-10 w-10"
+                      />
+                    )}
                   </div>
                   
                   {/* Receipt Scanner Button */}

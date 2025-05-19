@@ -10,15 +10,28 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { X } from "lucide-react";
 
-interface BarcodeItemAdderProps {
-  tripId: string;
-  onAddItem: (tripId: string, item: Omit<TripItem, 'id'>) => void;
-}
-
-// Import TripItem interface from TripDetailModal instead of redefining it
+// Import TripItem interface from TripDetailModal
 import { TripItem } from "./TripDetailModal";
 
-const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
+interface TripBarcodeAdderProps {
+  tripId: string;
+  onAddItem: (tripId: string, item: Omit<TripItem, 'id'>) => void;
+  buttonText?: string;
+  buttonVariant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  buttonSize?: "default" | "sm" | "lg" | "icon";
+  className?: string;
+  iconOnly?: boolean;
+}
+
+const TripBarcodeAdder = ({ 
+  tripId, 
+  onAddItem,
+  buttonText = "Scan & Add Item",
+  buttonVariant = "default",
+  buttonSize = "default",
+  className = "w-full mb-2",
+  iconOnly = false
+}: TripBarcodeAdderProps) => {
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<ScannedItem | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -38,6 +51,7 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
 
   const handleAddToTrip = () => {
     if (!scannedProduct || !tripId) return;
+    
     const newItem: Omit<TripItem, 'id'> = {
       name: scannedProduct.name || scannedProduct.upc,
       quantity: quantity,
@@ -46,12 +60,13 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
       category: category,
       checked: false,
       addedBy: {
-        name: "You",
+        name: "You", 
         avatar: "https://example.com/you.jpg"
       },
       isRecurring: false,
       recurrenceFrequency: null
     };
+    
     onAddItem(tripId, newItem);
     toast({
       title: "Item Added",
@@ -73,17 +88,17 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
     <>
       <BarcodeScannerButton
         onItemScanned={handleBarcodeScan}
-        buttonText="Scan & Add Item"
-        buttonVariant="default"
-        buttonSize="default"
-        className="w-full mb-2"
+        buttonText={iconOnly ? "" : buttonText}
+        buttonVariant={buttonVariant}
+        buttonSize={buttonSize}
+        className={className}
         tripId={tripId}
       />
       <Drawer open={isProductDrawerOpen} onOpenChange={setIsProductDrawerOpen}>
         <DrawerContent className="max-h-[90vh] overflow-hidden">
           <DrawerHeader className="px-4 py-3 sm:px-6">
             <DrawerTitle className="flex items-center justify-between">
-              <span>Add Scanned Product</span>
+              <span>Add Scanned Product to Trip</span>
               <Button
                 variant="outline"
                 size="icon"
@@ -94,7 +109,7 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
               </Button>
             </DrawerTitle>
             <DrawerDescription>
-              Review and add the scanned product to your trip
+              Review and add the scanned product to your shopping trip
             </DrawerDescription>
           </DrawerHeader>
           {scannedProduct && (
@@ -171,7 +186,7 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
                       type="text"
                       value={category}
                       onChange={e => setCategory(e.target.value)}
-                      placeholder="Pantry, Dairy, Produce, etc."
+                      placeholder="Produce, Dairy, Pantry, etc."
                     />
                   </div>
                 </CardContent>
@@ -204,4 +219,4 @@ const BarcodeItemAdder = ({ tripId, onAddItem }: BarcodeItemAdderProps) => {
   );
 };
 
-export default BarcodeItemAdder; 
+export default TripBarcodeAdder; 

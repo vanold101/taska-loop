@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import CreateTripModal from "@/components/CreateTripModal";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Clock, CheckCircle, Store, ShoppingCart, Map, Calendar, Settings, X, Sparkles } from "lucide-react";
+import { Search, Filter, Clock, CheckCircle, Store, ShoppingCart, Map, Calendar, Settings, X, Sparkles, ScanLine } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import QuickTripButton from "@/components/QuickTripButton";
@@ -23,6 +23,7 @@ import { calculateSplitAmounts, loadSplitConfig } from "@/services/CostSplitServ
 import ExportButton from "@/components/ExportButton";
 import SmartListParser from "@/components/SmartListParser";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import TripBarcodeAdder from "@/components/TripBarcodeAdder";
 
 // New component for trip selection dialog
 const TripSelectDialog = ({ 

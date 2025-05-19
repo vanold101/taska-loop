@@ -234,108 +234,105 @@ const TripCard = ({
               </div>
             </div>
             
-            <div className="flex flex-col items-end gap-2">
-              <StatusBadge variant={getStatusVariant()} className="capitalize">
-                {status}
-              </StatusBadge>
-            </div>
-          </div>
-          
-          {/* Combined action row with primary and secondary actions */}
-          <div className="flex items-center justify-between mt-4">
-            {/* Primary action - View trip items */}
-            <div 
-              className="flex items-center bg-gloop-accent dark:bg-gloop-dark-accent px-3 py-1.5 rounded-full cursor-pointer hover:bg-gloop-accent/80 transition-colors min-h-[40px]"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onTripClick) onTripClick();
-              }}
-              aria-label="View trip items"
-            >
-              <ShoppingCart className="h-4 w-4 mr-2 text-gloop-primary" />
-              <span className="text-[clamp(0.75rem,1.8vw,0.875rem)] font-medium">{itemCount ?? 0} items</span>
-              <ChevronRight className="h-4 w-4 ml-1 text-gloop-primary" />
-            </div>
-            
-            {/* Secondary actions menu - as a toggle instead of always visible */}
-            <div className="flex items-center gap-2">
-              {/* Show these buttons inline for larger screens or when actions menu is toggled */}
-              {(isActionsVisible || showActions) && (
-                <>
-                  {status !== 'completed' && status !== 'cancelled' && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onAddItem) onAddItem({
-                          name: "New Item",
-                          quantity: 1,
-                          addedBy: {
-                            name: "You",
-                            avatar: "https://example.com/avatar.jpg"
-                          },
-                          checked: false
-                        });
-                      }}
-                      aria-label="Add item"
-                    >
-                      <Plus className="h-5 w-5 text-gloop-primary" />
-                    </motion.button>
-                  )}
-                  
-                  {status !== 'completed' && status !== 'cancelled' && onEditTrip && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1, transition: { delay: 0.05 } }}
-                      className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onEditTrip) onEditTrip();
-                      }}
-                      aria-label="Edit trip"
-                    >
-                      <Edit className="h-5 w-5 text-gloop-primary" />
-                    </motion.button>
-                  )}
-                  
-                  {onShareTrip && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1, transition: { delay: 0.1 } }}
-                      className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onShareTrip) onShareTrip();
-                      }}
-                      aria-label="Share trip"
-                    >
-                      <Share2 className="h-5 w-5 text-gloop-primary" />
-                    </motion.button>
-                  )}
-                </>
-              )}
-              
-              {/* Toggle button for actions menu */}
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent hover:bg-gloop-accent/80 dark:bg-gloop-dark-accent dark:hover:bg-gloop-dark-accent/80"
-                onClick={toggleActions}
-                aria-label={showActions ? "Hide actions" : "Show actions"}
+            {/* Combined action row with primary and secondary actions */}
+            <div className="flex items-center justify-between mt-4">
+              {/* Primary action - View trip items */}
+              <div 
+                className="flex items-center bg-gloop-accent dark:bg-gloop-dark-accent px-3 py-1.5 rounded-full cursor-pointer hover:bg-gloop-accent/80 transition-colors min-h-[40px]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onTripClick) onTripClick();
+                }}
+                aria-label="View trip items"
               >
-                {showActions ? (
-                  <X className="h-5 w-5 text-gloop-primary" />
-                ) : (
-                  <motion.span 
-                    animate={{ rotate: showActions ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="text-xs font-medium"
-                  >
-                    <Info className="h-5 w-5 text-gloop-primary" />
-                  </motion.span>
+                <ShoppingCart className="h-4 w-4 mr-2 text-gloop-primary" />
+                <span className="text-[clamp(0.75rem,1.8vw,0.875rem)] font-medium">{itemCount ?? 0} items</span>
+                <ChevronRight className="h-4 w-4 ml-1 text-gloop-primary" />
+              </div>
+              
+              {/* Secondary actions menu - as a toggle instead of always visible */}
+              <div className="flex items-center gap-2">
+                {/* Show these buttons inline for larger screens or when actions menu is toggled */}
+                {(isActionsVisible || showActions) && (
+                  <>
+                    {status !== 'completed' && status !== 'cancelled' && (
+                      <>
+                        {/* Keep Manual Add Button */}
+                        <motion.button
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onAddItem) onAddItem({
+                              name: "New Item",
+                              quantity: 1,
+                              addedBy: {
+                                name: "You",
+                                avatar: "https://example.com/avatar.jpg"
+                              },
+                              checked: false
+                            });
+                          }}
+                          aria-label="Add item"
+                        >
+                          <Plus className="h-5 w-5 text-gloop-primary" />
+                        </motion.button>
+                      </>
+                    )}
+                    
+                    {status !== 'completed' && status !== 'cancelled' && onEditTrip && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1, transition: { delay: 0.05 } }}
+                        className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onEditTrip) onEditTrip();
+                        }}
+                        aria-label="Edit trip"
+                      >
+                        <Edit className="h-5 w-5 text-gloop-primary" />
+                      </motion.button>
+                    )}
+                    
+                    {onShareTrip && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1, transition: { delay: 0.1 } }}
+                        className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onShareTrip) onShareTrip();
+                        }}
+                        aria-label="Share trip"
+                      >
+                        <Share2 className="h-5 w-5 text-gloop-primary" />
+                      </motion.button>
+                    )}
+                  </>
                 )}
-              </motion.button>
+                
+                {/* Toggle button for actions menu */}
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent hover:bg-gloop-accent/80 dark:bg-gloop-dark-accent dark:hover:bg-gloop-dark-accent/80"
+                  onClick={toggleActions}
+                  aria-label={showActions ? "Hide actions" : "Show actions"}
+                >
+                  {showActions ? (
+                    <X className="h-5 w-5 text-gloop-primary" />
+                  ) : (
+                    <motion.span 
+                      animate={{ rotate: showActions ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-xs font-medium"
+                    >
+                      <Info className="h-5 w-5 text-gloop-primary" />
+                    </motion.span>
+                  )}
+                </motion.button>
+              </div>
             </div>
           </div>
         </div>

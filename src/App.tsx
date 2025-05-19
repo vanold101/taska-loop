@@ -20,7 +20,10 @@ import LedgerPage from "./pages/Ledger";
 import NotFound from "./pages/NotFound";
 import DashboardPage from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
+import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 
 const App = () => {
   // Apply theme preferences with light mode as default
@@ -56,6 +59,14 @@ const App = () => {
                     {/* Public routes */}
                     <Route path="/" element={<Landing />} />
                     <Route path="/login" element={<LoginPage />} />
+                    
+                    {/* Admin routes */}
+                    <Route path="/admin/login" element={<AdminLoginPage />} />
+                    <Route path="/admin/dashboard" element={
+                      <AdminRoute>
+                        <AdminDashboardPage />
+                      </AdminRoute>
+                    } />
                     
                     {/* Protected routes */}
                     <Route path="/home" element={
