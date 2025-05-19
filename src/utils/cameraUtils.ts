@@ -18,8 +18,29 @@ export interface CameraConstraints {
 }
 
 /**
+ * Check if we have camera permissions
+ * @returns Promise with boolean indicating if we have permission
+ */
+export const hasCameraPermission = async (): Promise<boolean> => {
+  try {
+    // Only available in secure contexts (HTTPS)
+    if (navigator.permissions && navigator.permissions.query) {
+      const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      return result.state === 'granted';
+    }
+    
+    // Fallback for browsers that don't support permissions API
+    return false;
+  } catch (error) {
+    console.warn("Could not check camera permissions:", error);
+    return false;
+  }
+};
+
+/**
  * Safely accesses the camera with proper error handling
  * @param constraints - Camera constraints
+ * @param timeoutMs - Maximum time to wait for camera initialization
  * @returns Promise with MediaStream or detailed error
  */
 export const requestCameraAccess = async (
@@ -27,7 +48,8 @@ export const requestCameraAccess = async (
     facingMode: 'environment', 
     width: { ideal: 1280 },
     height: { ideal: 720 }
-  }
+  },
+  timeoutMs = 10000
 ): Promise<{ stream: MediaStream | null; error: string | null }> => {
   try {
     // First check if camera is supported
@@ -38,47 +60,59 @@ export const requestCameraAccess = async (
       };
     }
 
-    // Try to enumerate devices to check if there's a camera
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cameras = devices.filter(device => device.kind === 'videoinput');
+    // Check for existing permissions
+    const hasPermission = await hasCameraPermission();
+    console.log(`Camera permission status: ${hasPermission ? 'granted' : 'not granted'}`);
+
+    // Create a camera access promise with timeout
+    const cameraPromise = (async () => {
+      // Prepare constraints with provided options
+      const videoConstraints: MediaTrackConstraints = {
+        // On mobile, specifically request the back camera
+        facingMode: {
+          exact: constraints.facingMode || 'environment'
+        }
+      };
       
-      if (cameras.length === 0) {
-        return {
-          stream: null,
-          error: "No camera detected on your device."
-        };
+      if (constraints.width) {
+        videoConstraints.width = constraints.width;
       }
-    } catch (enumError) {
-      console.warn("Could not enumerate devices:", enumError);
-      // Continue anyway, as some browsers might not allow enumeration without permission
-    }
+      
+      if (constraints.height) {
+        videoConstraints.height = constraints.height;
+      }
+      
+      if (constraints.frameRate) {
+        videoConstraints.frameRate = constraints.frameRate;
+      }
 
-    // Prepare constraints with provided options
-    const videoConstraints: MediaTrackConstraints = {};
-    
-    if (constraints.facingMode) {
-      videoConstraints.facingMode = constraints.facingMode;
-    }
-    
-    if (constraints.width) {
-      videoConstraints.width = constraints.width;
-    }
-    
-    if (constraints.height) {
-      videoConstraints.height = constraints.height;
-    }
-    
-    if (constraints.frameRate) {
-      videoConstraints.frameRate = constraints.frameRate;
-    }
+      // For mobile devices, try with ideal constraints first
+      try {
+        console.log("Attempting to access camera with constraints:", videoConstraints);
+        
+        // Request camera access with appropriate constraints
+        return await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+          audio: false
+        });
+      } catch (constraintError) {
+        console.warn("Failed with exact constraints, trying with more flexible settings:", constraintError);
+        
+        // If that fails, try with more basic constraints (especially for mobile)
+        return await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false
+        });
+      }
+    })();
 
-    // Request camera access with appropriate constraints
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: videoConstraints,
-      audio: false
+    // Create a timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Camera access timeout")), timeoutMs);
     });
 
+    // Race the camera access against the timeout
+    const stream = await Promise.race([cameraPromise, timeoutPromise]) as MediaStream;
     return { stream, error: null };
 
   } catch (error: any) {
@@ -86,6 +120,7 @@ export const requestCameraAccess = async (
 
     // Prepare detailed error message based on error type
     let errorMessage = "Failed to access camera";
+    const errorDetails = error.message || error.name || String(error);
     
     switch (error.name) {
       case "NotAllowedError":
@@ -94,7 +129,7 @@ export const requestCameraAccess = async (
         break;
         
       case "NotFoundError":
-        errorMessage = "No camera found or the camera is not accessible.";
+        errorMessage = "No camera found on your device.";
         break;
         
       case "NotReadableError":
@@ -107,19 +142,63 @@ export const requestCameraAccess = async (
         break;
         
       case "OverconstrainedError":
-        errorMessage = "Could not find a camera that meets the required constraints. Try using different settings.";
+        errorMessage = "Could not access the camera with the requested settings. Try using different settings.";
         break;
         
       case "TypeError":
-        errorMessage = "The camera constraints were invalid. This is a development issue.";
+        errorMessage = "Invalid camera constraints. Please try again with different settings.";
         break;
         
       default:
-        errorMessage = `Camera error: ${error.message || "Unknown error"}`;
+        if (error.message === "Camera access timeout") {
+          errorMessage = "Camera access timed out. This often happens on mobile devices. Please try again or check your device settings.";
+        } else {
+          errorMessage = `Camera error: ${errorDetails}`;
+        }
     }
+    
+    // Log detailed error information to help with debugging
+    console.error(`Camera error details - Name: ${error.name}, Message: ${error.message}`);
     
     return { stream: null, error: errorMessage };
   }
+};
+
+/**
+ * Retry camera access with different constraints
+ * @param retries - Number of retry attempts
+ * @returns Promise with MediaStream or error
+ */
+export const retryWithDifferentConstraints = async (retries = 3): Promise<{ stream: MediaStream | null; error: string | null }> => {
+  const constraints: CameraConstraints[] = [
+    // First try: Standard environment-facing camera with HD resolution
+    { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+    
+    // Second try: Environment-facing camera with lower resolution
+    { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+    
+    // Last try: Any camera with minimal constraints
+    { facingMode: 'environment' }
+  ];
+  
+  let lastError = null;
+  
+  for (let i = 0; i < Math.min(retries, constraints.length); i++) {
+    try {
+      console.log(`Camera access attempt ${i+1}/${retries} with constraints:`, constraints[i]);
+      const result = await requestCameraAccess(constraints[i]);
+      if (result.stream) {
+        return result;
+      }
+      lastError = result.error;
+      console.warn(`Attempt ${i+1} failed: ${lastError}`);
+    } catch (error) {
+      lastError = `Unexpected error: ${error}`;
+      console.error(`Attempt ${i+1} error:`, error);
+    }
+  }
+  
+  return { stream: null, error: `Failed after ${retries} attempts. ${lastError}` };
 };
 
 /**

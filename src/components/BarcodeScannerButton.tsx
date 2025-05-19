@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScanLine, Camera, X, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ScanLine, Camera, X, CheckCircle2, AlertCircle, XCircle, Plus } from "lucide-react";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 import { useToast } from "@/hooks/use-toast";
-import { isCameraSupported as checkCameraSupport, requestCameraAccess, stopMediaStream } from "@/utils/cameraUtils";
+import { isCameraSupported as checkCameraSupport, requestCameraAccess, stopMediaStream, retryWithDifferentConstraints, toggleTorch as toggleTorchUtil } from "@/utils/cameraUtils";
 import { fetchProductFromOpenFoodFacts } from "@/services/OpenFoodFactsService";
 import { fetchWithProxy } from "@/services/ProxyService";
 
@@ -101,6 +102,10 @@ const BarcodeScannerButton = ({
   const [scanResult, setScanResult] = useState<"none" | "detected" | "not_in_db" | "error">("none");
   const [lastScanTime, setLastScanTime] = useState<number>(0);
   const [scanAttempts, setScanAttempts] = useState<number>(0);
+  const [manualBarcodeInput, setManualBarcodeInput] = useState<string>("");
+  const [showManualInput, setShowManualInput] = useState<boolean>(false);
+  const [isCameraInitializing, setIsCameraInitializing] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState<number>(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,6 +128,48 @@ const BarcodeScannerButton = ({
   useEffect(() => {
     if (isOpen && !cameraActive) {
       const timer = setTimeout(() => {
+        initializeCamera();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        if (scanIntervalRef.current) {
+          clearInterval(scanIntervalRef.current);
+        }
+      };
+    } else if (!isOpen && cameraActive) {
+      setCameraActive(false);
+      setTorchEnabled(false);
+      setScanAttempts(0);
+      setCameraError(null);
+      
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+      }
+    }
+  }, [isOpen]);
+
+  // Initialize camera with retry attempts
+  const initializeCamera = async () => {
+    if (isCameraInitializing) return;
+    
+    try {
+      setIsCameraInitializing(true);
+      setCameraError(null);
+      setScanStatus("Initializing camera...");
+      
+      // Use the retry mechanism for more reliable camera access
+      const { stream, error } = await retryWithDifferentConstraints();
+      
+      if (error) {
+        console.error("Camera initialization failed:", error);
+        setCameraError(error);
+        setScanStatus("Camera access failed");
+        setCameraActive(false);
+        return;
+      }
+      
+      if (stream) {
         setCameraActive(true);
         setScanStatus("Waiting for barcode...");
         
@@ -141,24 +188,15 @@ const BarcodeScannerButton = ({
             return newValue;
           });
         }, 2000); // Check every 2 seconds
-      }, 100);
-      
-      return () => {
-        clearTimeout(timer);
-        if (scanIntervalRef.current) {
-          clearInterval(scanIntervalRef.current);
-        }
-      };
-    } else if (!isOpen && cameraActive) {
-      setCameraActive(false);
-      setTorchEnabled(false);
-      setScanAttempts(0);
-      
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
       }
+    } catch (err) {
+      console.error("Error initializing camera:", err);
+      setCameraError(`Error accessing camera: ${err}`);
+      setScanStatus("Camera initialization failed");
+    } finally {
+      setIsCameraInitializing(false);
     }
-  }, [isOpen]);
+  };
 
   const handleScanResult = async (error: any, result: any) => {
     if (isProcessingScan) return;
@@ -195,252 +233,363 @@ const BarcodeScannerButton = ({
 
       // Use Open Food Facts API to look up the product
       if (onItemScanned) {
-        console.log(`[Scanner] Looking up product details for UPC: ${scannedCode}`);
+        processScannedBarcode(scannedCode);
+      }
+    }
+  };
+
+  // Separate function to process a barcode (can be called from manual input too)
+  const processScannedBarcode = async (barcode: string) => {
+    if (!barcode || barcode.trim() === '') return;
+    
+    setIsProcessingScan(true);
+    setScanStatus("Processing barcode...");
+    
+    try {
+      console.log(`[Scanner] Looking up product details for UPC: ${barcode}`);
+      
+      // Try Open Food Facts API first
+      let productInfo = await fetchProductFromOpenFoodFacts(barcode);
+      
+      if (productInfo && Object.keys(productInfo).length > 0) {
+        // We found the product in Open Food Facts
+        console.log(`[Scanner] Found product in Open Food Facts: ${productInfo.name || 'Unknown'}`);
         
-        // Try Open Food Facts API first
-        console.log(`[Scanner] Attempting Open Food Facts API lookup`);
-        const productDetails = await fetchProductFromOpenFoodFacts(scannedCode);
+        onItemScanned?.({
+          upc: barcode,
+          ...productInfo
+        });
         
-        if (productDetails) {
-          // Open Food Facts found the product
-          console.log(`[Scanner] Product found in Open Food Facts:`, productDetails);
-          setScanStatus("Product found in database!");
-          setScanResult("detected");
-          onItemScanned({ upc: scannedCode, ...productDetails });
-          toast({
-            title: "Product Found",
-            description: `${productDetails.name || 'Product'} details fetched from Open Food Facts.`,
-          });
-        } else {
-          // Fall back to UPCItemDB if Open Food Facts failed
-          console.log(`[Scanner] Open Food Facts lookup failed, trying UPCItemDB`);
-          const itemDetails = await fetchFromUPCItemDB(scannedCode);
-          
-          if (itemDetails) {
-            console.log(`[Scanner] Product found in UPCItemDB:`, itemDetails);
-            setScanStatus("Product found in alternate database!");
-            setScanResult("detected");
-            onItemScanned({ upc: scannedCode, ...itemDetails });
-            toast({
-              title: "Item Found",
-              description: `${itemDetails.name || 'Product'} details fetched from alternate source.`,
-            });
-          } else {
-            // No data found from either API
-            console.log(`[Scanner] Product not found in any database for UPC: ${scannedCode}`);
-            setScanStatus("Barcode detected but not in database");
-            setScanResult("not_in_db");
-            onItemScanned({ upc: scannedCode });
-            toast({
-              title: "Details Not Found",
-              description: `Could not find details for barcode: ${scannedCode}. You can add it manually.`,
-              variant: "default" 
-            });
-          }
-        }
+        toast({
+          title: "Product Found",
+          description: `Found: ${productInfo.name || barcode} in Open Food Facts database.`,
+        });
+        
+        handleClose();
+        return;
       }
       
-      // Keep the dialog open for a moment so the user can see the status
-      setTimeout(() => {
+      console.log(`[Scanner] Product not found in Open Food Facts, trying UPCItemDB...`);
+      
+      // Try UPC Item DB as fallback
+      const upcItemDbResult = await fetchFromUPCItemDB(barcode);
+      
+      if (upcItemDbResult) {
+        // Success with UPC Item DB
+        console.log(`[Scanner] Found product in UPCItemDB: ${upcItemDbResult.name || 'Unknown'}`);
+        
+        onItemScanned?.({
+          upc: barcode,
+          ...upcItemDbResult
+        });
+        
+        toast({
+          title: "Product Found",
+          description: `Found: ${upcItemDbResult.name || barcode} in UPCItemDB.`,
+        });
+        
         handleClose();
-      }, 1500);
-    } else if (error && error.name !== 'NotFoundException' && error.name !== 'NotFoundException2') {
-      console.error("[Scanner] Barcode scanning error:", error);
+        return;
+      }
+      
+      // No results found in either database
+      console.log(`[Scanner] Product not found in any database`);
+      setScanResult("not_in_db");
+      
+      // Still add the item, but just with UPC
+      onItemScanned?.({
+        upc: barcode,
+        name: `Item (${barcode})`,
+      });
+      
+      toast({
+        title: "Limited Information",
+        description: "Product not found in database. Added with barcode only.",
+        variant: "default",
+      });
+      
+      handleClose();
+      
+    } catch (lookupError) {
+      console.error("[Scanner] Error looking up product:", lookupError);
       setScanResult("error");
-      handleCameraError(error);
+      
+      // Still add the item with just the UPC
+      onItemScanned?.({
+        upc: barcode,
+        name: `Item (${barcode})`,
+      });
+      
+      toast({
+        title: "Error Looking Up Product",
+        description: "Added with barcode only. Network issue or database limitation.",
+        variant: "destructive",
+      });
+      
+      handleClose();
     }
   };
 
   const handleCameraError = (error: any) => {
-    console.error("Camera error:", error);
-    let errorMessage = "Failed to access camera";
+    console.error("Camera error in scanner component:", error);
     
-    if (error.name === "NotAllowedError") {
-      errorMessage = "Camera access denied. Please enable camera permissions in your browser settings and try again.";
-    } else if (error.name === "NotFoundError") {
-      errorMessage = "No camera found on your device.";
-    } else if (error.name === "NotReadableError") {
-      errorMessage = "Camera is already in use by another application or tab.";
-    } else if (error.name === "OverconstrainedError") {
-      errorMessage = "Could not find a suitable camera.";
-    } else if (error.name === "SecurityError") {
-      errorMessage = "Camera access is blocked by browser security settings.";
-    } else if (error.name === "StreamApiNotSupportedError" || !isCameraSupported) {
-      errorMessage = "Your browser doesn't support camera access. Try using a modern browser.";
-      setIsCameraSupported(false);
-    }
-
-    setCameraError(errorMessage);
+    // Don't close the dialog, but show a retry option
     setCameraActive(false);
+    setCameraError(error.toString());
+    setScanStatus("Camera access failed. You can try again or enter a barcode manually.");
+    
+    // Show manual input option automatically when camera fails
+    setShowManualInput(true);
+    
+    // Show error toast
     toast({
       title: "Camera Error",
-      description: errorMessage,
+      description: "Could not access camera. You can enter a barcode manually or retry.",
       variant: "destructive"
     });
   };
+  
+  // Handle retry button click
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    setCameraError(null);
+    initializeCamera();
+  };
 
   const handleClose = () => {
-    setIsOpen(false);
-    setCameraActive(false);
-    setTorchEnabled(false);
-    setIsProcessingScan(false);
-    setCameraError(null);
-    setScanStatus("Waiting for barcode...");
-    setScanAttempts(0);
-    setDetectedBarcode(null);
-    setScanResult("none");
+    // Clean up resources and reset state
+    if (videoRef.current?.srcObject) {
+      stopMediaStream(videoRef.current.srcObject as MediaStream);
+    }
     
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
     }
+    
+    setCameraActive(false);
+    setIsProcessingScan(false);
+    setScanResult("none");
+    setDetectedBarcode(null);
+    setScanAttempts(0);
+    setCameraError(null);
+    setShowManualInput(false);
+    setManualBarcodeInput("");
+    setIsOpen(false);
   };
 
+  // Toggle torch implementation
   const toggleTorch = async () => {
-    setTorchEnabled(!torchEnabled);
-    toast({ 
-      title: "Torch " + (!torchEnabled ? "Enabled" : "Disabled"), 
-      description: "Camera light has been " + (!torchEnabled ? "turned on" : "turned off"), 
-      variant: "default" 
-    });
+    if (!videoRef.current?.srcObject) return;
+    
+    const newTorchStatus = !torchEnabled;
+    const success = await toggleTorchUtil(videoRef.current.srcObject as MediaStream, newTorchStatus);
+    
+    if (success) {
+      setTorchEnabled(newTorchStatus);
+    } else {
+      toast({
+        title: "Torch Unavailable",
+        description: "Your device doesn't support flash/torch control.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleOpenScanner = async () => {
-    // First check if camera is supported at all
-    const cameraSupported = checkCameraSupport();
-    if (!cameraSupported) {
-      setIsCameraSupported(false);
-      setCameraError("Your browser doesn't support camera access. Try using a modern browser like Chrome, Firefox, or Safari.");
-      setIsOpen(true);
+    // Check if browser supports camera
+    const supported = checkCameraSupport();
+    setIsCameraSupported(supported);
+    
+    if (!supported) {
+      // Just show scanner dialog with manual input option if camera is not supported
+      setShowManualInput(true);
+      setCameraError("Your browser doesn't support camera access. Please enter the barcode manually.");
+    }
+    
+    // Open the scanner dialog
+    setIsOpen(true);
+  };
+  
+  // Handle manual barcode input
+  const handleManualBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (manualBarcodeInput.trim() === '') {
+      toast({
+        title: "Invalid Barcode",
+        description: "Please enter a valid barcode.",
+        variant: "destructive"
+      });
       return;
     }
     
-    setIsOpen(true);
-    setCameraActive(false);
-    setIsProcessingScan(false);
-    setCameraError(null);
-    setScanStatus("Waiting for barcode...");
-    setScanAttempts(0);
+    processScannedBarcode(manualBarcodeInput);
+  };
+  
+  // Toggle manual input visibility
+  const toggleManualInput = () => {
+    setShowManualInput(!showManualInput);
   };
 
-  // Don't render if neither callback is provided
-  if (!onItemScanned && !onScan) {
-    console.warn('BarcodeScannerButton: Either onItemScanned or onScan prop must be provided');
-    return null;
-  }
+  // Fix hasFlash detection function
+  useEffect(() => {
+    const checkFlashAvailability = async () => {
+      if (videoRef.current?.srcObject) {
+        try {
+          const videoTrack = (videoRef.current.srcObject as MediaStream).getVideoTracks()[0];
+          if (videoTrack) {
+            const capabilities = videoTrack.getCapabilities();
+            setHasFlash(capabilities.torch === true);
+          }
+        } catch (error) {
+          console.warn("Failed to check flash capabilities:", error);
+          setHasFlash(false);
+        }
+      }
+    };
+
+    if (cameraActive) {
+      checkFlashAvailability();
+    }
+  }, [cameraActive]);
 
   return (
     <>
       <Button 
-        variant={buttonVariant}
-        size={buttonSize}
-        className={`flex items-center gap-1 ${className}`}
-        onClick={handleOpenScanner}
+        variant={buttonVariant} 
+        size={buttonSize} 
+        onClick={handleOpenScanner} 
+        className={className}
+        aria-label={buttonText || "Scan Barcode"}
       >
+        {buttonText && <span className="mr-2">{buttonText}</span>}
         <ScanLine className="h-4 w-4" />
-        {buttonText}
       </Button>
-
-      <Dialog open={isOpen} onOpenChange={(openState) => {
-        if (!openState) handleClose();
-      }}>
-        <DialogContent className="sm:max-w-md p-4">
+      
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ScanLine className="h-4 w-4" />
-                Scan Product Barcode
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-8 w-8" 
-                  onClick={toggleTorch}
-                  aria-label="Toggle flashlight"
-                >
-                  <Camera className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-8 w-8" 
-                  onClick={handleClose}
-                  aria-label="Close scanner"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+            <DialogTitle className="text-center">
+              {cameraError ? 
+                "Camera Error" : 
+                detectedBarcode ? 
+                  "Barcode Detected!" : 
+                  "Scan Barcode"
+              }
             </DialogTitle>
           </DialogHeader>
-
-          <div className="relative overflow-hidden rounded-md mt-4">
-            {cameraError ? (
-              <div className="bg-red-50 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-300 rounded-md text-center">
-                <p className="font-medium mb-2">Camera Error</p>
-                <p className="text-sm mt-1 mb-3">{cameraError}</p>
-                {isCameraSupported && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => {
-                      setCameraError(null);
-                      setCameraActive(false);
-                      setTimeout(() => setCameraActive(true), 50);
-                    }}
-                  >
-                    Retry Camera
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="aspect-video bg-black relative rounded-md overflow-hidden">
-                {isOpen && cameraActive && isCameraSupported && (
-                  <BarcodeScannerComponent
-                    width={"100%"}
-                    height={"100%"}
-                    onUpdate={handleScanResult}
-                    torch={torchEnabled}
-                    // The scanRate prop is not supported, so we'll use the default scanning rate
-                    onError={(error) => {
-                      console.error("BarcodeScannerComponent error:", error);
-                      handleCameraError(error);
-                    }}
-                  />
-                )}
-                {!cameraActive && isOpen && !cameraError && isCameraSupported && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black text-white">
-                    Starting camera...
-                  </div>
-                )}
-                {/* Add scanning animation overlay */}
-                {cameraActive && !cameraError && (
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500 opacity-70 animate-pulse"></div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 border-2 border-white/30 rounded-lg"></div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
           
-          <div className={`mt-4 p-3 rounded-md text-sm ${
-            scanResult === "none" ? "bg-gray-100 dark:bg-gray-800" : 
-            scanResult === "detected" ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" :
-            scanResult === "not_in_db" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300" :
-            "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
-          }`}>
-            <div className="flex items-center gap-2 mb-1">
-              {scanResult === "none" && <AlertCircle className="h-4 w-4" />}
-              {scanResult === "detected" && <CheckCircle2 className="h-4 w-4" />}
-              {scanResult === "not_in_db" && <AlertCircle className="h-4 w-4" />}
-              {scanResult === "error" && <XCircle className="h-4 w-4" />}
-              <p className="font-medium">{scanStatus}</p>
-            </div>
-            {detectedBarcode && (
-              <div className="text-xs mt-1 font-mono bg-black/10 dark:bg-white/10 p-1 rounded">
-                UPC: {detectedBarcode}
+          {/* Camera view */}
+          {!cameraError && cameraActive && (
+            <div className="relative overflow-hidden w-full aspect-square max-h-80 bg-muted rounded-md">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-full h-full">
+                  <BarcodeScannerComponent
+                    width="100%"
+                    height="100%"
+                    onUpdate={handleScanResult}
+                    onError={handleCameraError}
+                    torch={torchEnabled}
+                  />
+                </div>
               </div>
-            )}
+              
+              {/* Scanner UI overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-5/6 h-1/4 border-2 border-white rounded-lg bg-transparent">
+                  <div className="absolute inset-0 flex items-start justify-center mt-1">
+                    <div className="bg-black/40 text-white px-2 py-1 text-xs rounded">
+                      {scanStatus}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Torch button (if supported) */}
+              {hasFlash && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="absolute bottom-4 left-4 bg-white/80"
+                  onClick={toggleTorch}
+                >
+                  {torchEnabled ? "Torch Off" : "Torch On"}
+                </Button>
+              )}
+              
+              {/* Close button */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="absolute bottom-4 right-4 bg-white/80"
+                onClick={handleClose}
+              >
+                Close
+              </Button>
+            </div>
+          )}
+          
+          {/* Camera error state */}
+          {cameraError && (
+            <div className="space-y-4">
+              <div className="bg-destructive/10 p-4 rounded-md text-destructive flex items-start">
+                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <p className="font-medium">Camera Error</p>
+                  <p className="text-sm">{cameraError}</p>
+                </div>
+              </div>
+              
+              {/* Retry camera button */}
+              <Button 
+                variant="outline" 
+                onClick={handleRetry} 
+                className="w-full"
+                disabled={isCameraInitializing}
+              >
+                {isCameraInitializing ? "Initializing..." : "Retry Camera"}
+              </Button>
+            </div>
+          )}
+          
+          {/* Manual barcode input */}
+          {(showManualInput || cameraError) && (
+            <form onSubmit={handleManualBarcodeSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="manual-barcode" className="text-sm font-medium">
+                  Enter barcode manually
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    id="manual-barcode"
+                    placeholder="e.g., 1234567890"
+                    value={manualBarcodeInput}
+                    onChange={(e) => setManualBarcodeInput(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button type="submit" size="sm">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
+          
+          {/* Manual input toggle if camera is active */}
+          {cameraActive && !showManualInput && !cameraError && (
+            <div className="text-center">
+              <button 
+                onClick={toggleManualInput} 
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Enter barcode manually
+              </button>
+            </div>
+          )}
+          
+          <div className="text-center text-xs text-muted-foreground mt-2">
+            Scan any product barcode to get information
           </div>
         </DialogContent>
       </Dialog>
