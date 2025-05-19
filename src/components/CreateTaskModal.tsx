@@ -5,13 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, MapPin, X, Search } from "lucide-react";
+import { CalendarIcon, MapPin, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { Task } from "@/context/TaskContext";
-import { stores, findStoreByName } from "@/data/stores";
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -33,110 +32,101 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
   
   const locationInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
-  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesSessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-  
-  const [placeSearchResults, setPlaceSearchResults] = useState<Array<{
-    description: string;
-    place_id: string;
-  }>>([]);
-  const [searchingPlaces, setSearchingPlaces] = useState(false);
-  const [showPlacesDropdown, setShowPlacesDropdown] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number }>({ lat: 39.9789, lng: -82.8677 }); // Default to Columbus, OH
   
   const { toast } = useToast();
   
-  // Get user's location
+  // Initialize Google Places Autocomplete
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
+    console.log('CreateTaskModal: useEffect triggered', {
+      isOpen,
+      googleExists: !!window.google,
+      mapsExists: window.google ? !!window.google.maps : false,
+      placesExists: window.google && window.google.maps ? !!window.google.maps.places : false,
+      inputRefExists: !!locationInputRef.current
+    });
+    
+    // Wait a bit to ensure Google Maps API is fully loaded
+    const initAutocomplete = setTimeout(() => {
+      if (isOpen && locationInputRef.current) {
+        if (!window.google || !window.google.maps || !window.google.maps.places) {
+          console.error('Google Maps Places API not available');
+          toast({
+            title: "Google Maps not loaded",
+            description: "Please refresh the page and try again",
+            variant: "destructive"
           });
-        },
-        () => {
-          // Location access denied or error, use default
-          console.log("Using default location for place search");
+          return;
         }
-      );
-    }
-  }, []);
-  
-  // Initialize Google Places services
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    // Initialize Google Maps API if needed
-    const initGoogleMapsAPI = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        initializePlacesServices();
-        return;
-      }
-      
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8&libraries=places,geometry`;
-      script.async = true;
-      script.defer = true;
-      script.onload = initializePlacesServices;
-      document.head.appendChild(script);
-      
-      return () => {
-        if (document.head.contains(script)) {
-          document.head.removeChild(script);
-        }
-      };
-    };
-    
-    // Initialize Places services
-    const initializePlacesServices = () => {
-      if (!window.google || !window.google.maps || !window.google.maps.places) {
-        console.error("Google Maps Places API not available");
-        return;
-      }
-      
-      try {
-        // Create a dummy div for PlacesService (required but not used)
-        const dummyDiv = document.createElement('div');
-        placesServiceRef.current = new window.google.maps.places.PlacesService(dummyDiv);
-        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-        placesSessionToken.current = new window.google.maps.places.AutocompleteSessionToken();
         
-        // Setup Place Autocomplete for the location input
-        if (locationInputRef.current) {
+        try {
+          console.log('Initializing Google Places Autocomplete');
+          // Create a new autocomplete instance
           autocompleteRef.current = new window.google.maps.places.Autocomplete(locationInputRef.current, {
-            types: ['establishment', 'address']
+            types: ['address']
           });
           
+          console.log('Autocomplete instance created:', autocompleteRef.current);
+          
+          // Add listener for place selection
           autocompleteRef.current.addListener('place_changed', () => {
-            if (!autocompleteRef.current) return;
-            
-            const place = autocompleteRef.current.getPlace();
-            if (place && place.geometry && place.geometry.location) {
-              const address = place.formatted_address || place.name || "";
-              setLocation(address);
-              setCoordinates({
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng()
+            try {
+              console.log('Place changed event fired');
+              // Check if autocompleteRef.current is still valid before trying to get the place
+              if (!autocompleteRef.current) {
+                console.error('Autocomplete reference is null');
+                toast({
+                  title: "Error selecting location",
+                  description: "Please try again or enter the location manually",
+                  variant: "destructive"
+                });
+                return;
+              }
+              const place = autocompleteRef.current.getPlace();
+              console.log('Selected place:', place);
+              
+              if (place && place.geometry && place.geometry.location) {
+                // Explicitly handle type casting
+                const address = place.formatted_address ? String(place.formatted_address) : 
+                               (place.name ? String(place.name) : "");
+                                
+                setLocation(address);
+                setCoordinates({
+                  lat: place.geometry.location.lat(),
+                  lng: place.geometry.location.lng()
+                });
+                console.log('Location set to:', address);
+              } else {
+                console.warn('No place geometry found');
+                toast({
+                  title: "No location found",
+                  description: "Please select a location from the dropdown",
+                  variant: "destructive"
+                });
+              }
+            } catch (error) {
+              console.error("Error handling place selection:", error);
+              toast({
+                title: "Error selecting location",
+                description: "Please try again or enter the location manually",
+                variant: "destructive"
               });
-              setShowPlacesDropdown(false);
             }
           });
+        } catch (error) {
+          console.error("Error initializing autocomplete:", error);
         }
-      } catch (error) {
-        console.error("Error initializing Places services:", error);
+      }
+    }, 500); // Short delay to ensure API is loaded
+    
+    return () => {
+      // Clean up
+      clearTimeout(initAutocomplete);
+      if (autocompleteRef.current) {
+        console.log('Cleaning up autocomplete reference');
+        autocompleteRef.current = null;
       }
     };
-    
-    const cleanup = initGoogleMapsAPI();
-    return () => {
-      if (typeof cleanup === 'function') cleanup();
-      // Clean up references
-      autocompleteRef.current = null;
-    };
-  }, [isOpen]);
+  }, [isOpen, toast]);
   
   // Reset form when modal opens or when taskToEdit changes
   useEffect(() => {
@@ -162,10 +152,6 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
         setRotationFrequency(null);
         setDifficulty("Medium");
       }
-      
-      // Clear search results
-      setPlaceSearchResults([]);
-      setShowPlacesDropdown(false);
     }
   }, [isOpen, taskToEdit, isEditing]);
   
@@ -192,134 +178,8 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
     onClose();
   };
   
-  // Search places as user types
-  const searchPlaces = (query: string) => {
-    if (!query || query.length < 2) {
-      setPlaceSearchResults([]);
-      setShowPlacesDropdown(false);
-      return;
-    }
-    
-    // First, check if it matches a store name
-    const storeMatches = stores
-      .filter(store => store.name.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 3)
-      .map(store => ({
-        description: `${store.name} - ${store.address}`,
-        place_id: `store_${store.id}`,
-        isStore: true,
-        store: store
-      }));
-    
-    if (storeMatches.length > 0) {
-      setPlaceSearchResults(storeMatches);
-      setShowPlacesDropdown(true);
-      return;
-    }
-    
-    // If no store matches, use Google Places API
-    if (!autocompleteServiceRef.current || !placesSessionToken.current) {
-      return;
-    }
-    
-    setSearchingPlaces(true);
-    setShowPlacesDropdown(true);
-    
-    // Create request for place predictions
-    const request: google.maps.places.AutocompletionRequest = {
-      input: query,
-      types: ['establishment', 'geocode'],
-      componentRestrictions: { country: 'us' },
-      location: new google.maps.LatLng(userLocation.lat, userLocation.lng),
-      radius: 50000, // 50km radius
-      sessionToken: placesSessionToken.current
-    };
-    
-    // Get place predictions
-    autocompleteServiceRef.current.getPlacePredictions(
-      request,
-      (predictions, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && predictions && predictions.length > 0) {
-          setPlaceSearchResults(predictions.map(p => ({
-            description: p.description,
-            place_id: p.place_id
-          })));
-        } else {
-          setPlaceSearchResults([]);
-        }
-        setSearchingPlaces(false);
-      }
-    );
-  };
-  
-  // Handle place selection
-  const handlePlaceSelect = (placeId: string, description: string) => {
-    // Check if it's a store place ID (custom format "store_123")
-    if (placeId.startsWith('store_')) {
-      const storeId = placeId.replace('store_', '');
-      const store = stores.find(s => s.id === storeId);
-      
-      if (store) {
-        setLocation(store.name);
-        setCoordinates({
-          lat: store.lat,
-          lng: store.lng
-        });
-        setShowPlacesDropdown(false);
-        return;
-      }
-    }
-    
-    // Otherwise, use Places API
-    if (!placesServiceRef.current) return;
-    
-    placesServiceRef.current.getDetails(
-      {
-        placeId: placeId,
-        fields: ['name', 'formatted_address', 'geometry']
-      },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          // Use formatted address if available, otherwise use the description
-          setLocation(place.formatted_address || place.name || description);
-          
-          if (place.geometry?.location) {
-            setCoordinates({
-              lat: place.geometry.location.lat(),
-              lng: place.geometry.location.lng()
-            });
-          }
-          
-          // Reset places search
-          setPlaceSearchResults([]);
-          setShowPlacesDropdown(false);
-          
-          // Get a new session token for the next search
-          placesSessionToken.current = new google.maps.places.AutocompleteSessionToken();
-        } else {
-          toast({
-            title: "Error",
-            description: "Couldn't get place details",
-            variant: "destructive"
-          });
-        }
-      }
-    );
-  };
-  
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setLocation(value);
-    
-    // Clear coordinates if user is typing a new location
-    setCoordinates(null);
-    
-    // Debounce search
-    const debounceTimeout = setTimeout(() => {
-      searchPlaces(value);
-    }, 300);
-    
-    return () => clearTimeout(debounceTimeout);
+    setLocation(e.target.value);
   };
   
   return (
@@ -378,7 +238,7 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
                     <Input
                       id="location"
                       ref={locationInputRef}
-                      placeholder="Enter a store or location (e.g. Trader Joe's, Walmart)"
+                      placeholder="Enter a location"
                       value={location}
                       onChange={handleLocationChange}
                       className="pr-8 relative z-50"
@@ -396,43 +256,9 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
                         <X className="h-4 w-4" />
                       </button>
                     ) : null}
-                    <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gloop-text-muted" />
+                    <MapPin className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gloop-text-muted" />
                   </div>
                 </div>
-                
-                {/* Place search results dropdown */}
-                {showPlacesDropdown && (
-                  <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white dark:bg-gray-800 border rounded-md shadow-md max-h-60 overflow-y-auto">
-                    {searchingPlaces ? (
-                      <div className="p-2 text-center text-sm text-gray-500">
-                        Searching...
-                      </div>
-                    ) : placeSearchResults.length > 0 ? (
-                      <ul className="py-1">
-                        {placeSearchResults.map((place) => (
-                          <li 
-                            key={place.place_id} 
-                            className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
-                            onClick={() => handlePlaceSelect(place.place_id, place.description)}
-                          >
-                            <div className="flex items-start">
-                              <MapPin className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-                              <span>{place.description}</span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : location.length >= 2 ? (
-                      <div className="p-2 text-center text-sm text-gray-500">
-                        No places found
-                      </div>
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">
-                        Type at least 2 characters to search
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
