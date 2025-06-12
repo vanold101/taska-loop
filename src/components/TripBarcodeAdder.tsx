@@ -37,7 +37,6 @@ const TripBarcodeAdder = ({
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState<string>("");
   const [unit, setUnit] = useState<string>("ea");
-  const [category, setCategory] = useState<string>("other");
   const { toast } = useToast();
 
   const handleBarcodeScan = (item: ScannedItem) => {
@@ -46,7 +45,12 @@ const TripBarcodeAdder = ({
     setQuantity(1);
     setPrice("");
     setUnit(item.quantity || "ea");
-    setCategory(item.category || "other");
+    
+    // Show success toast
+    toast({
+      title: "Product Scanned",
+      description: `Found: ${item.name || item.upc}`,
+    });
   };
 
   const handleAddToTrip = () => {
@@ -57,7 +61,6 @@ const TripBarcodeAdder = ({
       quantity: quantity,
       price: price ? parseFloat(price) : undefined,
       unit: unit,
-      category: category,
       checked: false,
       addedBy: {
         name: "You", 
@@ -80,7 +83,6 @@ const TripBarcodeAdder = ({
     setQuantity(1);
     setPrice("");
     setUnit("ea");
-    setCategory("other");
     setIsProductDrawerOpen(false);
   };
 
@@ -124,39 +126,27 @@ const TripBarcodeAdder = ({
                     <Label htmlFor="name">Name</Label>
                     <Input
                       id="name"
-                      type="text"
                       value={scannedProduct.name || scannedProduct.upc}
-                      onChange={e => setScannedProduct({ ...scannedProduct, name: e.target.value })}
+                      readOnly
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="quantity">Quantity</Label>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      >
-                        -
-                      </Button>
-                      <Input
-                        id="quantity"
-                        type="number"
-                        value={quantity}
-                        onChange={(e) => setQuantity(Number(e.target.value))}
-                        className="w-16 text-center"
-                        min="1"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setQuantity(quantity + 1)}
-                      >
-                        +
-                      </Button>
-                    </div>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit">Unit</Label>
+                    <Input
+                      id="unit"
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="price">Price (optional)</Label>
@@ -164,55 +154,24 @@ const TripBarcodeAdder = ({
                       id="price"
                       type="number"
                       step="0.01"
-                      placeholder="0.00"
+                      min="0"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unit">Unit</Label>
-                    <Input
-                      id="unit"
-                      type="text"
-                      value={unit}
-                      onChange={e => setUnit(e.target.value)}
-                      placeholder="ea, pack, bottle, etc."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      type="text"
-                      value={category}
-                      onChange={e => setCategory(e.target.value)}
-                      placeholder="Produce, Dairy, Pantry, etc."
+                      placeholder="Enter price"
                     />
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between space-x-2 py-3">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={resetForm}
-                  >
+                <CardFooter className="flex justify-end gap-2 py-3">
+                  <Button variant="outline" onClick={resetForm}>
                     Cancel
                   </Button>
-                  <Button
-                    className="w-full"
-                    onClick={handleAddToTrip}
-                  >
+                  <Button onClick={handleAddToTrip}>
                     Add to Trip
                   </Button>
                 </CardFooter>
               </Card>
             </div>
           )}
-          <DrawerFooter className="pt-2">
-            <DrawerClose asChild>
-              <Button variant="outline">Close</Button>
-            </DrawerClose>
-          </DrawerFooter>
         </DrawerContent>
       </Drawer>
     </>

@@ -1,386 +1,212 @@
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { 
-  ShoppingCart, 
-  Users, 
-  Receipt, 
-  ArrowRight, 
-  CheckCircle, 
-  MapPin, 
-  Scan, 
-  RotateCw,
-  Wallet,
-  Sparkles,
-  ListChecks,
-  Clock,
-  PieChart,
-  Moon
-} from "lucide-react";
-import { motion } from "framer-motion";
+import { CheckCircle, ListTodo, ShoppingCart, Split, Users, ArrowRight } from "lucide-react";
 
 const Landing = () => {
   const navigate = useNavigate();
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.3
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.5
-      }
-    }
-  };
-
   return (
-    <div className="min-h-screen overflow-x-hidden w-full">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-teal-50 dark:from-blue-900/30 dark:via-purple-900/20 dark:to-teal-900/30">
+      {/* Navigation */}
+      <header className="container mx-auto py-4">
+        <nav className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ListTodo className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+            <span className="text-xl font-bold text-teal-600 dark:text-teal-400">TaskaLoop</span>
+          </div>
+          <div className="hidden md:flex items-center gap-4">
+            <Button variant="ghost" className="text-teal-700 hover:text-teal-900 hover:bg-teal-50 dark:text-teal-400 dark:hover:text-teal-300 dark:hover:bg-teal-900/20">
+              Home
+            </Button>
+            <Button variant="ghost" className="text-slate-600 hover:text-teal-900 hover:bg-teal-50 dark:text-slate-400 dark:hover:text-teal-300 dark:hover:bg-teal-900/20">
+              Features
+            </Button>
+            <Button variant="ghost" className="text-slate-600 hover:text-teal-900 hover:bg-teal-50 dark:text-slate-400 dark:hover:text-teal-300 dark:hover:bg-teal-900/20">
+              About
+            </Button>
+            <Button variant="ghost" className="text-slate-600 hover:text-teal-900 hover:bg-teal-50 dark:text-slate-400 dark:hover:text-teal-300 dark:hover:bg-teal-900/20">
+              Contact
+            </Button>
+          </div>
+          <div>
+            <Button 
+              className="bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 text-white"
+              onClick={() => navigate('/home')}
+            >
+              Get Started
+            </Button>
+          </div>
+        </nav>
+      </header>
+
       {/* Hero Section */}
-      <section className="w-full pt-12 md:pt-16 pb-16 md:pb-24 bg-gradient-to-b from-blue-500/10 via-green-500/10 to-blue-500/10 dark:from-blue-900/30 dark:via-green-900/30 dark:to-blue-900/30">
-        <div className="w-full px-[5vw] md:px-[8vw] lg:px-[10vw]">
-          <motion.div 
-            className="max-w-xl md:max-w-3xl lg:max-w-4xl mx-auto text-center"
-            initial="hidden"
-            animate="visible"
-            variants={containerVariants}
-          >
-            <motion.h1 
-              className="text-4xl md:text-5xl font-bold tracking-tight mb-4 md:mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-green-500"
-              variants={itemVariants}
-            >
-              TaskaLoop
-            </motion.h1>
-            <motion.p 
-              className="text-xl md:text-2xl mb-8 md:mb-10 text-gray-700 dark:text-gray-200"
-              variants={itemVariants}
-            >
-              Simplify household tasks, shopping trips, and expense sharing
-            </motion.p>
-            
-            {/* Demo card */}
-            <motion.div 
-              className="flex justify-center mb-10 md:mb-14"
-              variants={itemVariants}
-            >
-              <div className="w-full max-w-sm md:max-w-md px-6 md:px-8 py-8 md:py-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700">
-                <div className="space-y-5 md:space-y-6">
-                  <div className="flex items-start gap-3 md:gap-4">
-                    <div className="mt-1 bg-gradient-to-r from-blue-500 to-green-500 p-2.5 md:p-3 rounded-full shadow-md">
-                      <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-base md:text-lg">Rachel is heading to Trader Joe's</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">ETA: 20 minutes</p>
-                    </div>
-                  </div>
-                  <div className="pl-10 md:pl-14">
-                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3 md:p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
-                      <p className="font-medium mb-2">Need anything?</p>
-                      <div className="flex justify-start space-x-2 md:space-x-3">
-                        <Button size="sm" className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white border-0 text-xs md:text-sm px-2 md:px-3">
-                          Add Items
-                        </Button>
-                        <Button size="sm" variant="outline" className="bg-white dark:bg-gray-800 text-xs md:text-sm px-2 md:px-3">
-                          No Thanks
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-            
-            <motion.div variants={itemVariants}>
+      <section className="container mx-auto py-16 md:py-24">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div className="space-y-6">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-800 dark:text-slate-200 leading-tight">
+              Simplify Your <span className="text-teal-600 dark:text-teal-400">Daily Tasks</span> With TaskaLoop
+            </h1>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-md">
+              The all-in-one solution for managing shopping lists, splitting expenses, and organizing your daily tasks.
+            </p>
+            <div className="flex gap-4 pt-4">
               <Button 
-                onClick={() => navigate('/home')} 
-                size="lg"
-                className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white text-base md:text-lg px-6 md:px-8 py-5 md:py-6 h-auto rounded-full shadow-lg"
+                className="bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 px-6 py-6 h-auto"
+                onClick={() => navigate('/home')}
               >
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+                Try It Free
               </Button>
-            </motion.div>
-          </motion.div>
+              <Button 
+                variant="outline" 
+                className="border-teal-600 text-teal-600 hover:bg-teal-50 dark:border-teal-400 dark:text-teal-400 dark:hover:bg-teal-900/20 px-6 py-6 h-auto"
+              >
+                Learn More
+              </Button>
+            </div>
+          </div>
+          <div className="flex justify-center">
+            <div className="relative w-full max-w-md aspect-square bg-gradient-to-br from-teal-200 to-blue-200 dark:from-teal-600/50 dark:to-blue-600/50 rounded-full flex items-center justify-center">
+              <div className="absolute inset-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full flex items-center justify-center">
+                <ListTodo className="h-24 w-24 text-teal-600 dark:text-teal-400" />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Main Features Section */}
-      <section className="w-full py-16 md:py-20 bg-gradient-to-br from-blue-500/20 via-green-500/20 to-blue-500/20 dark:from-blue-900/30 dark:via-green-900/30 dark:to-blue-900/30">
-        <div className="w-full px-[5vw] md:px-[8vw] lg:px-[10vw]">
-          <h2 className="text-center mb-12 md:mb-16 text-[clamp(1.875rem,4vw,3rem)] md:text-[clamp(2.25rem,5vw,3.75rem)] font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600 dark:from-blue-400 dark:to-green-400">
-            All Features in One Place
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-            {/* Feature 1: Shopping Trips */}
-            <motion.div 
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full overflow-hidden"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              viewport={{ once: true }}
-            >
-              <div className="p-6 md:p-8">
-                <div className="w-14 h-14 md:w-16 md:h-16 mb-6 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center shadow-md">
-                  <ShoppingCart className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                </div>
-                <h3 className="text-xl md:text-2xl font-semibold mb-3">Shopping Trips</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">Create, share and manage shopping trips with your household members.</p>
-                <ul className="space-y-3">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Create shopping trips to specific stores</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Track item quantities, prices, and status</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Reactivate completed trips for repeat shopping</span>
-                  </li>
-                </ul>
-              </div>
-            </motion.div>
-            
-            {/* Feature 2: Cost Splitting */}
-            <motion.div 
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full overflow-hidden"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.1 }}
-              viewport={{ once: true }}
-            >
-              <div className="p-6 md:p-8">
-                <div className="w-14 h-14 md:w-16 md:h-16 mb-6 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center shadow-md">
-                  <Wallet className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                </div>
-                <h3 className="text-xl md:text-2xl font-semibold mb-3">Cost Splitting</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">Fair and transparent expense sharing with automatic ledger updates.</p>
-                <ul className="space-y-3">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Split costs equally, by percentage, or custom amounts</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Track who paid for what and who owes whom</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Settlement transactions logged in shared ledger</span>
-                  </li>
-                </ul>
-              </div>
-            </motion.div>
-            
-            {/* Feature 3: Scan & Track */}
-            <motion.div 
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full overflow-hidden"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-              viewport={{ once: true }}
-            >
-              <div className="p-6 md:p-8">
-                <div className="w-14 h-14 md:w-16 md:h-16 mb-6 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center shadow-md">
-                  <Scan className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                </div>
-                <h3 className="text-xl md:text-2xl font-semibold mb-3">Scan & Track</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">Digitize your shopping with quick scanning tools.</p>
-                <ul className="space-y-3">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Scan product barcodes to add items quickly</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Receipt scanning to capture all purchases</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Detect duplicate items and prevent double-buying</span>
-                  </li>
-                </ul>
-              </div>
-            </motion.div>
-            
-            {/* Feature 4: Map Integration */}
-            <motion.div 
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full overflow-hidden"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              viewport={{ once: true }}
-            >
-              <div className="p-6 md:p-8">
-                <div className="w-14 h-14 md:w-16 md:h-16 mb-6 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center shadow-md">
-                  <MapPin className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                </div>
-                <h3 className="text-xl md:text-2xl font-semibold mb-3">Map Integration</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">Location-based features for better shopping planning.</p>
-                <ul className="space-y-3">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Find nearby stores and view on an interactive map</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Optimize shopping routes for multiple stops</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Get precise distance and travel-time estimates</span>
-                  </li>
-                </ul>
-              </div>
-            </motion.div>
-            
-            {/* Feature 5: Price Tracking */}
-            <motion.div 
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full overflow-hidden"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.4 }}
-              viewport={{ once: true }}
-            >
-              <div className="p-6 md:p-8">
-                <div className="w-14 h-14 md:w-16 md:h-16 mb-6 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center shadow-md">
-                  <PieChart className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                </div>
-                <h3 className="text-xl md:text-2xl font-semibold mb-3">Price Tracking</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">Never overpay for household items again.</p>
-                <ul className="space-y-3">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Track prices across different stores</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Compare prices to find the best deals</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">View price history for common purchases</span>
-                  </li>
-                </ul>
-              </div>
-            </motion.div>
-            
-            {/* Feature 6: Task Management */}
-            <motion.div 
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full overflow-hidden"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.5 }}
-              viewport={{ once: true }}
-            >
-              <div className="p-6 md:p-8">
-                <div className="w-14 h-14 md:w-16 md:h-16 mb-6 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center shadow-md">
-                  <ListChecks className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                </div>
-                <h3 className="text-xl md:text-2xl font-semibold mb-3">Task Management</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">Coordinate household responsibilities seamlessly.</p>
-                <ul className="space-y-3">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Create and assign tasks with priorities</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Set due dates and get reminders</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-600 dark:text-gray-300">Track completion and rotation schedules</span>
-                  </li>
-                </ul>
-              </div>
-            </motion.div>
-          </div>
+      {/* Features Section */}
+      <section className="container mx-auto py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 dark:text-slate-200 mb-4">All Features in One Place</h2>
+          <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+            TaskaLoop brings together everything you need to organize your shopping and daily activities.
+          </p>
         </div>
-      </section>
-      
-      {/* Additional Features Section */}
-      <section className="w-full py-12 md:py-16 bg-gradient-to-br from-green-500/20 via-blue-500/20 to-green-500/20 dark:from-green-800/30 dark:via-blue-800/30 dark:to-green-800/30">
-        <div className="w-full px-[5vw] md:px-[8vw] lg:px-[10vw]">
-          <h2 className="text-center mb-8 md:mb-12 text-2xl md:text-3xl font-bold">More Great Features</h2>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            <div className="text-center bg-white/90 dark:bg-gray-800/90 p-4 md:p-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="w-12 h-12 md:w-14 md:h-14 mx-auto mb-3 md:mb-4 bg-gradient-to-r from-blue-500/20 to-green-500/20 dark:from-blue-900/30 dark:to-green-900/30 rounded-full flex items-center justify-center">
-                <Moon className="h-6 w-6 md:h-7 md:w-7 text-blue-600 dark:text-blue-400" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Shopping Trips Card */}
+          <Card className="border-none shadow-md hover:shadow-lg transition-shadow dark:bg-gray-800/60 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center mb-2">
+                <ShoppingCart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <p className="font-medium">Dark Mode</p>
-            </div>
-            
-            <div className="text-center bg-white/90 dark:bg-gray-800/90 p-4 md:p-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="w-12 h-12 md:w-14 md:h-14 mx-auto mb-3 md:mb-4 bg-gradient-to-r from-blue-500/20 to-green-500/20 dark:from-blue-900/30 dark:to-green-900/30 rounded-full flex items-center justify-center">
-                <Users className="h-6 w-6 md:h-7 md:w-7 text-blue-600 dark:text-blue-400" />
+              <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Shopping Trips</CardTitle>
+              <CardDescription className="dark:text-slate-400">Organize your shopping lists by store or trip</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Create multiple shopping lists</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Categorize items automatically</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Track prices and budgets</span>
+                </li>
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button variant="ghost" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:text-teal-300 dark:hover:bg-teal-900/20 px-0">
+                Learn more →
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Cart Splitting Card */}
+          <Card className="border-none shadow-md hover:shadow-lg transition-shadow dark:bg-gray-800/60 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center mb-2">
+                <Split className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <p className="font-medium">Multi-User Support</p>
-            </div>
-            
-            <div className="text-center bg-white/90 dark:bg-gray-800/90 p-4 md:p-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="w-12 h-12 md:w-14 md:h-14 mx-auto mb-3 md:mb-4 bg-gradient-to-r from-blue-500/20 to-green-500/20 dark:from-blue-900/30 dark:to-green-900/30 rounded-full flex items-center justify-center">
-                <Receipt className="h-6 w-6 md:h-7 md:w-7 text-blue-600 dark:text-blue-400" />
+              <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Cart Splitting</CardTitle>
+              <CardDescription className="dark:text-slate-400">Easily split expenses with roommates or friends</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Assign items to different people</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Calculate individual totals</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Share expense reports</span>
+                </li>
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button variant="ghost" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:text-teal-300 dark:hover:bg-teal-900/20 px-0">
+                Learn more →
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Group Management Card */}
+          <Card className="border-none shadow-md hover:shadow-lg transition-shadow dark:bg-gray-800/60 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <div className="w-12 h-12 rounded-full bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center mb-2">
+                <Users className="h-6 w-6 text-teal-600 dark:text-teal-400" />
               </div>
-              <p className="font-medium">Shared Receipts</p>
-            </div>
-            
-            <div className="text-center bg-white/90 dark:bg-gray-800/90 p-4 md:p-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-              <div className="w-12 h-12 md:w-14 md:h-14 mx-auto mb-3 md:mb-4 bg-gradient-to-r from-blue-500/20 to-green-500/20 dark:from-blue-900/30 dark:to-green-900/30 rounded-full flex items-center justify-center">
-                <Clock className="h-6 w-6 md:h-7 md:w-7 text-blue-600 dark:text-blue-400" />
-              </div>
-              <p className="font-medium">Real-time Updates</p>
-            </div>
-          </div>
+              <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Group Management</CardTitle>
+              <CardDescription className="dark:text-slate-400">Collaborate with family and friends</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Create household groups</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Share lists with specific people</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-slate-600 dark:text-slate-400">Real-time updates for all members</span>
+                </li>
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button variant="ghost" className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:text-teal-300 dark:hover:bg-teal-900/20 px-0">
+                Learn more →
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="w-full py-14 md:py-20 bg-gradient-to-r from-blue-600 to-green-500 text-white">
-        <div className="w-full px-[5vw] md:px-[8vw] lg:px-[10vw] text-center">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4 md:mb-6">Ready to simplify your household management?</h2>
-          <p className="text-lg md:text-xl mb-8 md:mb-10 text-white/90 max-w-2xl mx-auto">Join TaskaLoop today and start saving time, money, and effort with our comprehensive household coordination platform.</p>
+      <section className="container mx-auto py-16 mb-8">
+        <div className="bg-gradient-to-r from-teal-500 to-blue-500 dark:from-teal-600 dark:to-blue-600 rounded-2xl p-8 md:p-12 text-center text-white">
+          <h2 className="text-3xl font-bold mb-4">Ready to Simplify Your Life?</h2>
+          <p className="max-w-2xl mx-auto mb-8">
+            Join thousands of users who are already enjoying the benefits of TaskaLoop.
+          </p>
           <Button 
-            onClick={() => navigate('/home')} 
-            size="lg"
-            className="bg-white text-blue-600 hover:bg-white/90 text-base md:text-lg px-6 md:px-8 py-5 md:py-6 h-auto rounded-full shadow-lg"
+            className="bg-white text-teal-600 hover:bg-gray-100 dark:hover:bg-gray-200 px-8 py-6 h-auto text-lg"
+            onClick={() => navigate('/home')}
           >
-            Start Using TaskaLoop Now
-            <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+            Get Started for Free
           </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="w-full py-10 md:py-12 bg-gradient-to-r from-blue-500/10 to-green-500/10 dark:from-blue-900/30 dark:to-green-900/30">
-        <div className="w-full px-[5vw] md:px-[8vw] lg:px-[10vw]">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8">
-            <div className="mb-4 md:mb-0">
-              <h3 className="text-lg md:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-green-500">TaskaLoop</h3>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">Simplify your household management</p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-4 md:gap-0 md:space-x-8">
-              <button onClick={() => navigate('/home')} className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500">Home</button>
-              <button onClick={() => navigate('/trips')} className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500">Trips</button>
-              <button onClick={() => navigate('/map')} className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500">Map</button>
-              <button onClick={() => navigate('/ledger')} className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500">Ledger</button>
-            </div>
+      <footer className="container mx-auto py-8 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col md:flex-row justify-between items-center">
+          <div className="flex items-center gap-2 mb-4 md:mb-0">
+            <ListTodo className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+            <span className="text-lg font-semibold text-teal-600 dark:text-teal-400">TaskaLoop</span>
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 md:pt-8 text-center">
-            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">&copy; 2025 TaskaLoop. All rights reserved.</p>
-          </div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">© {new Date().getFullYear()} TaskaLoop. All rights reserved.</div>
         </div>
       </footer>
     </div>

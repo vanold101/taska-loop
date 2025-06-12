@@ -182,6 +182,7 @@ export const NotificationCenter = ({
                               e.stopPropagation();
                               if (onAction) onAction(notification);
                             }}
+                            aria-label={`${notification.actionText} for notification: ${notification.title}`}
                           >
                             {notification.actionText}
                           </Button>

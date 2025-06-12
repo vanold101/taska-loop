@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,9 @@ import {
   DollarSign,
   SplitSquareVertical,
   Sparkles,
-  BarChart2
+  BarChart2,
+  ListPlus,
+  Store
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -26,7 +28,6 @@ import { useToast } from "@/hooks/use-toast";
 import PriceInput from "./PriceInput";
 import { recordPrice } from "@/services/PriceHistoryService";
 import ItemSplitSelector from "./ItemSplitSelector";
-import CostSplitSummary from "./CostSplitSummary";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BarcodeScannerButton from "./BarcodeScannerButton";
 import TripBarcodeAdder from "./TripBarcodeAdder";
@@ -38,14 +39,20 @@ import UnitSelector from "./UnitSelector";
 import { guessUnitForItem, formatValueWithUnit } from "@/services/UnitConversionService";
 import { useTaskContext } from "@/context/TaskContext";
 import ReceiptScannerButton from "./ReceiptScannerButton";
-import { groceryCategories, suggestCategoryForItem, categoriesMap } from "@/services/CategoryService";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { calculateNextDueDate, RecurrenceFrequency } from "@/services/RecurrenceService";
 import ExportButton from "./ExportButton";
 import SmartListParser from "./SmartListParser";
-import PriceRecommendationsPanel from "./PriceRecommendation";
 import { Link } from "react-router-dom";
+import PriceRecommendationsPanel from "./PriceRecommendation";
+import CostSplitSummary from "./CostSplitSummary";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import AutocompleteInput from "./AutocompleteInput";
+import { fruits } from "@/data/fruits";
+import { vegetables } from "@/data/vegetables";
+import { usePantry, PantryItem } from "@/context/PantryContext";
 
 // Add success variant to BadgeProps
 declare module "@/components/ui/badge" {
@@ -54,45 +61,47 @@ declare module "@/components/ui/badge" {
   }
 }
 
-// Types for trip data
-export type TripItem = {
+export interface TripItem {
   id: string;
   name: string;
   quantity: number;
+  unit?: string;
   price?: number;
-  unit?: string; // Unit ID (e.g., 'kg', 'lb', 'ea')
-  category?: string;
-  addedBy: {
-    name: string;
-    avatar: string;
-  };
   checked: boolean;
   isRecurring?: boolean;
   recurrenceFrequency?: 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | null;
   nextDueDate?: string;
-  baseItemId?: string; 
+  baseItemId?: string;
   lastAddedToTripDate?: string;
-};
+  addedBy: {
+    name: string;
+    avatar: string;
+  };
+}
+
+export interface TripParticipant {
+  id: string;
+  name: string;
+  avatar: string; // Required for CostSplitSummary
+}
+
+export interface TripShopper {
+  name: string;
+  avatar: string;  // Make avatar required to match TripCard expectations
+}
 
 export interface TripData {
   id: string;
   store: string;
-  location?: string;
-  coordinates?: { lat: number; lng: number };
+  date: string;
   eta: string;
   status: 'open' | 'shopping' | 'completed' | 'cancelled';
   items: TripItem[];
-  participants: {
-    id: string;
-    name: string;
-    avatar: string;
-  }[];
-  shopper?: {
-    name: string;
-    avatar: string;
-  };
-  date: string; // ISO string format
+  participants: TripParticipant[];
+  shopper: TripShopper;
 }
+
+type RecurrenceFrequencyType = 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | undefined;
 
 type TripDetailModalProps = {
   isOpen: boolean;
@@ -109,6 +118,29 @@ type TripDetailModalProps = {
   onUpdateItemUnit?: (tripId: string, itemId: string, unit: string, newQuantity?: number) => void;
 };
 
+// Add unit definitions
+const units = [
+  { id: 'ea', name: 'Each' },
+  { id: 'kg', name: 'Kilograms' },
+  { id: 'g', name: 'Grams' },
+  { id: 'lb', name: 'Pounds' },
+  { id: 'oz', name: 'Ounces' },
+  { id: 'l', name: 'Liters' },
+  { id: 'ml', name: 'Milliliters' },
+  { id: 'pkg', name: 'Package' },
+  { id: 'box', name: 'Box' },
+  { id: 'can', name: 'Can' },
+  { id: 'bottle', name: 'Bottle' }
+];
+
+// Add recurrence frequency definitions
+const recurrenceFrequencies = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'bi-weekly', label: 'Bi-weekly' },
+  { value: 'monthly', label: 'Monthly' }
+];
+
 const TripDetailModal = ({ 
   isOpen, 
   onClose, 
@@ -121,13 +153,12 @@ const TripDetailModal = ({
   onReactivateTrip,
   onUpdateItemPrice,
   onSettleUp,
-  onUpdateItemUnit
+  onUpdateItemUnit,
 }: TripDetailModalProps) => {
   const [newItemName, setNewItemName] = useState("");
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [newItemPrice, setNewItemPrice] = useState<number | undefined>(undefined);
   const [newItemUnit, setNewItemUnit] = useState<string>("ea");
-  const [newItemCategory, setNewItemCategory] = useState<string>('other');
   const [activeTab, setActiveTab] = useState("items");
   const [showSaveProductDialog, setShowSaveProductDialog] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState("");
@@ -135,9 +166,16 @@ const TripDetailModal = ({
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [pendingItem, setPendingItem] = useState<Omit<TripItem, 'id'> | null>(null);
   const [newItemIsRecurring, setNewItemIsRecurring] = useState(false);
-  const [newItemRecurrenceFrequency, setNewItemRecurrenceFrequency] = useState<'daily' | 'weekly' | 'bi-weekly' | 'monthly' | null>(null);
+  const [newItemRecurrenceFrequency, setNewItemRecurrenceFrequency] = useState<RecurrenceFrequencyType>(undefined);
   const [showSmartParser, setShowSmartParser] = useState(false);
   const { toast } = useToast();
+  const { pantryItems } = usePantry();
+  const [pantrySearchQuery, setPantrySearchQuery] = useState("");
+  
+  const suggestions = useMemo(() => {
+    const pantryNames = pantryItems.map(item => item.name);
+    return Array.from(new Set([...fruits, ...vegetables, ...pantryNames]));
+  }, [pantryItems]);
   
   // Reset form when dialog is opened
   useEffect(() => {
@@ -146,20 +184,17 @@ const TripDetailModal = ({
       setNewItemQuantity(1);
       setNewItemPrice(undefined);
       setNewItemUnit("ea");
-      setNewItemCategory('other');
       setNewItemIsRecurring(false);
-      setNewItemRecurrenceFrequency(null);
+      setNewItemRecurrenceFrequency(undefined);
       setActiveTab("items");
     }
   }, [isOpen]);
   
-  // Update unit and category when item name changes
+  // Update unit when item name changes
   useEffect(() => {
     if (newItemName.trim()) {
       const suggestedUnit = guessUnitForItem(newItemName);
       setNewItemUnit(suggestedUnit.id);
-      const suggestedCategory = suggestCategoryForItem(newItemName);
-      setNewItemCategory(suggestedCategory);
     }
   }, [newItemName]);
   
@@ -187,17 +222,13 @@ const TripDetailModal = ({
       quantity: newItemQuantity,
       price: newItemPrice,
       unit: newItemUnit,
-      category: newItemCategory,
+      checked: false,
       addedBy: {
         name: "You",
         avatar: "https://example.com/you.jpg"
       },
-      checked: false,
       isRecurring: newItemIsRecurring,
-      recurrenceFrequency: newItemIsRecurring ? newItemRecurrenceFrequency : null,
-      nextDueDate: initialNextDueDate,
-      baseItemId: newItemIsRecurring ? Date.now().toString() + '-base' : undefined,
-      lastAddedToTripDate: newItemIsRecurring ? new Date().toISOString() : undefined,
+      recurrenceFrequency: newItemIsRecurring ? newItemRecurrenceFrequency : undefined
     };
     
     // Check for duplicates before adding
@@ -232,9 +263,8 @@ const TripDetailModal = ({
     setNewItemQuantity(1);
     setNewItemPrice(undefined);
     setNewItemUnit("ea");
-    setNewItemCategory('other');
     setNewItemIsRecurring(false);
-    setNewItemRecurrenceFrequency(null);
+    setNewItemRecurrenceFrequency(undefined);
     
     // Add haptic feedback
     if (navigator.vibrate) {
@@ -352,40 +382,31 @@ const TripDetailModal = ({
     if (product.defaultPrice) {
       setNewItemPrice(product.defaultPrice);
     }
-  };
-  
-  // Add new function to handle receipt scan results
-  const handleReceiptScan = (items: { name: string; price: number; quantity: number }[]) => {
-    if (!trip) return;
     
-    // Add each item from the receipt
-    items.forEach(item => {
-      const newItem = {
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        unit: "ea", // Default unit
-        category: 'other',
-        addedBy: {
-          name: "You",
-          avatar: "https://example.com/you.jpg"
-        },
-        checked: false
-      };
-      
-      // Check for duplicates before adding
-      const suggestion = detectDuplicateOrSimilar(item.name, trip.items);
-      
-      if (suggestion) {
-        // Found a duplicate or similar item
-        setDuplicateSuggestion(suggestion);
-        setShowDuplicateDialog(true);
-        setPendingItem(newItem);
-      } else {
-        // No duplicates, proceed with adding
-        addItemToTrip(newItem);
-      }
-    });
+    // Add the item with the current user's info
+    const newItem: Omit<TripItem, "id"> = {
+      name: product.name,
+      quantity: 1,
+      price: product.defaultPrice,
+      unit: product.unit || 'ea',
+      checked: false,
+      addedBy: {
+        name: "You",
+        avatar: "https://example.com/you.jpg"
+      },
+      isRecurring: false,
+      recurrenceFrequency: undefined
+    };
+    
+    if (!trip) return;
+    onAddItem(trip.id, newItem);
+    
+    // Reset form
+    setNewItemName("");
+    setNewItemQuantity(1);
+    setNewItemPrice(undefined);
+    setNewItemUnit("ea");
+    setShowSaveProductDialog(false);
   };
   
   const handleAddItemsFromParser = (items: Omit<TripItem, 'id'>[]) => {
@@ -441,441 +462,191 @@ const TripDetailModal = ({
     });
   };
   
+  const handleAddItemFromPantry = (pantryItem: PantryItem) => {
+    if (!trip) return;
+
+    const newItem: Omit<TripItem, 'id'> = {
+      name: pantryItem.name,
+      quantity: 1, // Default quantity
+      checked: false,
+      addedBy: {
+        name: "You",
+        avatar: "https://example.com/you.jpg"
+      },
+    };
+
+    addItemToTrip(newItem);
+    toast({
+      title: "Item Added",
+      description: `${newItem.name} has been added to your trip from the pantry.`,
+    });
+  };
+  
   if (!trip) return null;
   
   const isUserShopper = trip.shopper ? trip.shopper.name === "You" : false; // TODO: Compare with actual authenticated user ID
-  const uncheckedItems = trip.items.filter(item => !item.checked);
-  const checkedItems = trip.items.filter(item => item.checked);
   
   // Calculate total price of items
   const totalPrice = trip.items.reduce((sum, item) => {
     return sum + (item.price || 0);
   }, 0);
   
+  // Ensure participants have avatars for CostSplitSummary
+  const participantsWithAvatars = trip.participants.map(p => ({
+    ...p,
+    avatar: p.avatar || `https://api.dicebear.com/7.x/avatars/svg?seed=${p.id}`
+  })) || [];
+  
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" /> 
-            <span>{trip?.store || "Trip"}</span>
-            <Badge variant={trip?.status === 'completed' ? 'success' : trip?.status === 'shopping' ? 'default' : 'outline'}>
-              {trip?.status === 'completed' ? 'Completed' : trip?.status === 'shopping' ? 'Shopping' : 'Planning'}
-            </Badge>
+            <Store /> {trip.store}
           </DialogTitle>
-          
-          <div className="flex items-center gap-3 text-sm text-muted-foreground py-1">
-            <span className="flex items-center">
-              <Clock className="h-4 w-4 mr-1" /> 
-              {new Date(trip?.date || "").toLocaleDateString()} | {trip?.eta}
-            </span>
-            
-            {trip?.status !== 'completed' && (
-              <div className="flex ml-auto gap-2">
-                <Button
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => onInviteParticipant(trip?.id || "")}
-                >
-                  <UserPlus className="h-4 w-4 mr-2" /> Invite
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={() => onCompleteTrip(trip?.id || "")}
-                  disabled={!trip?.items.some(item => item.checked)}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" /> Complete
-                </Button>
-              </div>
-            )}
-            
-            {trip?.status === 'completed' && onReactivateTrip && (
-              <div className="flex ml-auto gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onReactivateTrip(trip?.id || "")}
-                >
-                  <ShoppingCart className="h-4 w-4 mr-2" /> Reactivate
-                </Button>
-                <ExportButton tripData={trip} />
-              </div>
-            )}
-          </div>
         </DialogHeader>
-        
-        {/* Tabs for different sections */}
-        <Tabs defaultValue="items" value={activeTab} onValueChange={setActiveTab} className="mt-2">
-          <TabsList className="grid grid-cols-3">
-            <TabsTrigger value="items">Items ({trip?.items.length || 0})</TabsTrigger>
-            <TabsTrigger value="people">People ({trip?.participants.length || 0})</TabsTrigger>
-            <TabsTrigger value="costs">Costs</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+          <TabsList>
+            <TabsTrigger value="items">Items</TabsTrigger>
+            <TabsTrigger value="pantry">Add from Pantry</TabsTrigger>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="cost">Cost Split</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="items" className="space-y-4">
-            {/* Show price recommendations if trip is in planning phase */}
-            {trip?.status === 'open' && (
-              <PriceRecommendationsPanel items={trip?.items || []} currentStore={trip?.store} />
-            )}
-            
-            {/* Item Input Form */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Add Item</h3>
-              <form onSubmit={handleAddItem} className="space-y-3">
-                {/* Item Name */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor="item-name">Item</Label>
-                    <Input
-                      id="item-name"
-                      placeholder="e.g., Milk, Apples, Bread"
-                      value={newItemName}
-                      onChange={(e) => setNewItemName(e.target.value)}
-                    />
+          <TabsContent value="items" className="mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Add new item form */}
+              <div>
+                <h3 className="text-lg font-medium">Add Item</h3>
+                <form onSubmit={handleAddItem} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Item Name</Label>
+                      <AutocompleteInput
+                        suggestions={suggestions}
+                        value={newItemName}
+                        onChange={setNewItemName}
+                        onSelect={setNewItemName}
+                        placeholder="Enter item name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quantity">Quantity</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="quantity"
+                          type="number"
+                          value={newItemQuantity}
+                          onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                          min={1}
+                          className="w-24"
+                        />
+                        <Select value={newItemUnit} onValueChange={setNewItemUnit}>
+                          <SelectTrigger className="w-24">
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {units.map(unit => (
+                              <SelectItem key={unit.id} value={unit.id}>
+                                {unit.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Price (optional)</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        value={newItemPrice || ''}
+                        onChange={(e) => setNewItemPrice(Number(e.target.value))}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
                   </div>
-                  
-                  {/* Smart List Parser Button */}
-                  <div className="pt-6">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => setShowSmartParser(true)}
-                      title="Open smart list parser"
-                    >
-                      <Sparkles className="h-5 w-5 text-amber-500" />
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="recurring"
+                      checked={newItemIsRecurring}
+                      onCheckedChange={(checked) => setNewItemIsRecurring(checked as boolean)}
+                    />
+                    <Label htmlFor="recurring">Add to recurring items</Label>
+                  </div>
+                  {newItemIsRecurring && (
+                    <div className="space-y-2">
+                      <Label htmlFor="frequency">Recurrence Frequency</Label>
+                      <Select
+                        value={newItemRecurrenceFrequency || ''}
+                        onValueChange={(value) => setNewItemRecurrenceFrequency(value as RecurrenceFrequencyType)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {recurrenceFrequencies.map(freq => (
+                            <SelectItem key={freq.value} value={freq.value}>
+                              {freq.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setShowSmartParser(true)}>
+                      <ListPlus className="h-4 w-4 mr-2" />
+                      Smart Add
+                    </Button>
+                    <Button type="submit">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Item
                     </Button>
                   </div>
-                  
-                  {/* Barcode Scanner Button */}
-                  <div className="pt-6">
-                    {trip && (
-                      <TripBarcodeAdder
-                        tripId={trip.id}
-                        onAddItem={onAddItem}
-                        buttonSize="icon"
-                        buttonVariant="ghost"
-                        buttonText=""
-                        iconOnly={true}
-                        className="h-10 w-10"
-                      />
-                    )}
-                  </div>
-                  
-                  {/* Receipt Scanner Button */}
-                  <div className="pt-6">
-                    <ReceiptScannerButton onScan={handleReceiptScan} />
-                  </div>
-                </div>
-                
-                {/* Bottom row with quantity, unit, and price */}
-                <div className="grid grid-cols-4 gap-3">
-                  {/* Quantity */}
-                  <div>
-                    <Label htmlFor="item-quantity">Quantity</Label>
-                    <Input
-                      id="item-quantity"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      placeholder="1"
-                      value={newItemQuantity}
-                      onChange={(e) => setNewItemQuantity(Number(e.target.value))}
-                    />
-                  </div>
-                  
-                  {/* Unit */}
-                  <div>
-                    <Label htmlFor="item-unit">Unit</Label>
-                    <UnitSelector
-                      value={newItemUnit}
-                      onChange={setNewItemUnit}
-                    />
-                  </div>
-                  
-                  {/* Price */}
-                  <div>
-                    <Label htmlFor="item-price">Price (optional)</Label>
-                    <PriceInput
-                      id="item-price"
-                      value={newItemPrice}
-                      onChange={setNewItemPrice}
-                    />
-                  </div>
-                  
-                  {/* Category */}
-                  <div>
-                    <Label htmlFor="item-category">Category</Label>
-                    <Select value={newItemCategory} onValueChange={setNewItemCategory}>
-                      <SelectTrigger id="item-category">
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(categoriesMap).map(([id, category]) => (
-                          <SelectItem key={id} value={id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                {/* Recurring item options */}
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="recurring-item"
-                    checked={newItemIsRecurring}
-                    onCheckedChange={setNewItemIsRecurring}
-                  />
-                  <Label htmlFor="recurring-item">Make this a recurring item</Label>
-                  
-                  {newItemIsRecurring && (
-                    <Select 
-                      value={newItemRecurrenceFrequency || ''} 
-                      onValueChange={(val) => setNewItemRecurrenceFrequency(val as RecurrenceFrequency)}
-                    >
-                      <SelectTrigger className="w-[130px] ml-2">
-                        <SelectValue placeholder="Frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-                
-                <Button type="submit">
-                  <Plus className="h-4 w-4 mr-2" /> Add to Trip
-                </Button>
-              </form>
-            </div>
-            
-            {/* List of items */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Items</h3>
-              
-              {trip?.items.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                  <p>No items added yet. Add some items above.</p>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  <AnimatePresence initial={false}>
-                    {trip?.items.map((item) => (
-                      <motion.li
-                        key={item.id}
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className={cn(
-                          "flex items-center justify-between p-3 border rounded-lg",
-                          item.checked && "bg-muted border-muted"
-                        )}
-                      >
-                        <div className="flex items-center flex-1">
-                          {/* Checkbox for marking item */}
-                          <button 
-                            className={cn(
-                              "w-6 h-6 border rounded-md mr-3 flex items-center justify-center",
-                              item.checked ? "bg-primary border-primary text-primary-foreground" : "border-input"
-                            )}
-                            onClick={() => onToggleItemCheck(trip.id, item.id)}
-                          >
-                            {item.checked && <Check className="h-4 w-4" />}
-                          </button>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              <span className={cn("font-medium", item.checked && "line-through text-muted-foreground")}>
-                                {item.name}
-                              </span>
-                              
-                              {/* Display category if available */}
-                              {item.category && categoriesMap[item.category] && (
-                                <Badge variant="outline" className="ml-2 text-xs">
-                                  {categoriesMap[item.category].name}
-                                </Badge>
-                              )}
-                              
-                              {/* Show recurring indicator */}
-                              {item.isRecurring && (
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                  {item.recurrenceFrequency}
-                                </Badge>
-                              )}
-                            </div>
-                            
-                            <div className="text-sm text-muted-foreground flex gap-4">
-                              <span>
-                                {formatValueWithUnit(item.quantity, item.unit || 'ea')}
-                              </span>
-                              
-                              {item.price && (
-                                <span className="text-primary">
-                                  ${item.price.toFixed(2)}
-                                </span>
-                              )}
-                              
-                              <span>
-                                Added by {item.addedBy.name}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-1">
-                          {/* Price input for items without price */}
-                          {!item.price && trip.status !== 'completed' && (
-                            <PriceInput
-                              value={item.price}
-                              onChange={(value) => handleItemPriceChange(item.id, value)}
-                              className="w-24 mr-2"
-                              placeholder="Add price"
-                            />
-                          )}
-                          
-                          {/* Unit selector for changing units */}
-                          {trip.status !== 'completed' && (
-                            <UnitSelector
-                              value={item.unit || 'ea'}
-                              onChange={(value) => handleItemUnitChange(item.id, value)}
-                              className="w-20 mr-2"
-                            />
-                          )}
-                          
-                          {/* Remove item button */}
-                          {trip.status !== 'completed' && (
-                            <Button 
-                              size="icon" 
-                              variant="ghost"
-                              onClick={() => onRemoveItem(trip.id, item.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
-                      </motion.li>
-                    ))}
-                  </AnimatePresence>
-                </ul>
-              )}
+                </form>
+              </div>
             </div>
           </TabsContent>
-          
-          {/* People tab content */}
-          <TabsContent value="people">
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Participants</h3>
-              
-              {trip?.participants.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                  <p>No participants added yet.</p>
-                </div>
-              ) : (
-                <ul className="grid grid-cols-2 gap-3">
-                  {trip?.participants.map((participant) => (
-                    <li 
-                      key={participant.id}
-                      className="flex items-center p-3 border rounded-lg"
-                    >
-                      <Avatar className="h-10 w-10 mr-3">
-                        <AvatarImage src={participant.avatar} alt={participant.name} />
-                        <AvatarFallback>{participant.name[0]}</AvatarFallback>
-                      </Avatar>
+          <TabsContent value="pantry" className="mt-4">
+            <div>
+              <Input
+                type="search"
+                placeholder="Search pantry..."
+                value={pantrySearchQuery}
+                onChange={(e) => setPantrySearchQuery(e.target.value)}
+                className="mb-4"
+              />
+              <div className="max-h-[60vh] overflow-y-auto">
+                {pantryItems
+                  .filter(pItem => 
+                    pItem.name.toLowerCase().includes(pantrySearchQuery.toLowerCase()) &&
+                    !trip.items.some(tItem => tItem.name.toLowerCase() === pItem.name.toLowerCase())
+                  )
+                  .map(pantryItem => (
+                    <div key={pantryItem.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg">
                       <div>
-                        <div className="font-medium">{participant.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {participant.id === '123' ? 'Owner' : 'Participant'}
-                        </div>
+                        <p className="font-medium">{pantryItem.name}</p>
+                        <p className="text-sm text-muted-foreground">In stock: {pantryItem.quantity}</p>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              
-              <div className="pt-4">
-                <Button onClick={() => onInviteParticipant(trip?.id || "")}>
-                  <UserPlus className="h-4 w-4 mr-2" /> Invite Participant
-                </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAddItemFromPantry(pantryItem)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" /> Add
+                      </Button>
+                    </div>
+                ))}
               </div>
             </div>
           </TabsContent>
-          
-          {/* Costs tab content */}
-          <TabsContent value="costs">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Cost Summary</h3>
-                {trip?.status === 'completed' && (
-                  <Badge variant="success" className="px-2 py-1">
-                    <CheckCircle className="h-3 w-3 mr-1" /> Trip Completed
-                  </Badge>
-                )}
-              </div>
-              
-              {trip?.items.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                  <p>No items added yet.</p>
-                </div>
-              ) : (
-                <>
-                  {/* Items with costs */}
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Items</h4>
-                    <ul className="space-y-2">
-                      {trip?.items.map((item) => (
-                        <li
-                          key={item.id}
-                          className="flex items-center justify-between p-3 border rounded-lg"
-                        >
-                          <div className="flex items-center">
-                            <div className="font-medium">{item.name}</div>
-                            <div className="text-sm text-muted-foreground ml-2">
-                              {formatValueWithUnit(item.quantity, item.unit || 'ea')}
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center">
-                            {item.price ? (
-                              <span className="font-medium">${item.price.toFixed(2)}</span>
-                            ) : (
-                              <span className="text-muted-foreground">No price</span>
-                            )}
-                            
-                            {/* Split indicator */}
-                            {item.price && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="ml-2"
-                              >
-                                <SplitSquareVertical className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div className="pt-4">
-                    <CostSplitSummary 
-                      items={trip?.items || []} 
-                      participants={trip?.participants || []} 
-                      onSettleUp={onSettleUp}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+          <TabsContent value="details" className="mt-4">
+            {/* Details Content */}
+          </TabsContent>
+          <TabsContent value="cost" className="mt-4">
+            <CostSplitSummary items={trip.items} participants={trip.participants} />
           </TabsContent>
         </Tabs>
       </DialogContent>

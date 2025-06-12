@@ -38,7 +38,7 @@ const AUTH_USER_KEY = 'authUser';
 // Create the AuthProvider component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Start with loading true to check initial auth status
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Check for saved auth on initial load
@@ -47,12 +47,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       const storedUser = localStorage.getItem(AUTH_USER_KEY);
       
+      // For development: Create a default user if none exists
+      const defaultUser: User = {
+        id: 'default_user',
+        name: 'Default User',
+        email: 'default@example.com',
+        avatar: 'https://ui-avatars.com/api/?name=Default+User&background=random',
+        chorePreferences: [],
+      };
+
       if (storedUser) {
         const parsedUser: User = JSON.parse(storedUser);
         setUser({
-          ...parsedUser, 
-          chorePreferences: parsedUser.chorePreferences || [] 
+          ...parsedUser,
+          chorePreferences: parsedUser.chorePreferences || []
         });
+      } else {
+        // For development: Auto-login with default user
+        setUser(defaultUser);
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(defaultUser));
       }
     } catch (e) {
       console.error("Error loading auth state:", e);

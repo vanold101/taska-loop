@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import CreateTripModal from "@/components/CreateTripModal";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Clock, CheckCircle, Store, ShoppingCart, Map, Calendar, Settings, X, Sparkles, ScanLine } from "lucide-react";
+import { Search, Filter, Clock, CheckCircle, Store as StoreIcon, ShoppingCart, Map, Calendar, Settings, X, Sparkles, ScanLine, DollarSign, Plus, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import QuickTripButton from "@/components/QuickTripButton";
@@ -24,6 +24,15 @@ import ExportButton from "@/components/ExportButton";
 import SmartListParser from "@/components/SmartListParser";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import TripBarcodeAdder from "@/components/TripBarcodeAdder";
+import { AllItemsView } from '@/components/AllItemsView';
+import { ScheduleTripModal } from "@/components/ScheduleTripModal";
+import { BudgetAdjustModal } from "@/components/BudgetAdjustModal";
+import { NearbyStoresModal } from "@/components/NearbyStoresModal";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { format } from "date-fns";
+import { haptics } from "@/lib/haptics";
+import type { Store as StoreType } from "@/types/store";
+import { ActiveTripAnimation } from "@/components/ActiveTripAnimation";
 
 // New component for trip selection dialog
 const TripSelectDialog = ({ 
@@ -62,7 +71,7 @@ const TripSelectDialog = ({
                   onClick={() => onSelect(trip)}
                 >
                   <div className="flex items-center gap-2">
-                    <Store className="h-4 w-4 text-blue-500" />
+                    <StoreIcon className="h-4 w-4 text-blue-500" />
                     <span className="font-medium">{trip.store}</span>
                   </div>
                   <Badge 
@@ -133,6 +142,11 @@ const TripsPage = () => {
   const [showSmartParser, setShowSmartParser] = useState(false);
   const [showTripSelectDialog, setShowTripSelectDialog] = useState(false);
   const [parsedItemsForLaterAdd, setParsedItemsForLaterAdd] = useState<Omit<TripItem, 'id'>[]>([]);
+  const [showAllItems, setShowAllItems] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showNearbyStoresModal, setShowNearbyStoresModal] = useState(false);
+  const [monthlyBudget, setMonthlyBudget] = useLocalStorage("monthlyBudget", 500);
   
   // Split trips into active and past based on status
   const [trips, setTrips] = useState<TripData[]>([]);
@@ -167,16 +181,25 @@ const TripsPage = () => {
       const transformedTrips = contextTrips.map(trip => ({
         id: trip.id,
         store: trip.store,
-        shopper: trip.shopper || {
-          name: "You",
-          avatar: "https://example.com/you.jpg"
+        shopper: {
+          name: trip.shopper?.name || "You",
+          avatar: trip.shopper?.avatar || "https://example.com/you.jpg"
         },
         eta: trip.eta || '',
         status: trip.status,
-        items: trip.items,
-        participants: trip.participants,
-        itemCount: trip.items.length,
-        date: trip.date ? new Date(trip.date).toISOString() : new Date().toISOString() // Ensure date is always set
+        items: trip.items.map(item => ({
+          ...item,
+          recurrenceFrequency: item.recurrenceFrequency || null,
+          addedBy: {
+            name: item.addedBy.name,
+            avatar: item.addedBy.avatar || "https://example.com/default-avatar.jpg"
+          }
+        })),
+        participants: trip.participants.map(p => ({
+          ...p,
+          avatar: p.avatar || `https://api.dicebear.com/7.x/avatars/svg?seed=${p.id}`
+        })),
+        date: trip.date ? new Date(trip.date).toISOString() : new Date().toISOString()
       }));
       
       // Split into active and past trips
@@ -212,13 +235,11 @@ const TripsPage = () => {
   // Show calendar view
   const handleCalendarView = () => {
     setShowCalendarView(true);
-    setShowMapView(false);
   };
   
   // Show map view
   const handleMapView = () => {
     setShowMapView(true);
-    setShowCalendarView(false);
   };
   
   // Create a new trip
@@ -594,11 +615,144 @@ const TripsPage = () => {
         : `Added ${addedCount} items to your trip.`
     });
   };
-  
+
+  const handleViewAllItems = () => {
+    setShowAllItems(true);
+  };
+
+  const handleItemClick = (tripId: string, itemId: string) => {
+    const trip = trips.find(t => t.id === tripId) || pastTrips.find(t => t.id === tripId);
+    if (trip) {
+      setSelectedTrip(trip);
+      setTripDetailModalOpen(true);
+      setShowAllItems(false);
+    }
+  };
+
+  const handleScheduleTrip = (data: { store: string; date: Date; eta: string }) => {
+    const newTrip: Omit<ContextTrip, "id"> = {
+      store: data.store,
+      date: data.date.toISOString(),
+      eta: data.eta,
+      status: "open",
+      items: [],
+      participants: [],
+      shopper: {
+        name: "You",
+        avatar: "https://example.com/avatar.jpg"
+      }
+    };
+    
+    addContextTrip(newTrip);
+    toast({
+      title: "Trip Scheduled",
+      description: `Trip to ${data.store} scheduled for ${format(data.date, "PPP")} at ${data.eta}`,
+    });
+  };
+
+  const handleBudgetAdjust = (newBudget: number) => {
+    setMonthlyBudget(newBudget);
+  };
+
+  const handleStoreSelect = (selectedStore: StoreType) => {
+    setTripModalOpen(true);
+    // Pre-fill the store name in the create trip modal
+    // You'll need to modify your CreateTripModal to accept an initial store value
+  };
+
+  const handleStartTrip = async (tripId: string) => {
+    const trip = trips.find(t => t.id === tripId);
+    if (!trip) return;
+
+    // Update trip status
+    await updateContextTrip(tripId, {
+      status: "shopping",
+      shopper: {
+        name: trip.shopper.name,
+        avatar: trip.shopper.avatar
+      }
+    });
+
+    // Show active trip animation
+    setActiveTrip(trip);
+
+    // Notify participants
+    if (trip.participants.length > 0) {
+      // Here you would typically integrate with a notification service
+      toast({
+        title: "Trip Started",
+        description: `Notified ${trip.participants.length} participants that shopping has begun.`,
+      });
+
+      // Send notifications to each participant
+      trip.participants.forEach(participant => {
+        // In a real app, you would use a proper notification service
+        console.log(`Sending notification to ${participant.name}`);
+      });
+    }
+
+    // Add haptic feedback
+    haptics.heavy();
+  };
+
+  // Add state for active trip
+  const [activeTrip, setActiveTrip] = useState<TripData | null>(null);
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen bg-gloop-background dark:bg-gloop-dark-background">
       <NavBar />
       
+      {/* Action buttons */}
+      <div className="flex items-center justify-between px-4 py-2 border-b dark:border-gray-700">
+        <h1 className="text-2xl font-semibold">Trips</h1>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowAllItems(true)}>
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            View All Items
+          </Button>
+          <Button variant="outline" onClick={handleCalendarView}>
+            <Calendar className="h-4 w-4 mr-2" />
+            Calendar
+          </Button>
+          <Button variant="outline" onClick={handleMapView}>
+            <Map className="h-4 w-4 mr-2" />
+            Map
+          </Button>
+          <Button variant="outline" onClick={() => setShowBudgetModal(true)}>
+            <DollarSign className="h-4 w-4 mr-2" />
+            Budget
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick action buttons */}
+      <div className="flex overflow-x-auto gap-2 p-4 hide-scrollbar">
+        <Button
+          variant="outline"
+          className="whitespace-nowrap"
+          onClick={() => setShowScheduleModal(true)}
+        >
+          <Calendar className="h-4 w-4 mr-2" />
+          Schedule Trip
+        </Button>
+        <Button
+          variant="outline"
+          className="whitespace-nowrap"
+          onClick={() => setShowNearbyStoresModal(true)}
+        >
+          <MapPin className="h-4 w-4 mr-2" />
+          Find Stores
+        </Button>
+        <Button
+          variant="outline"
+          className="whitespace-nowrap"
+          onClick={() => setTripModalOpen(true)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Trip
+        </Button>
+      </div>
+
       <main className="flex-grow w-full px-[5vw] md:px-[8vw] lg:px-[10vw] py-6 md:py-8 pb-20 md:pb-24">
         {/* Header with search and view toggles */}
         <header className="mb-6 md:mb-8">
@@ -689,196 +843,217 @@ const TripsPage = () => {
           </div>
         </header>
         
-        {showCalendarView ? (
-          <TripCalendarView 
-            trips={[...trips, ...pastTrips]} 
-            onClose={() => setShowCalendarView(false)}
-            onTripClick={handleTripClick}
-          />
-        ) : showMapView ? (
-          <TripMapView 
-            trips={[...trips, ...pastTrips]} 
-            onClose={() => setShowMapView(false)}
-            onTripClick={handleTripClick}
-          />
-        ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-gray-100/50 dark:bg-gray-800/50 p-1 mb-4">
-              <TabsTrigger value="active" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm">
-                Active Trips
-              </TabsTrigger>
-              <TabsTrigger value="past" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm">
-                Past Trips
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="active" className="mt-0">
-              <AnimatePresence>
-                {filteredActiveTrips.length > 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
-                  >
-                    {filteredActiveTrips.map((trip) => {
-                      // Ensure we provide the correct type for TripCard
-                      const tripCardData = {
-                        id: trip.id,
-                        store: trip.store,
-                        shopper: trip.shopper || {
-                          name: "You",
-                          avatar: "https://example.com/you.jpg"
-                        },
-                        eta: trip.eta || '',
-                        status: trip.status as 'open' | 'shopping' | 'completed' | 'cancelled',
-                        itemCount: trip.items.length
-                      };
-                      
-                      return (
+        {/* Trip content */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-gray-100/50 dark:bg-gray-800/50 p-1 mb-4">
+            <TabsTrigger value="active" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm">
+              <span>Active Trips</span>
+            </TabsTrigger>
+            <TabsTrigger value="past" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm">
+              <span>Past Trips</span>
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* Tab content */}
+          <TabsContent value="active" className="mt-0">
+            <AnimatePresence>
+              {filteredActiveTrips.length > 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
+                >
+                  {filteredActiveTrips.map((trip) => {
+                    const isActive = trip.status === 'shopping';
+                    
+                    // Ensure we provide the correct type for TripCard
+                    const tripCardData = {
+                      id: trip.id,
+                      store: trip.store,
+                      shopper: {
+                        name: trip.shopper.name,
+                        avatar: trip.shopper.avatar
+                      },
+                      eta: trip.eta || '',
+                      status: trip.status as 'open' | 'shopping' | 'completed' | 'cancelled',
+                      itemCount: trip.items.length
+                    };
+                    
+                    return (
+                      <div key={trip.id} className="relative">
                         <TripCard
-                          key={trip.id}
                           trip={tripCardData}
                           onTripClick={() => handleTripClick(trip)}
                           onAddItem={(item) => handleAddItem(trip.id, item)}
                           onEditTrip={() => handleEditTrip(trip)}
                           onCompleteTrip={() => handleCompleteTrip(trip.id)}
                           onShareTrip={() => handleShareTrip(trip.id)}
+                          onStartTrip={() => handleStartTrip(trip.id)}
                         />
-                      );
-                    })}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500/20 to-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <ShoppingCart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-2">No active trips</h3>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Create a new shopping trip to get started</p>
-                    <Button 
-                      onClick={() => setTripModalOpen(true)}
-                      className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
-                    >
-                      <ShoppingCart className="mr-2 h-4 w-4" />
-                      New Trip
-                    </Button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
-            
-            <TabsContent value="past" className="mt-0">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold flex items-center">
-                  <Clock className="h-5 w-5 mr-2 text-blue-500" />
-                  Shopping History
-                </h2>
-                {pastTrips.length > 0 && (
-                  <ExportButton 
-                    trips={pastTrips}
-                    includeHistory={true}
-                    size="sm"
-                    label="Export History"
-                  />
-                )}
-              </div>
-              
-              <AnimatePresence>
-                {filteredPastTrips.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredPastTrips
-                        .slice(0, expandedPastTripsSection ? undefined : 6)
-                        .map((trip, index) => (
-                          <motion.div
-                            key={trip.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.2, delay: index * 0.05 }}
-                            className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700 p-4"
-                            onClick={() => handleTripClick(trip)}
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-medium text-lg flex items-center">
-                                <Store className="h-4 w-4 mr-2 text-blue-500" />
-                                {trip.store}
-                              </h3>
-                              <Badge variant={trip.status === 'completed' ? "outline" : "destructive"} 
-                                className={trip.status === 'completed' ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : ""}>
-                                {trip.status === 'completed' ? (
-                                  <span className="flex items-center">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Completed
-                                  </span>
-                                ) : 'Cancelled'}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              <p className="flex items-center mb-1">
-                                <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                                {new Date(trip.date).toLocaleDateString(undefined, {
-                                  year: 'numeric', 
-                                  month: 'short', 
-                                  day: 'numeric'
-                                })}
-                              </p>
-                              <p className="flex items-center mb-1">
-                                <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
-                                {trip.items.length} items
-                              </p>
-                              <p className="flex items-center font-medium">
-                                Total: ${trip.items.reduce((sum, item) => sum + (item.price || 0), 0).toFixed(2)}
-                              </p>
-                            </div>
-                          </motion.div>
-                        ))}
-                    </div>
-                    
-                    {pastTrips.length > 6 && (
-                      <div className="flex justify-center mt-4">
-                        <Button 
-                          variant="outline" 
-                          onClick={togglePastTripsSection}
-                        >
-                          {expandedPastTripsSection ? "Show Less" : `View ${pastTrips.length - 6} More Trips`}
-                        </Button>
+                        {isActive && (
+                          <ActiveTripAnimation shopper={trip.shopper} />
+                        )}
                       </div>
-                    )}
+                    );
+                  })}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-200 dark:border-gray-700"
+                >
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500/20 to-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <ShoppingCart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-200 dark:border-gray-700"
+                  <h3 className="text-lg font-medium mb-2">No active trips</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Create a new shopping trip to get started</p>
+                  <Button 
+                    onClick={() => setTripModalOpen(true)}
+                    className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
                   >
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500/20 to-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <CheckCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    New Trip
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </TabsContent>
+          
+          <TabsContent value="past" className="mt-0">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold flex items-center">
+                <Clock className="h-5 w-5 mr-2 text-blue-500" />
+                Shopping History
+              </h2>
+              {pastTrips.length > 0 && (
+                <ExportButton 
+                  trips={pastTrips.map(trip => ({
+                    ...trip,
+                    items: trip.items.map(item => ({
+                      ...item,
+                      recurrenceFrequency: item.recurrenceFrequency || null,
+                      addedBy: {
+                        name: item.addedBy.name,
+                        avatar: item.addedBy.avatar
+                      }
+                    }))
+                  }))}
+                  includeHistory={true}
+                  size="sm"
+                  label="Export History"
+                />
+              )}
+            </div>
+            
+            <AnimatePresence>
+              {filteredPastTrips.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredPastTrips
+                      .slice(0, expandedPastTripsSection ? undefined : 6)
+                      .map((trip, index) => (
+                        <motion.div
+                          key={trip.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.2, delay: index * 0.05 }}
+                          className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700 p-4"
+                          onClick={() => handleTripClick(trip)}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-medium text-lg flex items-center">
+                              <StoreIcon className="h-4 w-4 mr-2 text-blue-500" />
+                              {trip.store}
+                            </h3>
+                            <Badge variant={trip.status === 'completed' ? "outline" : "destructive"} 
+                              className={trip.status === 'completed' ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : ""}>
+                              {trip.status === 'completed' ? (
+                                <span className="flex items-center">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Completed
+                                </span>
+                              ) : 'Cancelled'}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="flex items-center mb-1">
+                              <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                              {new Date(trip.date).toLocaleDateString(undefined, {
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric'
+                              })}
+                            </p>
+                            <p className="flex items-center mb-1">
+                              <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+                              {trip.items.length} items
+                            </p>
+                            <p className="flex items-center font-medium">
+                              Total: ${trip.items.reduce((sum, item) => sum + (item.price || 0), 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                  
+                  {pastTrips.length > 6 && (
+                    <div className="flex justify-center mt-4">
+                      <Button 
+                        variant="outline" 
+                        onClick={togglePastTripsSection}
+                      >
+                        {expandedPastTripsSection ? "Show Less" : `View ${pastTrips.length - 6} More Trips`}
+                      </Button>
                     </div>
-                    <h3 className="text-lg font-medium mb-2">No past trips</h3>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Your completed trips will appear here</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
-          </Tabs>
-        )}
+                  )}
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-200 dark:border-gray-700"
+                >
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500/20 to-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">No past trips</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Your completed trips will appear here</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </TabsContent>
+        </Tabs>
       </main>
       
-      {/* Smart List Parser */}
+      {/* Modals */}
+      {showCalendarView && (
+        <TripCalendarView
+          trips={[...trips, ...pastTrips]}
+          onClose={() => setShowCalendarView(false)}
+          onTripClick={handleTripClick}
+        />
+      )}
+
+      {showMapView && (
+        <TripMapView
+          trips={[...trips, ...pastTrips]}
+          onClose={() => setShowMapView(false)}
+          onTripClick={handleTripClick}
+        />
+      )}
+
+      {/* Other modals */}
       <SmartListParser 
         isOpen={showSmartParser}
         onClose={() => setShowSmartParser(false)}
         onAddItems={handleAddItemsFromParser}
       />
-      
-      {/* Trip Selection Dialog */}
+
       <TripSelectDialog
         isOpen={showTripSelectDialog}
         onClose={() => setShowTripSelectDialog(false)}
@@ -932,6 +1107,36 @@ const TripsPage = () => {
           }}
         />
       )}
+
+      {/* Add AllItemsView */}
+      <AnimatePresence>
+        {showAllItems && (
+          <AllItemsView
+            trips={[...trips, ...pastTrips]}
+            onClose={() => setShowAllItems(false)}
+            onItemClick={handleItemClick}
+          />
+        )}
+      </AnimatePresence>
+
+      <ScheduleTripModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onSchedule={handleScheduleTrip}
+      />
+
+      <BudgetAdjustModal
+        isOpen={showBudgetModal}
+        onClose={() => setShowBudgetModal(false)}
+        currentBudget={monthlyBudget}
+        onAdjust={handleBudgetAdjust}
+      />
+
+      <NearbyStoresModal
+        isOpen={showNearbyStoresModal}
+        onClose={() => setShowNearbyStoresModal(false)}
+        onSelectStore={handleStoreSelect}
+      />
     </div>
   );
 };

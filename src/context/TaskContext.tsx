@@ -21,48 +21,37 @@ export interface Task {
   notes?: string;
 }
 
-// Define the trip type that will be shared across the app
-export interface Trip {
-  id: string;
-  store: string;
-  location?: string;
-  coordinates?: { lat: number; lng: number };
-  eta: string;
-  status: 'open' | 'shopping' | 'completed' | 'cancelled';
-  items: TripItem[];
-  participants: TripParticipant[];
-  shopper?: {
-    name: string;
-    avatar: string;
-  };
-  date: string; // ISO string format
-}
-
-export interface TripItem {
+export interface Item {
   id: string;
   name: string;
   quantity: number;
+  checked: boolean;
+  category?: string;
+  notes?: string;
   price?: number;
-  unit?: string; // Unit ID (e.g., 'kg', 'lb', 'ea')
-  category?: string; // Added category field
-  addedBy: {
+  unit?: string;
+  addedBy?: {
     name: string;
     avatar: string;
   };
-  checked: boolean;
-
-  // Fields for recurring items
-  isRecurring?: boolean;
-  recurrenceFrequency?: 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | null;
-  nextDueDate?: string; // ISO date string for when it should appear on a list next
-  baseItemId?: string; // Optional: if this item is an instance of a recurring template
-  lastAddedToTripDate?: string; // Optional: ISO date string for when this item was last automatically added to a trip
 }
 
-export interface TripParticipant {
+export interface Trip {
   id: string;
-  name: string;
-  avatar: string;
+  store: string;
+  date: string;
+  time?: string;
+  items: Item[];
+  status: 'open' | 'pending' | 'shopping' | 'completed' | 'cancelled';
+  notes?: string;
+  eta?: string;
+  budget?: number;
+  actualSpent?: number;
+  sharedWith?: string[];
+  coordinates?: { lat: number; lng: number };
+  location?: string;
+  participants: Array<{ id: string; name: string; avatar: string }>;
+  shopper: { name: string; avatar: string };
 }
 
 // Initial mock data for tasks
@@ -118,14 +107,10 @@ const mockTrips: Trip[] = [
   {
     id: '1',
     store: "Trader Joe's",
-    location: "Trader Joe's",
+    date: new Date().toISOString(),
+    time: "10:00",
+    status: 'pending',
     coordinates: { lat: 39.9702, lng: -83.0150 },
-    shopper: {
-      name: "Rachel",
-      avatar: "https://example.com/rachel.jpg"
-    },
-    eta: "10 min",
-    status: 'open',
     items: [
       {
         id: '1-1',
@@ -156,19 +141,15 @@ const mockTrips: Trip[] = [
       { id: '1', name: 'You', avatar: "https://example.com/you.jpg" },
       { id: '2', name: 'Rachel', avatar: "https://example.com/rachel.jpg" }
     ],
-    date: new Date().toISOString() // Today
+    shopper: { name: 'You', avatar: 'https://example.com/you.jpg' }
   },
   {
     id: '2',
     store: "Costco",
-    location: "Costco",
-    coordinates: { lat: 39.9650, lng: -83.0200 },
-    shopper: {
-      name: "You",
-      avatar: "https://example.com/you.jpg"
-    },
-    eta: "15 min",
+    date: new Date(Date.now() + 86400000).toISOString(),
+    time: "14:00",
     status: 'shopping',
+    coordinates: { lat: 39.9650, lng: -83.0200 },
     items: [
       {
         id: '2-1',
@@ -186,19 +167,15 @@ const mockTrips: Trip[] = [
     participants: [
       { id: '1', name: 'You', avatar: "https://example.com/you.jpg" }
     ],
-    date: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+    shopper: { name: 'You', avatar: 'https://example.com/you.jpg' }
   },
   {
     id: '3',
     store: "Whole Foods",
-    location: "Whole Foods",
-    coordinates: { lat: 39.9600, lng: -83.0180 },
-    shopper: {
-      name: "Alex",
-      avatar: "https://example.com/alex.jpg"
-    },
-    eta: "Completed",
+    date: new Date(Date.now() - 86400000).toISOString(),
+    time: "15:00",
     status: 'completed',
+    coordinates: { lat: 39.9600, lng: -83.0180 },
     items: [
       {
         id: '3-1',
@@ -217,27 +194,30 @@ const mockTrips: Trip[] = [
       { id: '1', name: 'You', avatar: "https://example.com/you.jpg" },
       { id: '3', name: 'Alex', avatar: "https://example.com/alex.jpg" }
     ],
-    date: new Date(Date.now() - 86400000).toISOString() // Yesterday
+    shopper: { name: 'Alex', avatar: 'https://example.com/alex.jpg' }
   }
 ];
 
-interface TaskContextType {
+export interface TaskContextType {
   tasks: Task[];
   trips: Trip[];
   addTask: (task: Omit<Task, 'id'>) => void;
   updateTask: (id: string, task: Partial<Task>) => void;
   deleteTask: (id: string) => void;
-  addTrip: (trip: Omit<Trip, 'id'>) => void;
-  updateTrip: (id: string, trip: Partial<Trip>) => void;
-  deleteTrip: (id: string) => void;
+  addTrip: (tripData: Omit<Trip, 'id' | 'status'> & { items?: Item[] }) => void;
+  updateTrip: (tripId: string, updates: Partial<Trip>) => void;
+  deleteTrip: (tripId: string) => void;
   syncTasksWithTrips: () => void;
+  budget: number;
+  updateBudget: (newBudget: number) => void;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
-export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [trips, setTrips] = useState<Trip[]>(mockTrips);
+  const [budget, setBudget] = useState(500);
 
   // Load tasks and trips from localStorage on initial render
   useEffect(() => {
@@ -284,6 +264,11 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [trips]);
 
+  // Save budget to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('budget', JSON.stringify(budget));
+  }, [budget]);
+
   // Add a new task
   const addTask = (task: Omit<Task, 'id'>) => {
     const newTask: Task = {
@@ -307,46 +292,31 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Add a new trip
-  const addTrip = (trip: Omit<Trip, 'id'>) => {
+  const addTrip = (tripData: Omit<Trip, 'id' | 'status'> & { items?: Item[] }) => {
     const newTrip: Trip = {
-      ...trip,
-      id: Date.now().toString(),
-      date: trip.date ? new Date(trip.date).toISOString() : new Date().toISOString() // Ensure date is in ISO format
+      id: Math.random().toString(36).substr(2, 9),
+      ...tripData,
+      items: tripData.items || [],
+      status: 'pending',
+      shopper: tripData.shopper || { name: 'You', avatar: 'https://example.com/you.jpg' }
     };
-    
-    setTrips(prevTrips => {
-      const updatedTrips = [...prevTrips, newTrip];
-      // Save to localStorage
-      localStorage.setItem('trips', JSON.stringify(updatedTrips, replacer));
-      return updatedTrips;
-    });
+    setTrips(prevTrips => [...prevTrips, newTrip]);
+    return newTrip;
   };
 
   // Update an existing trip
-  const updateTrip = (id: string, updatedTrip: Partial<Trip>) => {
-    setTrips(prevTrips => {
-      const updatedTrips = prevTrips.map(trip => {
-        if (trip.id === id) {
-          // If date is being updated, ensure it's in ISO format
-          const newDate = updatedTrip.date ? new Date(updatedTrip.date).toISOString() : trip.date;
-          return { 
-            ...trip, 
-            ...updatedTrip,
-            date: newDate
-          };
-        }
-        return trip;
-      });
-      // Save to localStorage
-      localStorage.setItem('trips', JSON.stringify(updatedTrips, replacer));
-      return updatedTrips;
-    });
+  const updateTrip = (tripId: string, updates: Partial<Trip>) => {
+    setTrips(prevTrips =>
+      prevTrips.map(trip =>
+        trip.id === tripId ? { ...trip, ...updates } : trip
+      )
+    );
   };
 
   // Delete a trip
-  const deleteTrip = (id: string) => {
-    const trip = trips.find(t => t.id === id);
-    setTrips(trips.filter(trip => trip.id !== id));
+  const deleteTrip = (tripId: string) => {
+    const trip = trips.find(t => t.id === tripId);
+    setTrips(trips.filter(trip => trip.id !== tripId));
     
     // Delete corresponding task
     if (trip) {
@@ -362,19 +332,17 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const syncTasksWithTrips = () => {
     // Create tasks for trips that don't have corresponding tasks
     trips.forEach(trip => {
-      if (trip.coordinates) {
-        const taskTitle = `Trip to ${trip.store}`;
-        const existingTask = tasks.find(t => t.title === taskTitle);
-        
-        if (!existingTask) {
-          addTask({
-            title: taskTitle,
-            dueDate: new Date().toISOString().split('T')[0],
-            location: trip.store,
-            coordinates: trip.coordinates,
-            priority: 'medium',
-          });
-        }
+      const taskTitle = `Trip to ${trip.store}`;
+      const existingTask = tasks.find(t => t.title === taskTitle);
+      
+      if (!existingTask && trip.coordinates) {
+        addTask({
+          title: taskTitle,
+          dueDate: new Date().toISOString().split('T')[0],
+          location: trip.store,
+          coordinates: trip.coordinates,
+          priority: 'medium',
+        });
       }
     });
     
@@ -384,7 +352,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storeName = task.title.replace('Trip to ', '');
         const trip = trips.find(t => t.store === storeName);
         
-        if (trip && trip.coordinates) {
+        if (trip?.coordinates) {
           updateTask(task.id, {
             location: trip.store,
             coordinates: trip.coordinates,
@@ -394,27 +362,31 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  return (
-    <TaskContext.Provider value={{
-      tasks,
-      trips,
-      addTask,
-      updateTask,
-      deleteTask,
-      addTrip,
-      updateTrip,
-      deleteTrip,
-      syncTasksWithTrips,
-    }}>
-      {children}
-    </TaskContext.Provider>
-  );
-};
+  const updateBudget = (newBudget: number) => {
+    setBudget(newBudget);
+  };
 
-export const useTaskContext = () => {
+  const value = {
+    tasks,
+    trips,
+    addTask,
+    updateTask,
+    deleteTask,
+    addTrip,
+    updateTrip,
+    deleteTrip,
+    syncTasksWithTrips,
+    budget,
+    updateBudget,
+  };
+
+  return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
+}
+
+export function useTaskContext() {
   const context = useContext(TaskContext);
   if (context === undefined) {
     throw new Error('useTaskContext must be used within a TaskProvider');
   }
   return context;
-};
+}

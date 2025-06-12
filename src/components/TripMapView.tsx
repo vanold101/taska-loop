@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Map, MapPin, X, Search, Filter, Navigation, Store as StoreIcon } from 'lucide-react';
+import { Map, MapPin, X, Search, Filter, Navigation, Store as StoreIcon, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TripData } from './TripDetailModal';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { stores, Store, findStoreByName, getStoresByCategory } from '@/data/stores';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useToast } from '@/hooks/use-toast';
+import { initGoogleMapsDirections, initGoogleMapsGeometry } from '@/services/googlePlaces';
 
 interface TripMapViewProps {
   trips: TripData[];
@@ -13,25 +16,22 @@ interface TripMapViewProps {
   onClose: () => void;
 }
 
-// Declare only the initTripMap without redeclaring google
-declare global {
-  interface Window {
-    initTripMap: () => void;
-  }
-}
-
 const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }) => {
+  const { toast } = useToast();
   const [selectedTrip, setSelectedTrip] = useState<TripData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState({ lat: 37.78, lng: -122.41 });
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [tripsWithStores, setTripsWithStores] = useState<(TripData & { lat: number, lng: number })[]>([]);
+  const [isOptimizingRoute, setIsOptimizingRoute] = useState(false);
+  const [optimizedRoute, setOptimizedRoute] = useState<google.maps.DirectionsResult | null>(null);
   
   const mapRef = useRef<HTMLDivElement>(null);
-  const googleMapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const infoWindowRef = useRef<any>(null);
+  const googleMapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
 
   // Get user's location on initial load
   useEffect(() => {
@@ -63,66 +63,80 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
     }
   }, []);
 
-  // Load Google Maps
+  // Initialize map
   useEffect(() => {
-    // Connect trips with store coordinates
-    const tripsWithCoords = trips.map(trip => {
-      const storeInfo = findStoreByName(trip.store);
-      return {
-        ...trip,
-        lat: storeInfo?.lat || userLocation.lat + (Math.random() * 0.01 - 0.005),
-        lng: storeInfo?.lng || userLocation.lng + (Math.random() * 0.01 - 0.005)
-      };
-    });
-    setTripsWithStores(tripsWithCoords);
-
-    // Load Google Maps script
-    const loadGoogleMapsScript = () => {
-      // Check if script is already loaded
-      if (window.google && window.google.maps) {
-        window.initTripMap();
-        return () => {};
-      }
-      
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8&libraries=places,geometry&callback=initTripMap`;
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-      
-      return () => {
-        if (document.head.contains(script)) {
-          document.head.removeChild(script);
-        }
-      };
-    };
-
-    // Initialize map when script is loaded
-    window.initTripMap = () => {
+    const initializeMap = async () => {
       if (mapRef.current && !googleMapRef.current) {
-        const mapOptions = {
-          center: userLocation,
-          zoom: 12,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: true,
-          zoomControl: true
-        };
-        
-        googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
-        infoWindowRef.current = new window.google.maps.InfoWindow();
-        
-        // Add markers for all trips
-        addTripMarkers(tripsWithCoords);
+        try {
+          await initGoogleMapsDirections();
+          await initGoogleMapsGeometry();
+
+          const mapOptions = {
+            center: userLocation,
+            zoom: 12,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+            zoomControl: true,
+            styles: [
+              {
+                featureType: "poi",
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+              }
+            ]
+          };
+          
+          const map = new window.google.maps.Map(mapRef.current, mapOptions);
+          googleMapRef.current = map;
+          infoWindowRef.current = new window.google.maps.InfoWindow();
+          
+          directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+            suppressMarkers: true,
+            preserveViewport: false,
+            polylineOptions: {
+              strokeColor: '#4285F4',
+              strokeWeight: 4,
+              strokeOpacity: 0.8
+            }
+          });
+          
+          directionsRendererRef.current.setMap(map);
+
+        } catch (error) {
+          console.error("Failed to initialize Google Maps", error);
+          toast({
+            title: "Map Error",
+            description: "Could not load the map. Please try again later.",
+            variant: "destructive"
+          });
+        }
       }
     };
+    
+    if (!isLoadingLocation) {
+      initializeMap();
+    }
+  }, [isLoadingLocation, userLocation, toast]);
 
-    const cleanup = loadGoogleMapsScript();
-    return cleanup;
-  }, [trips, userLocation]);
+  // Update markers when trips or map is ready
+  useEffect(() => {
+    if (googleMapRef.current && trips.length > 0) {
+      const tripsWithCoords = trips.map(trip => {
+        const storeInfo = findStoreByName(trip.store);
+        return {
+          ...trip,
+          lat: storeInfo?.lat || userLocation.lat + (Math.random() * 0.01 - 0.005),
+          lng: storeInfo?.lng || userLocation.lng + (Math.random() * 0.01 - 0.005)
+        };
+      });
+      setTripsWithStores(tripsWithCoords);
+      addTripMarkers(tripsWithCoords);
+    }
+  }, [trips, googleMapRef.current, userLocation]);
 
   // Add markers for all trips
-  const addTripMarkers = (tripsWithCoords: (TripData & { lat: number, lng: number })[]) => {
+  const addTripMarkers = (tripsWithStores: (TripData & { lat: number, lng: number })[]) => {
     if (!googleMapRef.current || !window.google) return;
     
     // Clear existing markers
@@ -132,84 +146,13 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
     markersRef.current = [];
     
     const bounds = new window.google.maps.LatLngBounds();
-    
-    // Check if AdvancedMarkerElement is available (newer API)
-    const useAdvancedMarker = window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement;
-    
-    tripsWithCoords.forEach((trip) => {
-      if (useAdvancedMarker) {
-        // Create advanced marker (recommended by Google)
-        const markerElement = document.createElement('div');
-        markerElement.className = 'marker-container';
-        markerElement.innerHTML = `
-          <div style="
-            width: 30px; 
-            height: 30px; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            background-color: ${getMarkerColor(trip.status)};
-            color: white;
-            font-weight: bold;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            border: 2px solid white;
-          ">
-            ${trip.items.length}
-          </div>
-        `;
-        
-        const marker = new window.google.maps.marker.AdvancedMarkerElement({
-          position: { lat: trip.lat, lng: trip.lng },
-          map: googleMapRef.current,
-          title: trip.store,
-          content: markerElement
-        });
-        
-        // Add click listener to marker
-        marker.addListener('click', () => {
-          handleTripMarkerClick(trip, marker);
-        });
-        
-        markersRef.current.push(marker);
-      } else {
-        // Fallback to legacy marker if AdvancedMarkerElement is not available
-        const marker = new window.google.maps.Marker({
-          position: { lat: trip.lat, lng: trip.lng },
-          map: googleMapRef.current,
-          title: trip.store,
-          label: {
-            text: trip.items.length.toString(),
-            color: '#FFFFFF'
-          },
-          icon: {
-            path: 'M10 27c-.2 0-.2 0-.5-1-.3-.8-.7-2-1.6-3.5-1-1.5-2-2.7-3-3.8-2.2-2.8-3.9-5-3.9-8.8C1 4.9 5 1 10 1s9 4 9 8.9c0 3.9-1.8 6-4 8.8-1 1.2-1.9 2.4-2.8 3.8-.3 1-.4 1-.6 1Z',
-            fillColor: getMarkerColor(trip.status),
-            fillOpacity: 1,
-            strokeWeight: 1,
-            strokeColor: '#FFFFFF',
-            anchor: new window.google.maps.Point(15, 29),
-            scale: 1.2,
-            labelOrigin: new window.google.maps.Point(10, 9),
-          }
-        });
-        
-        // Add click listener to marker
-        marker.addListener('click', () => {
-          handleTripMarkerClick(trip, marker);
-        });
-        
-        markersRef.current.push(marker);
-      }
-      
-      bounds.extend({ lat: trip.lat, lng: trip.lng });
-    });
+    bounds.extend(userLocation);
     
     // Add user location marker
     const userMarker = new window.google.maps.Marker({
       position: userLocation,
       map: googleMapRef.current,
-      title: "Your Location",
+      title: 'Your Location',
       icon: {
         path: window.google.maps.SymbolPath.CIRCLE,
         fillColor: '#4285F4',
@@ -219,180 +162,242 @@ const TripMapView: React.FC<TripMapViewProps> = ({ trips, onTripClick, onClose }
         scale: 8
       }
     });
-    
     markersRef.current.push(userMarker);
-    bounds.extend(userLocation);
     
-    // Fit map to show all markers
-    if (tripsWithCoords.length > 0) {
-      googleMapRef.current.fitBounds(bounds);
-      
-      // If only one marker, zoom out a bit
-      if (tripsWithCoords.length === 1) {
-        googleMapRef.current.setZoom(14);
-      }
-    }
-  };
-
-  // Get marker color based on trip status
-  const getMarkerColor = (status: string) => {
-    switch (status) {
-      case 'open':
-        return '#22c55e'; // Green-500
-      case 'in-progress':
-        return '#3b82f6'; // Blue-500
-      case 'waiting':
-        return '#f59e0b'; // Amber-500
-      case 'completed':
-        return '#6b7280'; // Gray-500
-      default:
-        return '#3b82f6'; // Blue-500
-    }
-  };
-
-  // Handle trip marker click
-  const handleTripMarkerClick = (trip: TripData, marker: any) => {
-    setSelectedTrip(trip);
-    
-    if (infoWindowRef.current) {
-      const contentString = `
-        <div style="padding: 8px; max-width: 200px;">
-          <h3 style="margin: 0 0 8px; font-size: 16px;">${trip.store}</h3>
-          <p style="margin: 0 0 4px; font-size: 14px;">${trip.items.length} items</p>
-          <p style="margin: 0; font-size: 14px;">Status: ${trip.status}</p>
-          <div style="margin-top: 8px;">
-            <button id="view-trip-btn" style="
-              background-color: #1a73e8;
-              color: white;
-              border: none;
-              padding: 6px 12px;
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 14px;
-            ">View Trip</button>
-          </div>
-        </div>
-      `;
-      
-      infoWindowRef.current.setContent(contentString);
-      infoWindowRef.current.open(googleMapRef.current, marker);
-      
-      // Add event listener to the view trip button
-      setTimeout(() => {
-        const viewTripBtn = document.getElementById('view-trip-btn');
-        if (viewTripBtn) {
-          viewTripBtn.addEventListener('click', () => {
-            onTripClick(trip);
-          });
+    tripsWithStores.forEach((trip) => {
+      const marker = new window.google.maps.Marker({
+        position: { lat: trip.lat, lng: trip.lng },
+        map: googleMapRef.current,
+        title: trip.store,
+        icon: {
+          url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png'
         }
-      }, 100);
+      });
+      
+      marker.addListener('click', () => {
+        handleTripMarkerClick(trip, marker);
+      });
+      
+      markersRef.current.push(marker);
+      bounds.extend({ lat: trip.lat, lng: trip.lng });
+    });
+    
+    // Fit bounds with padding
+    googleMapRef.current.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+  };
+
+  const handleTripMarkerClick = (trip: TripData, marker: google.maps.Marker) => {
+    if (!infoWindowRef.current || !googleMapRef.current) return;
+    
+    const contentString = `
+      <div class="p-3">
+        <h3 class="font-semibold mb-2">${trip.store}</h3>
+        <p class="text-sm mb-1">${trip.items.length} items</p>
+        <p class="text-sm mb-2">Status: ${trip.status}</p>
+        <button
+          id="view-trip-btn"
+          class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors"
+        >
+          View Details
+        </button>
+      </div>
+    `;
+    
+    infoWindowRef.current.setContent(contentString);
+    infoWindowRef.current.open(googleMapRef.current, marker);
+    
+    // Add click listener to the view button
+    setTimeout(() => {
+      const viewBtn = document.getElementById('view-trip-btn');
+      if (viewBtn) {
+        viewBtn.addEventListener('click', () => {
+          onTripClick(trip);
+          infoWindowRef.current?.close();
+        });
+      }
+    }, 0);
+  };
+
+  const optimizeRoute = async () => {
+    if (!googleMapRef.current || !window.google || tripsWithStores.length === 0) {
+      toast({
+        title: "Cannot optimize route",
+        description: "No trips available or map not initialized",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsOptimizingRoute(true);
+
+    try {
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      // Google Maps has a limit of 25 waypoints in the free tier
+      if (tripsWithStores.length > 25) {
+        toast({
+          title: "Too many stops",
+          description: "Route optimization is limited to 25 stops. Only the first 25 stops will be included.",
+          variant: "default"
+        });
+      }
+
+      // Take only the first 25 trips to stay within limits
+      const tripsToOptimize = tripsWithStores.slice(0, 25);
+      
+      // Create waypoints from trips
+      const waypoints = tripsToOptimize.map(trip => ({
+        location: new window.google.maps.LatLng(trip.lat, trip.lng),
+        stopover: true
+      }));
+
+      // Clear existing route if any
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+          suppressMarkers: true,
+          preserveViewport: false,
+          polylineOptions: {
+            strokeColor: '#4285F4',
+            strokeWeight: 4,
+            strokeOpacity: 0.8
+          }
+        });
+        directionsRendererRef.current.setMap(googleMapRef.current);
+      }
+
+      const result = await directionsService.route({
+        origin: userLocation,
+        destination: userLocation, // Return to start
+        waypoints: waypoints,
+        optimizeWaypoints: true,
+        travelMode: google.maps.TravelMode.DRIVING
+      });
+
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setDirections(result);
+      }
+
+      setOptimizedRoute(result);
+
+      // Calculate total distance and duration
+      const route = result.routes[0];
+      let totalDistance = 0;
+      let totalDuration = 0;
+
+      route.legs.forEach(leg => {
+        totalDistance += leg.distance?.value || 0;
+        totalDuration += leg.duration?.value || 0;
+      });
+
+      // Get the optimized order of stops
+      const optimizedOrder = route.waypoint_order.map(index => tripsToOptimize[index].store);
+      const optimizedOrderStr = optimizedOrder.join(' → ');
+
+      // Update markers to show the optimized order
+      markersRef.current.forEach(marker => {
+        if (marker.getTitle() !== 'Your Location') {
+          const stopIndex = optimizedOrder.indexOf(marker.getTitle() || '');
+          if (stopIndex !== -1) {
+            // Update marker label to show the order
+            marker.setLabel({
+              text: (stopIndex + 1).toString(),
+              color: '#FFFFFF',
+              fontWeight: 'bold'
+            });
+          }
+        }
+      });
+
+      toast({
+        title: "Route Optimized",
+        description: `Total distance: ${(totalDistance / 1000).toFixed(1)}km, Duration: ${Math.round(totalDuration / 60)} mins\nOptimized route: ${optimizedOrderStr}`,
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Error optimizing route:', error);
+      toast({
+        title: "Route optimization failed",
+        description: "Could not calculate the optimal route",
+        variant: "destructive"
+      });
+    } finally {
+      setIsOptimizingRoute(false);
     }
   };
 
-  // Calculate distance between two coordinates in miles
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 3958.8; // Earth's radius in miles
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return R * c;
-  };
+  const clearRoute = () => {
+    if (directionsRendererRef.current) {
+      directionsRendererRef.current.setMap(null);
+      directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+        suppressMarkers: true,
+        preserveViewport: false,
+        polylineOptions: {
+          strokeColor: '#4285F4',
+          strokeWeight: 4,
+          strokeOpacity: 0.8
+        }
+      });
+      directionsRendererRef.current.setMap(googleMapRef.current);
+    }
+    setOptimizedRoute(null);
 
-  // Filter trips by search query
-  const filteredTrips = searchQuery.trim() === '' 
-    ? tripsWithStores 
-    : tripsWithStores.filter(trip => 
-        trip.store.toLowerCase().includes(searchQuery.toLowerCase()));
+    // Reset marker labels
+    markersRef.current.forEach(marker => {
+      if (marker.getTitle() !== 'Your Location') {
+        marker.setLabel(null);
+      }
+    });
+  };
 
   return (
-    <motion.div 
-      className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div 
-        className="p-4 flex-1 flex flex-col"
-        initial={{ y: 20 }}
-        animate={{ y: 0 }}
-      >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Trips Map</h2>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <div className="relative mb-4">
-          <Input
-            type="text"
-            placeholder="Search trips..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pr-10"
-          />
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
-        </div>
-
-        <div className="flex-1 relative rounded-lg overflow-hidden">
-          {isLoadingLocation ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                <p>Getting your location...</p>
-              </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[800px] h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-blue-600" />
+              Trip Map View
             </div>
-          ) : (
-            <>
-              <div 
-                ref={mapRef} 
-                className="h-full w-full"
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={optimizedRoute ? clearRoute : optimizeRoute}
+                disabled={isOptimizingRoute || tripsWithStores.length === 0}
               >
-                {/* Google Map will be rendered here */}
-              </div>
-              
-              {locationError && (
-                <div className="absolute bottom-4 left-4 right-4 bg-red-100 dark:bg-red-900 p-2 rounded-md text-sm text-red-700 dark:text-red-200">
-                  {locationError}
-                </div>
-              )}
-            </>
-          )}
+                {isOptimizingRoute ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Navigation className="h-4 w-4 mr-2" />
+                )}
+                {optimizedRoute ? 'Clear Route' : 'Optimize Route'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogTitle>
+          <DialogDescription>
+            View and optimize your shopping trips
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 h-full min-h-[400px] mt-4">
+          <div 
+            ref={mapRef} 
+            className="w-full h-full rounded-lg border shadow-sm"
+            style={{ minHeight: '500px' }}
+          />
         </div>
 
-        <div className="mt-4 flex justify-between">
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex items-center">
-              <div className="h-3 w-3 rounded-full bg-green-500 mr-1"></div>
-              <span className="text-xs">Open</span>
-            </div>
-            <div className="flex items-center">
-              <div className="h-3 w-3 rounded-full bg-blue-500 mr-1"></div>
-              <span className="text-xs">Shopping</span>
-            </div>
-            <div className="flex items-center">
-              <div className="h-3 w-3 rounded-full bg-gray-500 mr-1"></div>
-              <span className="text-xs">Completed</span>
-            </div>
-            <div className="flex items-center">
-              <div className="h-3 w-3 rounded-full bg-red-500 mr-1"></div>
-              <span className="text-xs">Cancelled</span>
-            </div>
+        {locationError && (
+          <div className="mt-2 text-sm text-amber-600">
+            {locationError}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {filteredTrips.length} trips shown
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };
 

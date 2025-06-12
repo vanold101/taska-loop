@@ -7,6 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { X } from "lucide-react";
 
@@ -23,6 +24,60 @@ interface PantryBarcodeAdderProps {
   onAddPantryItem: (item: PantryItem) => void;
 }
 
+// Common food categories with mapping from Open Food Facts categories
+const CATEGORY_MAPPING: Record<string, string> = {
+  'dairy': 'Dairy',
+  'milk': 'Dairy',
+  'cheese': 'Dairy',
+  'yogurt': 'Dairy',
+  'eggs': 'Dairy',
+  'meat': 'Meat',
+  'poultry': 'Meat',
+  'fish': 'Seafood',
+  'seafood': 'Seafood',
+  'fruit': 'Produce',
+  'vegetable': 'Produce',
+  'produce': 'Produce',
+  'bakery': 'Bakery',
+  'bread': 'Bakery',
+  'pastry': 'Bakery',
+  'pasta': 'Pantry',
+  'rice': 'Pantry',
+  'cereal': 'Pantry',
+  'canned': 'Pantry',
+  'spice': 'Pantry',
+  'sauce': 'Pantry',
+  'oil': 'Pantry',
+  'snack': 'Snacks',
+  'candy': 'Snacks',
+  'chocolate': 'Snacks',
+  'beverage': 'Beverages',
+  'drink': 'Beverages',
+  'juice': 'Beverages',
+  'soda': 'Beverages',
+  'water': 'Beverages',
+  'alcohol': 'Beverages',
+  'frozen': 'Frozen',
+  'ice cream': 'Frozen',
+  'pizza': 'Frozen',
+  'cleaning': 'Household',
+  'paper': 'Household',
+  'household': 'Household'
+};
+
+const COMMON_CATEGORIES = [
+  'Dairy',
+  'Meat',
+  'Seafood',
+  'Produce',
+  'Bakery',
+  'Pantry',
+  'Snacks',
+  'Beverages',
+  'Frozen',
+  'Household'
+];
+
 const PantryBarcodeAdder = ({ onAddPantryItem }: PantryBarcodeAdderProps) => {
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<ScannedItem | null>(null);
@@ -31,29 +86,74 @@ const PantryBarcodeAdder = ({ onAddPantryItem }: PantryBarcodeAdderProps) => {
   const [category, setCategory] = useState<string>('Pantry');
   const { toast } = useToast();
 
+  // Determine category from Open Food Facts category data
+  const determineCategoryFromProduct = (product: ScannedItem): string => {
+    if (!product.category) return 'Pantry'; // Default
+    
+    const lowerCategory = product.category.toLowerCase();
+    
+    // Try to find a matching category
+    for (const [key, value] of Object.entries(CATEGORY_MAPPING)) {
+      if (lowerCategory.includes(key)) {
+        return value;
+      }
+    }
+    
+    // If no match, return default
+    return 'Pantry';
+  };
+
   const handleBarcodeScan = (item: ScannedItem) => {
+    console.log("Scanned item:", item);
+    
     setScannedProduct(item);
     setIsProductDrawerOpen(true);
     setQuantity(1);
-    setExpiry(new Date().toISOString().split('T')[0]);
-    setCategory('Pantry');
+    
+    // Set expiry date to 2 weeks from now as a reasonable default
+    const twoWeeksFromNow = new Date();
+    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+    setExpiry(twoWeeksFromNow.toISOString().split('T')[0]);
+    
+    // Try to determine category from product data
+    const detectedCategory = determineCategoryFromProduct(item);
+    setCategory(detectedCategory);
+    
+    toast({
+      title: "Product Scanned",
+      description: `Found: ${item.name || item.upc}`,
+    });
   };
 
   const handleAddToPantry = () => {
     if (!scannedProduct) return;
+    
+    // Validate item data
+    if (!scannedProduct.name && !scannedProduct.upc) {
+      toast({
+        title: "Invalid Item",
+        description: "The scanned item doesn't have enough information.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const newItem: PantryItem = {
       id: Date.now().toString(),
-      name: scannedProduct.name || scannedProduct.upc,
+      name: scannedProduct.name || `Product (${scannedProduct.upc})`,
       quantity,
       expiry,
       category,
       lowStock: quantity <= 1
     };
+    
     onAddPantryItem(newItem);
+    
     toast({
-      title: "Item Added",
+      title: "Item Added to Pantry",
       description: `${newItem.name} has been added to your pantry.`,
     });
+    
     resetForm();
   };
 
@@ -140,13 +240,16 @@ const PantryBarcodeAdder = ({ onAddPantryItem }: PantryBarcodeAdderProps) => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      type="text"
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      placeholder="Pantry, Dairy, Produce, etc."
-                    />
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMMON_CATEGORIES.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between space-x-2 py-3">

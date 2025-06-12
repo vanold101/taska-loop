@@ -137,17 +137,17 @@ ${input}`;
             console.log(`No numeric quantity found, using as unit: ${unit}`);
           }
           
-          const newItem = {
+          const newItem: Omit<TripItem, 'id'> = {
             name,
             quantity,
             unit,
-            price: 0,
             checked: false,
-            category: 'uncategorized',
             addedBy: {
               name: "You",
               avatar: "https://example.com/you.jpg"
-            }
+            },
+            isRecurring: false,
+            recurrenceFrequency: null
           };
           
           console.log("Adding structured item:", newItem);
@@ -166,17 +166,17 @@ ${input}`;
             const quantity = parseFloat(simpleMatch[2]);
             const unit = simpleMatch[3] ? simpleMatch[3].trim() : '';
             
-            const newItem = {
+            const newItem: Omit<TripItem, 'id'> = {
               name,
               quantity,
               unit,
-              price: 0,
               checked: false,
-              category: 'uncategorized',
               addedBy: {
                 name: "You",
                 avatar: "https://example.com/you.jpg"
-              }
+              },
+              isRecurring: false,
+              recurrenceFrequency: null
             };
             
             console.log("Adding simple format item:", newItem);
@@ -195,17 +195,17 @@ ${input}`;
             const quantity = parseFloat(dashMatch[2]);
             const unit = dashMatch[3] ? dashMatch[3].trim() : '';
             
-            const newItem = {
+            const newItem: Omit<TripItem, 'id'> = {
               name,
               quantity,
               unit,
-              price: 0,
               checked: false,
-              category: 'uncategorized',
               addedBy: {
                 name: "You",
                 avatar: "https://example.com/you.jpg"
-              }
+              },
+              isRecurring: false,
+              recurrenceFrequency: null
             };
             
             console.log("Adding dash format item:", newItem);
@@ -217,17 +217,17 @@ ${input}`;
         if (!parsedItem) {
           console.log("No format match, treating as plain item:", itemText);
           
-          const newItem = {
+          const newItem: Omit<TripItem, 'id'> = {
             name: itemText,
             quantity: 1,
             unit: '',
-            price: 0,
             checked: false,
-            category: 'uncategorized',
             addedBy: {
               name: "You",
               avatar: "https://example.com/you.jpg"
-            }
+            },
+            isRecurring: false,
+            recurrenceFrequency: null
           };
           
           console.log("Adding plain item:", newItem);

@@ -1,10 +1,10 @@
 import React from 'react';
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "../components/ui/button";
+import { Switch } from "../components/ui/switch";
+import { Label } from "../components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Car, PersonStanding, Train, Bike } from 'lucide-react';
-import type { RoutePreferences as RoutePreferencesType } from '@/types/routing';
+import type { RoutePreferences as RoutePreferencesType } from '../types/routing';
 
 interface RoutePreferencesProps {
   preferences: RoutePreferencesType;

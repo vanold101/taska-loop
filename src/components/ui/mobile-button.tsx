@@ -1,20 +1,32 @@
 import { ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { LoadingSpinner } from "./loading-spinner";
 
 interface MobileButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive";
   size?: "default" | "sm" | "lg" | "icon";
   fullWidth?: boolean;
   loading?: boolean;
+  loadingText?: string;
 }
 
 const MobileButton = forwardRef<HTMLButtonElement, MobileButtonProps>(
-  ({ className, variant = "default", size = "default", fullWidth, loading, children, ...props }, ref) => {
+  ({ 
+    className, 
+    variant = "default", 
+    size = "default", 
+    fullWidth, 
+    loading = false,
+    loadingText,
+    children,
+    disabled,
+    ...props 
+  }, ref) => {
     const isMobile = useMediaQuery("(max-width: 768px)");
 
     const baseStyles = cn(
-      "inline-flex items-center justify-center rounded-md font-medium transition-colors active:scale-95",
+      "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors active:scale-95",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       "disabled:pointer-events-none disabled:opacity-50",
       {
@@ -37,12 +49,14 @@ const MobileButton = forwardRef<HTMLButtonElement, MobileButtonProps>(
       <button
         ref={ref}
         className={baseStyles}
+        disabled={disabled || loading}
         {...props}
       >
         {loading ? (
-          <div
-            className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"
-          />
+          <>
+            <LoadingSpinner size={size === "sm" ? "sm" : size === "lg" ? "lg" : "default"} />
+            {loadingText && <span>{loadingText}</span>}
+          </>
         ) : (
           children
         )}

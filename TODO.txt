@@ -1,0 +1,90 @@
+# Button and Functionality Issues TODO List
+
+## Easy Fixes (1-2 hours)
+
+1. Missing Aria Labels ✅
+- Add aria-labels to all MobileCardAction buttons ✅
+- Add descriptive aria-labels to UnitSelector buttons ✅
+- Add aria-labels to notification action buttons ✅
+- Add aria-labels to voice command buttons ✅
+
+2. Button Loading States ✅
+- Add loading state to MobileButton component for all variants ✅
+- Implement consistent loading spinner across all button types ✅
+- Add loading state to BarcodeScannerButton during initialization ✅
+
+3. Touch Target Sizes
+- Ensure all mobile buttons meet 44px minimum touch target size
+- Fix small touch targets in UnitSelector compact mode
+- Adjust spacing between buttons in horizontal scroll chips
+
+4. Button Feedback
+- Add haptic feedback to MobileCardAction buttons
+- Implement consistent hover/active states for all button variants
+- Add visual feedback for disabled states in all button components
+
+## Medium Fixes (2-4 hours)
+
+5. Button Accessibility
+- Implement proper focus management in dialog buttons
+- Add keyboard navigation support for UnitSelector popover
+- Improve screen reader support for FloatingActionButton actions
+- Add ARIA live regions for dynamic button content
+
+6. Error Handling
+- Improve error messages in BarcodeScannerButton
+- Add retry mechanism for failed camera initialization
+- Implement proper error states for VoiceCommandButton
+- Add error boundary for button action failures
+
+7. Performance Optimization
+- Optimize button click handlers to prevent double triggers
+- Improve motion animations performance on low-end devices
+- Reduce unnecessary re-renders in button components
+- Implement proper cleanup for camera resources
+
+## Hard Fixes (4+ hours)
+
+8. Complex Interaction Patterns
+- Fix swipe action conflicts in TripCard mobile interactions
+- Improve long-press detection in FloatingActionButton
+- Handle complex gesture interactions in VoiceCommandButton
+- Implement proper touch event handling for nested buttons
+
+9. State Management
+- Implement proper state synchronization for multi-step button actions
+- Fix race conditions in camera initialization/cleanup
+- Improve state management for button groups and toggles
+- Handle edge cases in button state transitions
+
+10. Device Compatibility
+- Fix torch functionality across different devices
+- Improve camera handling for various mobile browsers
+- Handle different screen sizes and orientations properly
+- Support offline functionality for button actions
+
+11. Integration Issues
+- Resolve conflicts between haptic feedback and system events
+- Fix interaction between floating buttons and scrolling content
+- Improve coordination between multiple floating action buttons
+- Handle complex dialog/modal button interactions
+
+## Critical Issues
+
+12. Security and Permissions
+- Implement proper permission handling for camera access
+- Add security checks for voice command actions
+- Improve error handling for denied permissions
+- Add rate limiting for button actions
+
+13. Accessibility Compliance
+- Ensure all buttons meet WCAG 2.1 requirements
+- Implement proper focus management system
+- Add support for screen readers and assistive technologies
+- Improve keyboard navigation patterns
+
+## Notes
+- All button components should follow the same design system
+- Maintain consistent behavior across different devices and platforms
+- Consider implementing automated testing for button interactions
+- Document all button behaviors and accessibility features 

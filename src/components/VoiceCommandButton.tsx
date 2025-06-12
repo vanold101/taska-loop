@@ -3,6 +3,41 @@ import { Mic, MicOff, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
+// Add TypeScript declarations for the Web Speech API
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: {
+    [key: number]: {
+      [key: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
 type VoiceCommandButtonProps = {
   onTaskCommand: (title: string, dueDate?: string) => void;
   onTripCommand: (store: string, eta?: string) => void;
@@ -19,35 +54,38 @@ const VoiceCommandButton = ({ onTaskCommand, onTripCommand }: VoiceCommandButton
   // Initialize speech recognition
   useEffect(() => {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
+      const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionAPI();
+      
+      if (recognitionRef.current) {
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = 'en-US';
 
-      recognitionRef.current.onresult = (event) => {
-        const current = event.resultIndex;
-        const result = event.results[current];
-        const transcriptValue = result[0].transcript;
-        setTranscript(transcriptValue);
-      };
+        recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+          const current = event.resultIndex;
+          const result = event.results[current];
+          const transcriptValue = result[0].transcript;
+          setTranscript(transcriptValue);
+        };
 
-      recognitionRef.current.onend = () => {
-        if (isListening) {
-          processCommand(transcript);
-        }
-        setIsListening(false);
-      };
+        recognitionRef.current.onend = () => {
+          if (isListening) {
+            processCommand(transcript);
+          }
+          setIsListening(false);
+        };
 
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setIsListening(false);
-        toast({
-          title: "Voice recognition error",
-          description: `Error: ${event.error}. Please try again.`,
-          variant: "destructive",
-        });
-      };
+        recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.error('Speech recognition error', event.error);
+          setIsListening(false);
+          toast({
+            title: "Voice recognition error",
+            description: `Error: ${event.error}. Please try again.`,
+            variant: "destructive",
+          });
+        };
+      }
     } else {
       toast({
         title: "Voice commands not supported",
@@ -61,7 +99,7 @@ const VoiceCommandButton = ({ onTaskCommand, onTripCommand }: VoiceCommandButton
         recognitionRef.current.abort();
       }
     };
-  }, [toast]);
+  }, [toast, isListening, transcript]);
 
   const toggleListening = () => {
     if (!recognitionRef.current) return;
@@ -259,6 +297,8 @@ const VoiceCommandButton = ({ onTaskCommand, onTripCommand }: VoiceCommandButton
         whileTap={{ scale: 0.95 }}
         onClick={toggleListening}
         disabled={isProcessing}
+        aria-label={isProcessing ? "Processing voice command" : isListening ? "Stop listening" : "Start voice command"}
+        aria-live="polite"
       >
         {isProcessing ? (
           <Loader2 className="h-5 w-5 animate-spin" />

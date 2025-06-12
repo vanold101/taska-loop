@@ -1,29 +1,33 @@
 import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider } from "./context/AuthContext";
 import { TripProvider } from "./context/TripContext";
+import { TripsProvider } from "./context/TripsContext";
 import NotificationProvider from "./context/NotificationContext";
+import { PantryProvider } from "./context/PantryContext";
 
 // Import pages
 import Landing from "./pages/Landing";
-import HomePage from "./pages/Index";
-import TripsPage from "./pages/Trips";
+import HomePage from "./pages/Home";
+import TripsPage from "./pages/TripsPage";
 import MapPage from "./pages/Map";
-import PantryPage from "./pages/Pantry";
-import ProfilePage from "./pages/Profile";
+import PantryPage from "./pages/PantryPage";
+import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import LedgerPage from "./pages/Ledger";
 import NotFound from "./pages/NotFound";
-import DashboardPage from "./pages/Dashboard";
+import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import CalendarPage from "./pages/CalendarPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import TripDetailPage from "./pages/TripDetailPage";
 
 const App = () => {
   // Apply theme preferences with light mode as default
@@ -45,84 +49,106 @@ const App = () => {
   }, []);
   
   return (
-    <TaskProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
+    <TooltipProvider>
+      <TaskProvider>
         <AuthProvider>
-          <TripProvider>
-            <NotificationProvider>
-              <Router>
-                <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
-                  <div className="pattern-overlay"></div>
-                  <Routes>
-                    {/* Public routes */}
-                    <Route path="/" element={<Landing />} />
-                    <Route path="/login" element={<LoginPage />} />
-                    
-                    {/* Admin routes */}
-                    <Route path="/admin/login" element={<AdminLoginPage />} />
-                    <Route path="/admin/dashboard" element={
-                      <AdminRoute>
-                        <AdminDashboardPage />
-                      </AdminRoute>
-                    } />
-                    
-                    {/* Protected routes */}
-                    <Route path="/home" element={
-                      <ProtectedRoute>
-                        <HomePage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/dashboard" element={
-                      <ProtectedRoute>
-                        <DashboardPage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/map" element={
-                      <ProtectedRoute>
-                        <MapPage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/trips" element={
-                      <ProtectedRoute>
-                        <TripsPage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/ledger" element={
-                      <ProtectedRoute>
-                        <LedgerPage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/pantry" element={
-                      <ProtectedRoute>
-                        <PantryPage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/profile" element={
-                      <ProtectedRoute>
-                        <ProfilePage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/settings" element={
-                      <ProtectedRoute>
-                        <SettingsPage />
-                      </ProtectedRoute>
-                    } />
-                    <Route path="/history" element={
-                      <Navigate to="/trips?view=past" replace />
-                    } />
-                    
-                    {/* Catch all route */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </div>
-              </Router>
-            </NotificationProvider>
-          </TripProvider>
+          <TripsProvider>
+            <TripProvider>
+              <NotificationProvider>
+                <PantryProvider>
+                  <HashRouter>
+                    <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
+                      <div className="pattern-overlay"></div>
+                      <Routes>
+                        {/* Public routes */}
+                        <Route path="/" element={<Landing />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        
+                        {/* Admin routes */}
+                        <Route path="/admin/login" element={<AdminLoginPage />} />
+                        <Route path="/admin/dashboard" element={
+                          <AdminRoute>
+                            <AdminDashboardPage />
+                          </AdminRoute>
+                        } />
+                        
+                        {/* Protected routes */}
+                        <Route path="/home" element={
+                          <ProtectedRoute>
+                            <HomePage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/dashboard" element={
+                          <ProtectedRoute>
+                            <DashboardPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/map" element={
+                          <ProtectedRoute>
+                            <MapPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/trips" element={
+                          <ProtectedRoute>
+                            <TripsPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/trip/:id" element={
+                          <ProtectedRoute>
+                            <TripDetailPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/ledger" element={
+                          <ProtectedRoute>
+                            <LedgerPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/pantry" element={
+                          <ProtectedRoute>
+                            <PantryPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/calendar" element={
+                          <ProtectedRoute>
+                            <CalendarPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/profile" element={
+                          <ProtectedRoute>
+                            <ProfilePage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/household" element={
+                          <ProtectedRoute>
+                            <ProfilePage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/roommates" element={
+                          <ProtectedRoute>
+                            <ProfilePage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/settings" element={
+                          <ProtectedRoute>
+                            <SettingsPage />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/history" element={
+                          <Navigate to="/trips?view=past" replace />
+                        } />
+                        
+                        {/* Catch all route */}
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </div>
+                  </HashRouter>
+                </PantryProvider>
+              </NotificationProvider>
+            </TripProvider>
+          </TripsProvider>
         </AuthProvider>
-      </TooltipProvider>
-    </TaskProvider>
+      </TaskProvider>
+    </TooltipProvider>
   );
 };
 

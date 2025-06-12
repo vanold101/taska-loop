@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import NavBar from "../components/NavBar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { 
   calculateUserBalances, 
@@ -27,13 +26,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { 
-  ArrowRight, 
-  Calendar, 
   Check, 
-  Clock, 
   DollarSign, 
-  Download,
-  FileText,
   FilterX,
   Home,
   Plus,
@@ -42,20 +36,27 @@ import {
   Search,
   Send,
   ShoppingCart,
-  SlidersHorizontal,
   Tag,
   User, 
-  UserMinus, 
-  UserPlus,
   Utensils,
-  Wallet,
   Zap,
   Building,
   Car,
   Film,
   CircleDot,
   Stethoscope,
-  X
+  MoreHorizontal,
+  PieChart,
+  ArrowDownUp,
+  CheckSquare,
+  ArrowRight,
+  Clock,
+  Download,
+  Wallet,
+  X,
+  SlidersHorizontal,
+  Calendar,
+  FileText
 } from "lucide-react";
 import {
   Dialog,
@@ -75,7 +76,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import { Sidebar } from "../components/Sidebar";
 import { motion } from "framer-motion";
+import { AppLayout } from "../components/AppLayout";
 
 // Get category label by ID
 const getCategoryLabel = (categoryId?: TransactionCategory): string => {
@@ -202,101 +213,133 @@ const LedgerPage = () => {
   const handleInitiatePayment = (recommendation: {from: UserBalance, to: UserBalance, amount: number}) => {
     setSelectedPayment(recommendation);
     setPaymentAmount(recommendation.amount.toFixed(2));
-    setPaymentDescription(`Payment to ${recommendation.to.userName}`);
-    setSelectedRecipientId(recommendation.to.userId);
-    setSelectedCategory(undefined); // Reset category
+    setPaymentDescription(`Payment from ${recommendation.from.userName} to ${recommendation.to.userName}`);
     setShowPaymentDialog(true);
   };
   
   // Handle confirming a payment
   const handleConfirmPayment = (transactionId: string) => {
-    const result = confirmPayment(transactionId);
-    if (result) {
+    try {
+      confirmPayment(transactionId);
+      loadData(); // Reload data to reflect changes
       toast({
         title: "Payment confirmed",
-        description: "The payment has been marked as completed."
+        description: "The payment has been successfully confirmed.",
       });
-      loadData();
+    } catch (error) {
+      toast({
+        title: "Error confirming payment",
+        description: "There was a problem confirming this payment.",
+        variant: "destructive"
+      });
     }
   };
   
   // Handle cancelling a payment
   const handleCancelPayment = (transactionId: string) => {
-    const result = cancelPayment(transactionId);
-    if (result) {
+    try {
+      cancelPayment(transactionId);
+      loadData(); // Reload data to reflect changes
       toast({
         title: "Payment cancelled",
-        description: "The payment has been cancelled."
+        description: "The payment has been cancelled.",
       });
-      loadData();
+    } catch (error) {
+      toast({
+        title: "Error cancelling payment",
+        description: "There was a problem cancelling this payment.",
+        variant: "destructive"
+      });
     }
   };
   
   // Submit a new payment
   const handleSubmitPayment = () => {
-    // Get the current user
-    const currentUser = balances.find(b => b.userName === "You");
-    if (!currentUser) {
-      toast({
-        title: "User not found",
-        description: "Could not identify the current user.",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!selectedPayment) return;
     
-    // Get the selected recipient
-    const recipient = balances.find(b => b.userId === selectedRecipientId);
-    if (!recipient) {
-      toast({
-        title: "Please select a recipient",
-        description: "You need to select who you're paying.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
+    // Validation
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
       toast({
         title: "Invalid amount",
-        description: "Please enter a valid payment amount.",
+        description: "Please enter a valid amount greater than 0.",
         variant: "destructive"
       });
       return;
     }
     
-    const transaction = createPaymentTransaction(
-      currentUser.userId,
-      currentUser.userName,
-      recipient.userId,
-      recipient.userName,
-      amount,
-      paymentDescription || `Payment to ${recipient.userName}`,
-      selectedCategory
-    );
-    
-    if (transaction) {
+    if (!paymentDescription.trim()) {
       toast({
-        title: "Payment created",
-        description: `You've created a payment of $${amount.toFixed(2)} to ${recipient.userName}.`
+        title: "Description required",
+        description: "Please enter a description for this payment.",
+        variant: "destructive"
       });
+      return;
+    }
+    
+    if (!selectedRecipientId && !selectedPayment.to.userId) {
+      toast({
+        title: "Recipient required",
+        description: "Please select a recipient for this payment.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      // Create the payment transaction
+      createPaymentTransaction(
+        selectedPayment.from.userId,
+        selectedPayment.from.userName,
+        selectedRecipientId || selectedPayment.to.userId,
+        selectedRecipientId ? balances.find(b => b.userId === selectedRecipientId)?.userName || "" : selectedPayment.to.userName,
+        amount,
+        paymentDescription
+      );
       
-      // Close dialog and reload data
-      setShowPaymentDialog(false);
+      // Reset form and close dialog
+      setPaymentAmount("");
+      setPaymentDescription("");
       setSelectedRecipientId("");
+      setSelectedPayment(null);
+      setShowPaymentDialog(false);
+      
+      // Reload data to reflect changes
       loadData();
+      
+      toast({
+        title: "Payment recorded",
+        description: "Your payment has been recorded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error recording payment",
+        description: "There was a problem recording this payment.",
+        variant: "destructive"
+      });
     }
   };
   
   // Handle new payment dialog open
   const handleOpenNewPayment = () => {
-    // Reset the payment form
-    setSelectedPayment(null);
+    if (balances.length === 0) {
+      toast({
+        title: "No users available",
+        description: "You need at least one other user to make a payment.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Pre-select the first user as payer
+    setSelectedPayment({
+      from: balances[0],
+      to: balances.length > 1 ? balances[1] : balances[0],
+      amount: 0
+    });
+    
     setPaymentAmount("");
     setPaymentDescription("");
-    setSelectedRecipientId("");
-    setSelectedCategory(undefined);
     setShowPaymentDialog(true);
   };
   
@@ -428,50 +471,55 @@ const LedgerPage = () => {
   
   // Export transactions to CSV
   const exportTransactions = () => {
-    // Create CSV content
-    const headers = ['Date', 'Description', 'Amount', 'From', 'To', 'Type', 'Status'];
+    if (transactions.length === 0) {
+      toast({
+        title: "No transactions to export",
+        description: "There are no transactions to export."
+      });
+      return;
+    }
     
-    // Determine which transactions to export based on current filters/search
-    const transactionsToExport = statusFilter === "all" && typeFilter === "all" && 
-                                userFilter === "all" && !searchQuery.trim() 
-      ? transactions 
-      : filteredAndSearchedTransactions;
+    try {
+      // Create CSV content
+      const headers = ["Date", "Description", "From", "To", "Amount", "Status", "Category"];
+      const csvRows = [
+        headers.join(","),
+        ...transactions.map(transaction => {
+          return [
+            format(new Date(transaction.timestamp), "yyyy-MM-dd"),
+            `"${transaction.description.replace(/"/g, '""')}"`,
+            transaction.fromUserName,
+            transaction.toUserName,
+            transaction.amount.toFixed(2),
+            transaction.status,
+            getCategoryLabel(transaction.category)
+          ].join(",");
+        })
+      ];
       
-    const rows = transactionsToExport.map(transaction => [
-      format(new Date(transaction.timestamp), "yyyy-MM-dd"),
-      transaction.description,
-      transaction.amount.toFixed(2),
-      transaction.fromUserName,
-      transaction.toUserName,
-      transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1),
-      transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)
-    ]);
-    
-    // Combine headers and rows
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-    
-    // Create a Blob with the CSV content
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    
-    // Create a download link
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `ledger-transactions-${format(new Date(), "yyyy-MM-dd")}.csv`);
-    link.style.visibility = 'hidden';
-    
-    // Append to the document, click the link, then remove it
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({
-      title: "Export successful",
-      description: `${transactionsToExport.length} transactions exported as CSV.`
-    });
+      const csvContent = csvRows.join("\n");
+      
+      // Create blob and download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `ledger-transactions-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Export successful",
+        description: "Your transactions have been exported to CSV."
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "There was a problem exporting your transactions.",
+        variant: "destructive"
+      });
+    }
   };
   
   // Get potential recipients (everyone except current user)
@@ -479,26 +527,45 @@ const LedgerPage = () => {
   
   // Handle updating a transaction's category
   const handleUpdateCategory = (transactionId: string, category: TransactionCategory) => {
-    const result = updateTransactionCategory(transactionId, category);
-    if (result) {
+    try {
+      updateTransactionCategory(transactionId, category);
+      setShowCategoryMenu(null);
+      loadData(); // Reload data to reflect changes
+      
       toast({
         title: "Category updated",
-        description: "The transaction category has been updated."
+        description: "Transaction category has been updated.",
       });
-      
-      // Hide the category menu
-      setShowCategoryMenu(null);
-      
-      // Reload data
-      loadData();
+    } catch (error) {
+      toast({
+        title: "Error updating category",
+        description: "There was a problem updating the category.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Add function to handle filter changes
+  const handleFilterChange = (type: string, value: string) => {
+    switch (type) {
+      case 'status':
+        setStatusFilter(value);
+        break;
+      case 'type':
+        setTypeFilter(value);
+        break;
+      case 'user':
+        setUserFilter(value);
+        break;
+      case 'category':
+        setCategoryFilter(value);
+        break;
     }
   };
   
   return (
-    <div className="flex flex-col min-h-screen">
-      <NavBar />
-      
-      <main className="flex-grow w-full px-[5vw] md:px-[8vw] lg:px-[10vw] py-6 md:py-8 pb-20 md:pb-24">
+    <AppLayout>
+      <div className="px-[5vw] md:px-[8vw] lg:px-[10vw] py-6 md:py-8 pb-20 md:pb-24">
         {/* Header section */}
         <header className="mb-6 md:mb-8">
           <h1 className="text-[clamp(1.875rem,4vw,2.5rem)] font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600 dark:from-blue-400 dark:to-green-400">Ledger</h1>
@@ -1301,6 +1368,7 @@ const LedgerPage = () => {
                           </Card>
                         ))}
                     </div>
+
                   </div>
                 ))}
               </div>
@@ -1324,7 +1392,7 @@ const LedgerPage = () => {
             )}
           </TabsContent>
         </Tabs>
-      </main>
+      </div>
       
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
@@ -1454,7 +1522,7 @@ const LedgerPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppLayout>
   );
 };
 

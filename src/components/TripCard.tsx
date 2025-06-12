@@ -1,10 +1,13 @@
-import { motion } from "framer-motion";
+import { motion, useAnimation, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Clock, User, Plus, Check, Share2, Trash2, Edit, Info, RotateCw, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TouchTargetButton } from "@/components/ui/TouchTargetButton";
+import { haptics } from "@/lib/haptics";
+import { ActiveTripAnimation } from "@/components/ActiveTripAnimation";
 
 type TripCardProps = {
   trip: {
@@ -25,6 +28,7 @@ type TripCardProps = {
   onCompleteTrip?: () => void;
   onEditTrip?: () => void;
   onReactivateTrip?: () => void;
+  onStartTrip?: () => void;
   isPast?: boolean;
 };
 
@@ -37,190 +41,183 @@ const TripCard = ({
   onCompleteTrip,
   onEditTrip,
   onReactivateTrip,
+  onStartTrip,
   isPast = false
 }: TripCardProps) => {
   const { store, shopper, eta, itemCount, status } = trip;
   const [isActionsVisible, setActionsVisible] = useState(false);
-  const [swipeOffset, setSwipeOffset] = useState(0);
   const [showActions, setShowActions] = useState(false);
-  const startXRef = useRef(0);
+  const controls = useAnimation();
   const cardRef = useRef<HTMLDivElement>(null);
-  const swipeThreshold = 80; // Pixels required to trigger action
-  
-  const getStatusVariant = () => {
-    switch(status) {
-      case 'open':
-        return 'open';
-      case 'shopping':
-        return 'shopping';
-      case 'completed':
-        return 'secondary';
-      case 'cancelled':
-        return 'danger';
-      default:
-        return 'secondary';
-    }
-  };
+  const gestureRef = useRef({
+    isScrolling: false,
+    startX: 0,
+    startY: 0,
+    lastTap: 0,
+    swipeThreshold: 80,
+    scrollThreshold: 10,
+    doubleTapDelay: 300,
+    currentX: 0
+  });
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    startXRef.current = e.touches[0].clientX;
-  };
+  // Prevent swipe actions on completed/cancelled trips
+  const canSwipe = status !== 'completed' && status !== 'cancelled';
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    // Don't allow swiping on completed trips
-    if (status === 'completed' || status === 'cancelled') {
+  const handleGestureStart = useCallback((event: React.TouchEvent | React.MouseEvent) => {
+    const touch = 'touches' in event ? event.touches[0] : event;
+    gestureRef.current.startX = touch.clientX;
+    gestureRef.current.startY = touch.clientY;
+    gestureRef.current.isScrolling = false;
+  }, []);
+
+  const handleGestureMove = useCallback((event: React.TouchEvent | React.MouseEvent) => {
+    if (!canSwipe) return;
+
+    const touch = 'touches' in event ? event.touches[0] : event;
+    const deltaX = touch.clientX - gestureRef.current.startX;
+    const deltaY = touch.clientY - gestureRef.current.startY;
+
+    // Determine if user is trying to scroll vertically
+    if (!gestureRef.current.isScrolling && Math.abs(deltaY) > gestureRef.current.scrollThreshold) {
+      gestureRef.current.isScrolling = true;
+      controls.set({ x: 0 }); // Reset any horizontal movement
       return;
     }
-    
-    const currentX = e.touches[0].clientX;
-    const diff = currentX - startXRef.current;
-    
-    // Limit swipe to left (negative values) and right with max thresholds
-    if (diff < 0) {
-      // Left swipe (delete) - limit to -swipeThreshold
-      setSwipeOffset(Math.max(diff, -swipeThreshold));
-    } else {
-      // Right swipe (complete) - limit to swipeThreshold
-      setSwipeOffset(Math.min(diff, swipeThreshold));
-    }
-  };
 
-  const handleTouchEnd = () => {
-    // Don't allow swipe actions on completed trips
-    if (status === 'completed' || status === 'cancelled') {
-      return;
+    // Only handle horizontal swipes if not scrolling
+    if (!gestureRef.current.isScrolling && Math.abs(deltaX) > gestureRef.current.scrollThreshold) {
+      event.preventDefault(); // Prevent scrolling once we've determined it's a swipe
+      controls.set({ x: deltaX });
+      gestureRef.current.currentX = deltaX;
+
+      // Add haptic feedback at threshold points
+      if (Math.abs(deltaX) >= gestureRef.current.swipeThreshold) {
+        haptics.medium();
+      }
     }
-    
-    if (swipeOffset <= -swipeThreshold && onDeleteTrip) {
-      // Trigger delete action
+  }, [canSwipe, controls]);
+
+  const handleGestureEnd = useCallback(async () => {
+    if (!canSwipe || gestureRef.current.isScrolling) return;
+
+    const currentX = gestureRef.current.currentX;
+
+    if (currentX <= -gestureRef.current.swipeThreshold && onDeleteTrip) {
+      haptics.heavy();
       onDeleteTrip();
-    } else if (swipeOffset >= swipeThreshold && onCompleteTrip) {
-      // Trigger complete action
+    } else if (currentX >= gestureRef.current.swipeThreshold && onCompleteTrip) {
+      haptics.heavy();
       onCompleteTrip();
     }
-    
-    // Reset swipe position with animation
-    setSwipeOffset(0);
-  };
 
-  const handleMouseEnter = () => {
-    setActionsVisible(true);
-  };
+    // Animate back to center with spring physics
+    controls.start({ 
+      x: 0,
+      transition: { type: "spring", stiffness: 500, damping: 30 }
+    });
+    gestureRef.current.currentX = 0;
+  }, [canSwipe, controls, onDeleteTrip, onCompleteTrip]);
 
-  const handleMouseLeave = () => {
-    setActionsVisible(false);
-  };
+  const handleTap = useCallback((event: React.TouchEvent | React.MouseEvent) => {
+    const now = Date.now();
+    const timeSinceLastTap = now - gestureRef.current.lastTap;
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    // Only trigger onClick if we have a handler
-    if (onTripClick) {
-      // Prevent default behavior to avoid any unwanted effects
-      e.preventDefault();
+    // Handle double tap
+    if (timeSinceLastTap < gestureRef.current.doubleTapDelay) {
+      event.preventDefault();
+      event.stopPropagation();
       
-      // Stop propagation to ensure other handlers don't execute
-      e.stopPropagation();
+      if (canSwipe && onAddItem) {
+        haptics.medium();
+        onAddItem({
+          name: "New Item",
+          quantity: 1,
+          addedBy: {
+            name: "You",
+            avatar: "https://example.com/avatar.jpg"
+          },
+          checked: false
+        });
+      }
+    } else if (onTripClick) {
+      // Handle single tap after a delay to avoid double tap conflicts
+      const target = event.target as HTMLElement;
+      const isInteractive = target.tagName === 'BUTTON' || 
+                           target.closest('button') !== null ||
+                           target.role === 'button' ||
+                           target.getAttribute('aria-label') !== null;
       
-      // Only execute if we're not clicking a child interactive element like a button
-      const target = e.target as HTMLElement;
-      const isButton = target.tagName === 'BUTTON' || 
-                       target.closest('button') !== null ||
-                       target.role === 'button' ||
-                       target.getAttribute('aria-label') !== null;
-      
-      if (!isButton) {
+      if (!isInteractive) {
+        // Remove the delay to make the click more responsive
         onTripClick();
+        haptics.light();
       }
     }
-  };
 
-  const handleDoubleTap = (e: React.TouchEvent) => {
-    // Prevent default to avoid zooming on mobile
-    e.preventDefault();
-    
-    // Don't allow adding items to completed trips
-    if (status === 'completed' || status === 'cancelled') {
-      return;
-    }
-    
-    // Double tap to add item
-    if (onAddItem) {
-      onAddItem({
-        name: "New Item",
-        quantity: 1,
-        addedBy: {
-          name: "You",
-          avatar: "https://example.com/avatar.jpg"
-        },
-        checked: false
-      });
-      
-      // Add haptic feedback if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-    }
-  };
+    gestureRef.current.lastTap = now;
+  }, [canSwipe, onAddItem, onTripClick]);
 
-  const handleInitialTouch = (e: React.TouchEvent) => {
-    // Track double taps
-    if (cardRef.current) {
-      const lastTap = (cardRef.current as any).lastTap || 0;
-      const currentTime = e.timeStamp;
-      
-      if (currentTime - lastTap < 300) {
-        handleDoubleTap(e);
-      }
-      
-      (cardRef.current as any).lastTap = currentTime;
-    }
-    
-    // Start the swipe tracking
-    handleTouchStart(e);
-  };
-
-  const toggleActions = (e: React.MouseEvent) => {
+  const toggleActions = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowActions(!showActions);
-    
-    // Add haptic feedback
-    if (navigator.vibrate) {
-      navigator.vibrate(20);
-    }
-  };
+    setShowActions(prev => !prev);
+    haptics.light();
+  }, []);
 
   return (
     <div className="relative">
-      {/* Swipe action indicators - only show when actively swiping */}
-      {swipeOffset !== 0 && (
-        <>
-          {swipeOffset > 0 && (
-            <div className="swipe-action swipe-action-left">
-              <Check className="h-5 w-5" />
-            </div>
-          )}
-          {swipeOffset < 0 && (
-            <div className="swipe-action swipe-action-right">
-              <Trash2 className="h-5 w-5" />
-            </div>
-          )}
-        </>
-      )}
-      
+      {/* Swipe action indicators */}
+      <AnimatePresence>
+        {canSwipe && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ 
+                opacity: gestureRef.current.currentX > gestureRef.current.swipeThreshold / 2 ? 1 : 0 
+              }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-y-0 left-0 flex items-center justify-center w-16 bg-green-500/10 rounded-l-lg"
+            >
+              <Check className="h-6 w-6 text-green-500" />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ 
+                opacity: gestureRef.current.currentX < -gestureRef.current.swipeThreshold / 2 ? 1 : 0 
+              }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-y-0 right-0 flex items-center justify-center w-16 bg-red-500/10 rounded-r-lg"
+            >
+              <Trash2 className="h-6 w-6 text-red-500" />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       <motion.div
         ref={cardRef}
-        className="premium-card overflow-hidden relative shadow-md dark:shadow-lg"
-        style={{ 
-          x: swipeOffset,
-          touchAction: "pan-y"
-        }}
-        onTouchStart={handleInitialTouch}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={handleCardClick}
-        onDoubleClick={status !== 'completed' && status !== 'cancelled' ? onAddItem : undefined}
+        className={cn(
+          "premium-card overflow-hidden relative shadow-md dark:shadow-lg",
+          trip.status === 'shopping' && "border-2 border-blue-500"
+        )}
+        animate={controls}
+        drag={canSwipe ? "x" : false}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.1}
+        onTouchStart={handleGestureStart}
+        onTouchMove={handleGestureMove}
+        onTouchEnd={handleGestureEnd}
+        onMouseDown={handleGestureStart}
+        onMouseMove={handleGestureMove}
+        onMouseUp={handleGestureEnd}
+        onClick={handleTap}
       >
+        {/* Active trip animation */}
+        <AnimatePresence>
+          {trip.status === 'shopping' && (
+            <ActiveTripAnimation shopper={trip.shopper} />
+          )}
+        </AnimatePresence>
+
         <div className="p-4">
           <div className="flex justify-between items-start">
             <div>
@@ -250,88 +247,46 @@ const TripCard = ({
                 <ChevronRight className="h-4 w-4 ml-1 text-gloop-primary" />
               </div>
               
-              {/* Secondary actions menu - as a toggle instead of always visible */}
+              {/* Secondary actions menu */}
               <div className="flex items-center gap-2">
-                {/* Show these buttons inline for larger screens or when actions menu is toggled */}
-                {(isActionsVisible || showActions) && (
-                  <>
-                    {status !== 'completed' && status !== 'cancelled' && (
-                      <>
-                        {/* Keep Manual Add Button */}
-                        <motion.button
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onAddItem) onAddItem({
-                              name: "New Item",
-                              quantity: 1,
-                              addedBy: {
-                                name: "You",
-                                avatar: "https://example.com/avatar.jpg"
-                              },
-                              checked: false
-                            });
-                          }}
-                          aria-label="Add item"
-                        >
-                          <Plus className="h-5 w-5 text-gloop-primary" />
-                        </motion.button>
-                      </>
-                    )}
-                    
-                    {status !== 'completed' && status !== 'cancelled' && onEditTrip && (
-                      <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1, transition: { delay: 0.05 } }}
-                        className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onEditTrip) onEditTrip();
-                        }}
-                        aria-label="Edit trip"
-                      >
-                        <Edit className="h-5 w-5 text-gloop-primary" />
-                      </motion.button>
-                    )}
-                    
-                    {onShareTrip && (
-                      <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1, transition: { delay: 0.1 } }}
-                        className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent/50 hover:bg-gloop-accent dark:bg-gloop-dark-accent/50 dark:hover:bg-gloop-dark-accent"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onShareTrip) onShareTrip();
-                        }}
-                        aria-label="Share trip"
-                      >
-                        <Share2 className="h-5 w-5 text-gloop-primary" />
-                      </motion.button>
-                    )}
-                  </>
+                {trip.status === 'open' && onStartTrip && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStartTrip();
+                    }}
+                    className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Start Trip
+                  </Button>
                 )}
-                
-                {/* Toggle button for actions menu */}
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  className="min-w-[40px] min-h-[40px] p-2 flex items-center justify-center rounded-full bg-gloop-accent hover:bg-gloop-accent/80 dark:bg-gloop-dark-accent dark:hover:bg-gloop-dark-accent/80"
-                  onClick={toggleActions}
-                  aria-label={showActions ? "Hide actions" : "Show actions"}
-                >
-                  {showActions ? (
-                    <X className="h-5 w-5 text-gloop-primary" />
-                  ) : (
-                    <motion.span 
-                      animate={{ rotate: showActions ? 180 : 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="text-xs font-medium"
-                    >
-                      <Info className="h-5 w-5 text-gloop-primary" />
-                    </motion.span>
-                  )}
-                </motion.button>
+                {onShareTrip && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShareTrip();
+                    }}
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                )}
+                {onEditTrip && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditTrip();
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>

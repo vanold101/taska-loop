@@ -1,266 +1,420 @@
-import React, { useState } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Store, Clock, User, MapPin } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { TripData } from './TripDetailModal';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { cn } from '@/lib/utils';
+import { useState, useCallback, useRef } from 'react';
+import { Calendar, dateFnsLocalizer, Views, View } from 'react-big-calendar';
+import format from 'date-fns/format';
+import parse from 'date-fns/parse';
+import startOfWeek from 'date-fns/startOfWeek';
+import getDay from 'date-fns/getDay';
+import addHours from 'date-fns/addHours';
+import parseISO from 'date-fns/parseISO';
+import enUS from 'date-fns/locale/en-US';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useTaskContext } from '@/context/TaskContext';
+import { Trip } from '@/context/TaskContext';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight, X, Plus, ShoppingCart, Clock, DollarSign, MapPin, CalendarDays } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
+
+const locales = {
+  'en-US': enUS
+};
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+});
 
 interface TripCalendarViewProps {
-  trips: TripData[];
-  onTripClick: (trip: TripData) => void;
+  isOpen: boolean;
   onClose: () => void;
 }
 
-const TripCalendarView: React.FC<TripCalendarViewProps> = ({ trips, onTripClick, onClose }) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  
-  // Generate calendar days for the current month
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayOfMonth = new Date(year, month, 1).getDay();
-    
-    const days = [];
-    
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < firstDayOfMonth; i++) {
-      days.push(null);
-    }
-    
-    // Add days of the month
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(new Date(year, month, i));
-    }
-    
-    return days;
+interface Item {
+  id: string;
+  name: string;
+  quantity: number;
+  notes: string;
+  checked: boolean;
+  addedBy: {
+    name: string;
+    avatar: string;
+    id: string;
   };
-  
-  const days = getDaysInMonth(currentMonth);
-  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  
-  // Get trips for a specific day
-  const getTripsForDay = (day: Date | null) => {
-    if (!day) return [];
-    
-    return trips.filter(trip => {
-      const tripDate = new Date(trip.date);
-      return tripDate.getDate() === day.getDate() && 
-             tripDate.getMonth() === day.getMonth() && 
-             tripDate.getFullYear() === day.getFullYear();
-    });
-  };
-  
-  const handlePrevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-    setSelectedDate(null);
-  };
-  
-  const handleNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-    setSelectedDate(null);
-  };
+  addedAt: string;
+}
 
-  const handleDayClick = (day: Date) => {
-    setSelectedDate(day);
-  };
+// Custom event component to show more trip details
+const EventComponent = ({ event, onClick }: { event: any; onClick: (event: any) => void }) => {
+  const trip: Trip = event.resource;
+  const itemCount = trip.items.length;
+  const pendingItems = trip.items.filter(item => !item.checked).length;
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'open':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case 'shopping':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'completed':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400';
-    }
-  };
-
-  // Group trips by status for a given day
-  const getTripsGroupedByStatus = (trips: TripData[]) => {
-    const grouped = {
-      open: trips.filter(t => t.status === 'open').length,
-      shopping: trips.filter(t => t.status === 'shopping').length,
-      completed: trips.filter(t => t.status === 'completed').length,
-      cancelled: trips.filter(t => t.status === 'cancelled').length
-    };
-    return grouped;
-  };
-  
   return (
-    <motion.div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-3xl w-full p-4 bg-gradient-to-br from-blue-500/5 via-green-500/5 to-blue-500/5 dark:from-blue-900/20 dark:via-green-900/20 dark:to-blue-900/20"
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 20 }}
-      >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold flex items-center">
-            <CalendarIcon className="mr-2 h-5 w-5 text-blue-600 dark:text-blue-400" />
-            Trip Calendar
-          </h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Calendar */}
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <Button variant="ghost" size="icon" onClick={handlePrevMonth}>
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <h3 className="text-lg font-medium">
-                {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-              </h3>
-              <Button variant="ghost" size="icon" onClick={handleNextMonth}>
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {weekdays.map(day => (
-                <div key={day} className="text-center text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {day}
-                </div>
-              ))}
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1">
-              {days.map((day, index) => {
-                const tripsForDay = day ? getTripsForDay(day) : [];
-                const tripsByStatus = day ? getTripsGroupedByStatus(tripsForDay) : null;
-                const isToday = day && 
-                  day.getDate() === new Date().getDate() && 
-                  day.getMonth() === new Date().getMonth() && 
-                  day.getFullYear() === new Date().getFullYear();
-                const isSelected = day && selectedDate && 
-                  day.getDate() === selectedDate.getDate() && 
-                  day.getMonth() === selectedDate.getMonth() && 
-                  day.getFullYear() === selectedDate.getFullYear();
-                
-                return (
-                  <div 
-                    key={index} 
-                    className={cn(
-                      'aspect-square p-1 rounded-md relative',
-                      day ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20' : '',
-                      isToday ? 'bg-blue-100 dark:bg-blue-900/40' : '',
-                      isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''
-                    )}
-                    onClick={() => day && handleDayClick(day)}
-                  >
-                    {day && (
-                      <div className="h-full flex flex-col">
-                        <div className="text-right text-sm">{day.getDate()}</div>
-                        <div className="flex-1 overflow-hidden">
-                          {tripsByStatus && (
-                            <div className="mt-1 space-y-0.5">
-                              {tripsByStatus.open > 0 && (
-                                <div className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded px-1 truncate">
-                                  {tripsByStatus.open} open
-                                </div>
-                              )}
-                              {tripsByStatus.shopping > 0 && (
-                                <div className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded px-1 truncate">
-                                  {tripsByStatus.shopping} active
-                                </div>
-                              )}
-                              {tripsByStatus.completed > 0 && (
-                                <div className="text-[10px] bg-gray-100 dark:bg-gray-800/50 text-gray-800 dark:text-gray-400 rounded px-1 truncate">
-                                  {tripsByStatus.completed} done
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Trip details for selected date */}
-          <div className="border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-700 pt-4 md:pt-0 md:pl-4">
-            <h3 className="text-lg font-medium mb-4">
-              {selectedDate ? (
-                `Trips on ${selectedDate.toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  day: 'numeric',
-                  year: 'numeric'
-                })}`
-              ) : (
-                'Select a date to view trips'
-              )}
-            </h3>
-            
-            <div className="space-y-3 max-h-[calc(100vh-24rem)] overflow-y-auto">
-              {selectedDate ? (
-                getTripsForDay(selectedDate).map(trip => (
-                  <motion.div 
-                    key={trip.id}
-                    className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
-                    onClick={() => onTripClick(trip)}
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center">
-                        <Store className="h-4 w-4 mr-2 text-blue-500" />
-                        <h4 className="font-medium">{trip.store}</h4>
-                      </div>
-                      <Badge variant="outline" className={cn("text-xs", getStatusColor(trip.status))}>
-                        {trip.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-2">
-                      <User className="h-3.5 w-3.5 mr-1" />
-                      <span className="mr-3">{trip.shopper.name}</span>
-                      <Clock className="h-3.5 w-3.5 mr-1" />
-                      <span>{trip.eta}</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm">
-                        {trip.items.length} item{trip.items.length !== 1 ? 's' : ''}
-                        {trip.items.some(item => !item.checked) && (
-                          <span className="text-amber-600 dark:text-amber-400"> • {trip.items.filter(item => !item.checked).length} pending</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-                        View Details →
-                      </div>
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  Click on a date to view trips scheduled for that day
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
+    <div className="p-1 overflow-hidden cursor-pointer hover:opacity-90" onClick={() => onClick(event)}>
+      <div className="font-medium truncate">{trip.store}</div>
+      <div className="text-xs flex items-center gap-1 flex-wrap">
+        <Badge 
+          variant="outline" 
+          className={
+            trip.status === 'completed' ? 'bg-green-100 text-green-800' :
+            trip.status === 'shopping' ? 'bg-blue-100 text-blue-800' :
+            trip.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+            'bg-gray-100 text-gray-800'
+          }
+        >
+          {trip.status}
+        </Badge>
+        <span>{itemCount} items</span>
+        {pendingItems > 0 && (
+          <span className="text-amber-600">({pendingItems} pending)</span>
+        )}
+      </div>
+    </div>
   );
 };
 
-export default TripCalendarView;
+const getEventTime = (timeStr?: string): number => {
+  if (typeof timeStr !== 'string' || !timeStr.includes(':')) {
+    // Default to a reasonable time like noon if not specified or invalid format
+    return 12 * 60;
+  }
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+};
+
+export default function TripCalendarView({ isOpen, onClose }: TripCalendarViewProps) {
+  const { trips, addTrip, updateTrip } = useTaskContext();
+  const [view, setView] = useState<View>('month');
+  const [date, setDate] = useState(new Date());
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [newItem, setNewItem] = useState({ name: '', quantity: '1', notes: '' });
+
+  const handleNavigate = useCallback((newDate: Date) => {
+    setDate(newDate);
+  }, []);
+
+  const handleViewChange = useCallback((newView: View) => {
+    setView(newView);
+  }, []);
+
+  const handleEventClick = useCallback((event: any) => {
+    setSelectedTrip(event.resource);
+  }, []);
+
+  const handleAddItem = useCallback(() => {
+    if (!selectedTrip || !newItem.name) return;
+
+    const updatedTrip = {
+      ...selectedTrip,
+      items: [
+        ...selectedTrip.items,
+        {
+          id: Date.now().toString(),
+          name: newItem.name,
+          quantity: parseInt(newItem.quantity) || 1,
+          notes: newItem.notes,
+          checked: false,
+          addedBy: {
+            name: "You",
+            id: "current-user",
+            avatar: "https://api.dicebear.com/7.x/avatars/svg?seed=current-user"
+          },
+          addedAt: new Date().toISOString()
+        } as Item
+      ]
+    };
+
+    updateTrip(selectedTrip.id, updatedTrip);
+    setSelectedTrip(updatedTrip as Trip);
+    setNewItem({ name: '', quantity: '1', notes: '' });
+    setIsAddingItem(false);
+    
+    toast({
+      title: "Item Added",
+      description: `${newItem.name} has been added to your trip.`,
+      variant: "default"
+    });
+  }, [selectedTrip, newItem, updateTrip]);
+
+  // Convert trips to calendar events with proper time slots
+  const events = trips.map(trip => {
+    const tripDate = parseISO(trip.date);
+    
+    // Parse the time string to set proper hours and minutes
+    const timeMinutes = getEventTime(trip.time);
+    tripDate.setHours(Math.floor(timeMinutes / 60));
+    tripDate.setMinutes(timeMinutes % 60);
+    
+    // Calculate duration from eta or default to 1 hour
+    let duration = 1;
+    if (trip.eta) {
+      if (trip.eta.includes('min')) {
+        duration = parseInt(trip.eta) / 60;
+      } else if (trip.eta.includes('hour')) {
+        duration = parseFloat(trip.eta);
+      }
+    }
+    
+    return {
+      id: trip.id,
+      title: `Shopping at ${trip.store}`,
+      start: tripDate,
+      end: addHours(tripDate, duration),
+      resource: trip,
+      allDay: false
+    };
+  });
+
+  const CustomToolbar = ({ onNavigate, onView, date, view: currentView }: any) => (
+    <div className="flex justify-between items-center mb-4 p-2">
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onNavigate('PREV')}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onNavigate('TODAY')}
+        >
+          Today
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onNavigate('NEXT')}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+      <h2 className="text-lg font-semibold">
+        {format(date, 'MMMM yyyy')}
+      </h2>
+      <div className="flex gap-2">
+        {['month', 'week', 'day'].map((viewName) => (
+          <Button
+            key={viewName}
+            variant={currentView === viewName ? "default" : "outline"}
+            size="sm"
+            onClick={() => onView(viewName)}
+          >
+            {viewName.charAt(0).toUpperCase() + viewName.slice(1)}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Shopping Trip Calendar</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 mt-4">
+          <Calendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: 'calc(80vh - 100px)' }}
+            views={{
+              month: true,
+              week: true,
+              day: true
+            }}
+            view={view}
+            date={date}
+            onNavigate={handleNavigate}
+            onView={handleViewChange}
+            components={{
+              event: (props) => <EventComponent {...props} onClick={handleEventClick} />,
+              toolbar: CustomToolbar
+            }}
+            eventPropGetter={(event) => {
+              const trip = event.resource as Trip;
+              let backgroundColor = '#60A5FA'; // blue-400
+              switch (trip.status) {
+                case 'completed':
+                  backgroundColor = '#34D399'; // green-400
+                  break;
+                case 'shopping':
+                  backgroundColor = '#60A5FA'; // blue-400
+                  break;
+                case 'cancelled':
+                  backgroundColor = '#F87171'; // red-400
+                  break;
+                default:
+                  backgroundColor = '#9CA3AF'; // gray-400
+              }
+              return { 
+                style: { 
+                  backgroundColor,
+                  border: 'none',
+                  borderRadius: '4px'
+                } 
+              };
+            }}
+          />
+        </div>
+      </DialogContent>
+
+      {/* Trip Details Sheet */}
+      <Sheet open={selectedTrip !== null} onOpenChange={() => setSelectedTrip(null)}>
+        <SheetContent className="w-[400px] sm:w-[540px]">
+          <SheetHeader>
+            <SheetTitle className="flex items-center justify-between">
+              <span>{selectedTrip?.store}</span>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => setSelectedTrip(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </SheetTitle>
+            <SheetDescription>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CalendarDays className="h-4 w-4" />
+                {selectedTrip && format(parseISO(selectedTrip.date), 'PPP')} at {selectedTrip?.time}
+              </div>
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium">Items</h3>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsAddingItem(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </Button>
+            </div>
+
+            {isAddingItem ? (
+              <div className="space-y-4 mb-4">
+                <div className="space-y-2">
+                  <Label htmlFor="itemName">Item Name</Label>
+                  <Input
+                    id="itemName"
+                    value={newItem.name}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter item name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Quantity</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    min="1"
+                    value={newItem.quantity}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Input
+                    id="notes"
+                    value={newItem.notes}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Add any notes"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddingItem(false);
+                      setNewItem({ name: '', quantity: '1', notes: '' });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddItem}>
+                    Add Item
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <ScrollArea className="h-[300px] pr-4">
+                {selectedTrip?.items.map((item, index) => (
+                  <div key={item.id} className="flex items-center justify-between py-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={() => {
+                          if (!selectedTrip) return;
+                          const updatedItems = [...selectedTrip.items];
+                          updatedItems[index] = { ...item, checked: !item.checked };
+                          const updatedTrip = { ...selectedTrip, items: updatedItems };
+                          updateTrip(selectedTrip.id, updatedTrip);
+                          setSelectedTrip(updatedTrip as Trip);
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span className={item.checked ? 'line-through text-gray-500' : ''}>
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      {item.quantity > 1 ? `×${item.quantity}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </ScrollArea>
+            )}
+
+            <Separator className="my-4" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    selectedTrip?.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    selectedTrip?.status === 'shopping' ? 'bg-blue-100 text-blue-800' :
+                    selectedTrip?.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }
+                >
+                  {selectedTrip?.status}
+                </Badge>
+              </div>
+              {selectedTrip?.eta && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Duration</span>
+                  <span>{selectedTrip.eta}</span>
+                </div>
+              )}
+              {selectedTrip?.budget && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Budget</span>
+                  <span>${selectedTrip.budget}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </Dialog>
+  );
+}

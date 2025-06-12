@@ -59,18 +59,20 @@ const UnitSelector = (props: UnitSelectorProps) => {
     const { value, onChange, className = "" } = props;
     
     return (
-      <Select value={value} onValueChange={onChange} className={className}>
-        <SelectTrigger>
-          <SelectValue placeholder="Select unit" />
-        </SelectTrigger>
-        <SelectContent>
-          {units.map((unit) => (
-            <SelectItem key={unit.id} value={unit.id}>
-              {unit.name} ({unit.abbreviation})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className={className}>
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select unit" />
+          </SelectTrigger>
+          <SelectContent>
+            {units.map((unit) => (
+              <SelectItem key={unit.id} value={unit.id}>
+                {unit.name} ({unit.abbreviation})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     );
   }
   
@@ -172,6 +174,8 @@ const UnitSelector = (props: UnitSelectorProps) => {
               variant="outline"
               size="sm"
               className="h-10 px-2 flex items-center justify-between rounded-l-none border-l-0"
+              aria-label={`Current unit: ${currentUnit?.abbreviation || 'each'}`}
+              aria-haspopup="true"
             >
               <span>{currentUnit?.abbreviation || 'ea'}</span>
               <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-50" />
@@ -190,6 +194,8 @@ const UnitSelector = (props: UnitSelectorProps) => {
                     size="sm"
                     className="h-8 text-xs"
                     onClick={() => handleTypeSelect(option.type)}
+                    aria-label={`Select ${option.label} measurement type`}
+                    aria-pressed={activeType === option.type}
                   >
                     {option.label}
                   </Button>
@@ -209,6 +215,8 @@ const UnitSelector = (props: UnitSelectorProps) => {
                       size="sm"
                       className="h-8 text-xs"
                       onClick={() => handleUnitSelect(unit.id)}
+                      aria-label={`Select ${unit.name} (${unit.abbreviation})`}
+                      aria-pressed={currentUnit?.id === unit.id}
                     >
                       {unit.abbreviation}
                     </Button>
@@ -248,6 +256,8 @@ const UnitSelector = (props: UnitSelectorProps) => {
                   size="sm"
                   className="h-8 text-xs"
                   onClick={() => handleTypeSelect(option.type)}
+                  aria-label={`Select ${option.label} measurement type`}
+                  aria-pressed={activeType === option.type}
                 >
                   {option.label}
                 </Button>
@@ -267,6 +277,8 @@ const UnitSelector = (props: UnitSelectorProps) => {
                     size="sm"
                     className="h-8 text-xs"
                     onClick={() => handleUnitSelect(unit.id)}
+                    aria-label={`Select ${unit.name} (${unit.abbreviation})`}
+                    aria-pressed={currentUnit?.id === unit.id}
                   >
                     {unit.abbreviation}
                   </Button>

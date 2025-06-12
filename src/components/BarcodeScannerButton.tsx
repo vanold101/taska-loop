@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isCameraSupported as checkCameraSupport, requestCameraAccess, stopMediaStream, retryWithDifferentConstraints, toggleTorch as toggleTorchUtil } from "@/utils/cameraUtils";
 import { fetchProductFromOpenFoodFacts } from "@/services/OpenFoodFactsService";
 import { fetchWithProxy } from "@/services/ProxyService";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 // Define the structure for the scanned item data
 export interface ScannedItem {

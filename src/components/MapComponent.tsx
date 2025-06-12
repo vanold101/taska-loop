@@ -13,14 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { calculateOptimalRoute } from '../utils/routeOptimization';
 import { RoutePreferences, OptimizedRoute, StopTimeWindow } from '../types/routing';
 import RoutePreferencesComponent from '../components/RoutePreferences';
-
-// Declare global Google Maps types
-declare global {
-  interface Window {
-    initMap: () => void;
-    google: typeof google;
-  }
-}
+import { initGoogleMapsDirections, initGoogleMapsGeometry } from "@/services/googlePlaces";
 
 export default function MapComponent() {
   const { toast } = useToast();
@@ -95,64 +88,42 @@ export default function MapComponent() {
 
   // Initialize Google Maps once location is available
   useEffect(() => {
-    // Only proceed if we're not loading anymore
     if (loading) return;
-    
-    console.log("Initializing Google Maps...");
-    
-    // Initialize Google Maps
-    const initMap = () => {
-      if (!mapRef.current) return;
-      
-      console.log("Creating map with center:", location);
-      
-      // Create the map
-      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
-        center: location,
-        zoom: 12,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-        zoomControl: true
-      });
-      
-      // Create info window for markers
-      infoWindowRef.current = new window.google.maps.InfoWindow();
-      
-      // Add markers for tasks
-      addTaskMarkers();
-      
-      // Add user location marker
-      addUserLocationMarker();
-      
-      console.log("Map initialized successfully");
-    };
-    
-    // Define global callback for Google Maps API
-    window.initMap = initMap;
-    
-    // Check if Google Maps API is already loaded
-    if (window.google && window.google.maps) {
-      console.log("Google Maps already loaded, initializing map");
-      initMap();
-      return;
-    }
-    
-    // Load Google Maps API if not already loaded
-    console.log("Loading Google Maps API...");
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8&libraries=places,geometry&callback=initMap`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-    
-    return () => {
-      // Clean up script tag if it exists and wasn't loaded yet
-      if (document.head.contains(script) && !window.google) {
-        document.head.removeChild(script);
+
+    const initializeMap = async () => {
+      if (!mapRef.current || googleMapRef.current) return;
+
+      try {
+        await initGoogleMapsDirections();
+        await initGoogleMapsGeometry();
+        
+        googleMapRef.current = new window.google.maps.Map(mapRef.current, {
+          center: location,
+          zoom: 12,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          zoomControl: true
+        });
+
+        infoWindowRef.current = new window.google.maps.InfoWindow();
+        
+        addTaskMarkers();
+        addUserLocationMarker();
+        
+      } catch (error) {
+        console.error("Failed to initialize Google Maps", error);
+        toast({
+          title: "Map Error",
+          description: "Could not load the map. Please try again later.",
+          variant: "destructive"
+        });
       }
     };
-  }, [loading, location]);
+
+    initializeMap();
+
+  }, [loading, location, tasks]); // Add tasks to dependency array
 
   // Add markers for tasks on the map
   const addTaskMarkers = () => {
@@ -169,7 +140,7 @@ export default function MapComponent() {
     bounds.extend(location); // Include user location in bounds
     
     // Add task markers
-    tasks.forEach(task => {
+    tasks.forEach((task, index) => {
       if (task.coordinates) {
         try {
           // Create marker for this task
@@ -177,13 +148,20 @@ export default function MapComponent() {
             position: { lat: task.coordinates.lat, lng: task.coordinates.lng },
             map: googleMapRef.current,
             title: task.title,
+            label: {
+              text: `${index + 1}`,
+              color: 'white',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            },
             icon: {
               path: window.google.maps.SymbolPath.CIRCLE,
               fillColor: getPriorityColor(task.priority),
               fillOpacity: 1,
               strokeWeight: 2,
               strokeColor: '#FFFFFF',
-              scale: 10
+              scale: 12,
+              labelOrigin: new window.google.maps.Point(0, 0)
             }
           });
           
@@ -308,7 +286,7 @@ export default function MapComponent() {
           polylineOptions: {
             strokeColor: '#4285F4',
             strokeWeight: 5,
-            strokeOpacity: 0.7
+            strokeOpacity: 0.8
           }
         });
       }
@@ -408,17 +386,11 @@ export default function MapComponent() {
         <div className="flex h-16 items-center px-4">
           <h1 className="text-xl font-bold">Map View</h1>
           <div className="ml-auto flex items-center space-x-4">
-            <Link to="/tasks/new">
+            <Link to="/dashboard">
               <Button className="bg-primary text-white hover:bg-primary/90">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Task
               </Button>
-            </Link>
-            <Link to="/tasks">
-              <Button variant="outline">Tasks</Button>
-            </Link>
-            <Link to="/home">
-              <Button variant="outline">Home</Button>
             </Link>
           </div>
         </div>
@@ -454,14 +426,31 @@ export default function MapComponent() {
               </Button>
               
               {optimizedRoute && (
-                <Button 
-                  onClick={clearRoute}
-                  variant="outline"
-                  className="flex items-center"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Clear Route
-                </Button>
+                <>
+                  <Button 
+                    onClick={clearRoute}
+                    variant="outline"
+                    className="flex items-center"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear Route
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => {
+                      // Open Google Maps with the optimized route
+                      const waypoints = optimizedRoute.waypoints.map(wp => `${wp.location.lat},${wp.location.lng}`).join('|');
+                      const originStr = `${location.lat},${location.lng}`;
+                      const url = `https://www.google.com/maps/dir/?api=1&origin=${originStr}&destination=${routePreferences.returnToStart ? originStr : waypoints.split('|').pop()}&waypoints=${waypoints}&travelmode=${routePreferences.transportMode.toLowerCase()}`;
+                      window.open(url, '_blank');
+                    }}
+                    variant="outline"
+                    className="flex items-center"
+                  >
+                    <MapIcon className="mr-2 h-4 w-4" />
+                    Open in Google Maps
+                  </Button>
+                </>
               )}
             </div>
             
@@ -499,7 +488,10 @@ export default function MapComponent() {
                         {optimizedRoute.segments.map((segment, index) => (
                           <div key={index} className="p-2 border rounded-md">
                             <div className="flex justify-between items-center">
-                              <span className="text-sm">Segment {index + 1}</span>
+                              <span className="text-sm flex items-center">
+                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-white text-xs font-bold mr-2">{index + 1}</span>
+                                Segment {index + 1}
+                              </span>
                               <div className={`px-2 py-0.5 rounded-full text-xs font-medium 
                                 ${segment.priority === 'high' ? 'bg-red-100 text-red-800' : 
                                   segment.priority === 'medium' ? 'bg-amber-100 text-amber-800' : 
@@ -529,7 +521,7 @@ export default function MapComponent() {
               <CardContent>
                 {tasks.length > 0 ? (
                   <div className="space-y-2">
-                    {tasks.map(task => (
+                    {tasks.map((task, index) => (
                       <div
                         key={task.id}
                         className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
@@ -547,18 +539,24 @@ export default function MapComponent() {
                             if (marker && window.google) {
                               window.google.maps.event.trigger(marker, 'click');
                             }
+                            
+                            // Set the selected task to show task details
+                            setSelectedTask(task);
                           }
                         }}
                       >
                         <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-medium">{task.title}</h3>
-                            <p className="text-sm text-gray-500 flex items-center">
-                              <MapPin className="h-3 w-3 mr-1" /> {task.location}
-                            </p>
-                            <p className="text-sm text-gray-500 flex items-center">
-                              <Clock className="h-3 w-3 mr-1" /> {format(new Date(task.dueDate), 'PPP')}
-                            </p>
+                          <div className="flex items-start">
+                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-white text-xs font-bold mr-3">{index + 1}</span>
+                            <div>
+                              <h3 className="font-medium">{task.title}</h3>
+                              <p className="text-sm text-gray-500 flex items-center">
+                                <MapPin className="h-3 w-3 mr-1" /> {task.location}
+                              </p>
+                              <p className="text-sm text-gray-500 flex items-center">
+                                <Clock className="h-3 w-3 mr-1" /> {format(new Date(task.dueDate), 'PPP')}
+                              </p>
+                            </div>
                           </div>
                           <div className={`px-2 py-1 rounded-full text-xs font-medium 
                             ${task.priority === 'high' ? 'bg-red-100 text-red-800' : 
@@ -579,19 +577,6 @@ export default function MapComponent() {
             </Card>
           </div>
         )}
-      </div>
-      
-      {/* Floating Action Button - Add Task */}
-      <div id="floating-add-button" style={{ position: 'fixed', bottom: '96px', right: '24px', zIndex: 9999 }}>
-        <Link to="/tasks/new">
-          <Button
-            size="lg"
-            className="h-16 w-16 rounded-full shadow-xl bg-primary hover:bg-primary/90 flex items-center justify-center"
-            style={{ boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.2)' }}
-          >
-            <Plus className="h-8 w-8" />
-          </Button>
-        </Link>
       </div>
       
       {/* Selected task info */}
