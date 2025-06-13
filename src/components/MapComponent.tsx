@@ -17,7 +17,7 @@ import { initGoogleMapsDirections, initGoogleMapsGeometry } from "@/services/goo
 
 export default function MapComponent() {
   const { toast } = useToast();
-  const { tasks } = useTaskContext();
+  const { tasks, trips } = useTaskContext();
   const [location, setLocation] = useState<{ lat: number, lng: number }>({ lat: 39.9789, lng: -82.8677 }); // Default to Columbus, OH
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -108,7 +108,7 @@ export default function MapComponent() {
 
         infoWindowRef.current = new window.google.maps.InfoWindow();
         
-        addTaskMarkers();
+        addLocationMarkers();
         addUserLocationMarker();
         
       } catch (error) {
@@ -123,13 +123,13 @@ export default function MapComponent() {
 
     initializeMap();
 
-  }, [loading, location, tasks]); // Add tasks to dependency array
+  }, [loading, location, tasks, trips]); // Add trips to dependency array
 
-  // Add markers for tasks on the map
-  const addTaskMarkers = () => {
+  // Add markers for tasks and trips on the map
+  const addLocationMarkers = () => {
     if (!googleMapRef.current || !window.google) return;
     
-    console.log("Adding task markers...");
+    console.log("Adding location markers...");
     
     // Clear existing markers
     markersRef.current.forEach(marker => marker.setMap(null));
@@ -139,8 +139,10 @@ export default function MapComponent() {
     const bounds = new window.google.maps.LatLngBounds();
     bounds.extend(location); // Include user location in bounds
     
+    let markerIndex = 1;
+    
     // Add task markers
-    tasks.forEach((task, index) => {
+    tasks.forEach((task) => {
       if (task.coordinates) {
         try {
           // Create marker for this task
@@ -149,7 +151,7 @@ export default function MapComponent() {
             map: googleMapRef.current,
             title: task.title,
             label: {
-              text: `${index + 1}`,
+              text: `${markerIndex}`,
               color: 'white',
               fontSize: '12px',
               fontWeight: 'bold'
@@ -181,6 +183,9 @@ export default function MapComponent() {
                 <p style="color: #666; font-size: 14px; margin: 4px 0;">
                   <span style="display: inline-block; margin-right: 4px;">⏰</span>${format(new Date(task.dueDate), 'PPP')}
                 </p>
+                <p style="color: #666; font-size: 14px; margin: 4px 0;">
+                  <span style="display: inline-block; margin-right: 4px;">🎯</span>Task - ${task.priority} priority
+                </p>
               </div>
             `;
             
@@ -190,8 +195,71 @@ export default function MapComponent() {
           
           markersRef.current.push(marker);
           bounds.extend({ lat: task.coordinates.lat, lng: task.coordinates.lng });
+          markerIndex++;
         } catch (error) {
           console.error(`Error adding marker for task ${task.id}:`, error);
+        }
+      }
+    });
+
+    // Add trip markers
+    trips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled').forEach((trip) => {
+      if (trip.coordinates) {
+        try {
+          // Create marker for this trip
+          const marker = new window.google.maps.Marker({
+            position: { lat: trip.coordinates.lat, lng: trip.coordinates.lng },
+            map: googleMapRef.current,
+            title: `Trip to ${trip.store}`,
+            label: {
+              text: `${markerIndex}`,
+              color: 'white',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            },
+            icon: {
+              path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+              fillColor: '#3B82F6', // Blue color for trips
+              fillOpacity: 1,
+              strokeWeight: 2,
+              strokeColor: '#FFFFFF',
+              scale: 12,
+              labelOrigin: new window.google.maps.Point(0, 0)
+            }
+          });
+          
+          // Add click listener to marker
+          marker.addListener('click', () => {
+            if (!infoWindowRef.current) return;
+            
+            // Show info window with trip details
+            const content = `
+              <div style="padding: 8px; min-width: 200px;">
+                <h3 style="font-weight: bold; margin-bottom: 4px;">Trip to ${trip.store}</h3>
+                <p style="color: #666; font-size: 14px; margin: 4px 0;">
+                  <span style="display: inline-block; margin-right: 4px;">📍</span>${trip.store}
+                </p>
+                <p style="color: #666; font-size: 14px; margin: 4px 0;">
+                  <span style="display: inline-block; margin-right: 4px;">📅</span>${format(new Date(trip.date), 'PPP')}
+                </p>
+                <p style="color: #666; font-size: 14px; margin: 4px 0;">
+                  <span style="display: inline-block; margin-right: 4px;">🛒</span>Shopping Trip - ${trip.items.length} items
+                </p>
+                <p style="color: #666; font-size: 14px; margin: 4px 0;">
+                  <span style="display: inline-block; margin-right: 4px;">📊</span>Status: ${trip.status}
+                </p>
+              </div>
+            `;
+            
+            infoWindowRef.current.setContent(content);
+            infoWindowRef.current.open(googleMapRef.current, marker);
+          });
+          
+          markersRef.current.push(marker);
+          bounds.extend({ lat: trip.coordinates.lat, lng: trip.coordinates.lng });
+          markerIndex++;
+        } catch (error) {
+          console.error(`Error adding marker for trip ${trip.id}:`, error);
         }
       }
     });
@@ -372,12 +440,12 @@ export default function MapComponent() {
     setRoutePreferences(newPreferences);
   };
   
-  // Update markers when tasks change
+  // Re-add markers when tasks or trips change
   useEffect(() => {
     if (googleMapRef.current && !loading) {
-      addTaskMarkers();
+      addLocationMarkers();
     }
-  }, [tasks]);
+  }, [tasks, trips]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

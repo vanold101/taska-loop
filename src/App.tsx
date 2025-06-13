@@ -9,6 +9,7 @@ import { TripProvider } from "./context/TripContext";
 import { TripsProvider } from "./context/TripsContext";
 import NotificationProvider from "./context/NotificationContext";
 import { PantryProvider } from "./context/PantryContext";
+import UserSwitcher from "./components/UserSwitcher";
 
 // Import pages
 import Landing from "./pages/Landing";
@@ -50,8 +51,8 @@ const App = () => {
   
   return (
     <TooltipProvider>
-      <TaskProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <TaskProvider>
           <TripsProvider>
             <TripProvider>
               <NotificationProvider>
@@ -59,6 +60,7 @@ const App = () => {
                   <HashRouter>
                     <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
                       <div className="pattern-overlay"></div>
+                      <UserSwitcher />
                       <Routes>
                         {/* Public routes */}
                         <Route path="/" element={<Landing />} />
@@ -141,13 +143,15 @@ const App = () => {
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </div>
+                    <Toaster />
+                    <Sonner />
                   </HashRouter>
                 </PantryProvider>
               </NotificationProvider>
             </TripProvider>
           </TripsProvider>
-        </AuthProvider>
-      </TaskProvider>
+        </TaskProvider>
+      </AuthProvider>
     </TooltipProvider>
   );
 };

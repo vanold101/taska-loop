@@ -20,16 +20,31 @@ else
   read -p "Firebase Messaging Sender ID: " messaging_sender_id
   read -p "Firebase App ID: " app_id
   read -p "Firebase Measurement ID: " measurement_id
+  read -p "Google OAuth Client ID: " google_client_id
+  read -p "Google Maps API Key: " google_maps_key
+  read -p "Firebase VAPID Key: " vapid_key
   
   cat > .env << EOL
 # Firebase Configuration
-NEXT_PUBLIC_FIREBASE_API_KEY="${api_key}"
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="${auth_domain}"
-NEXT_PUBLIC_FIREBASE_PROJECT_ID="${project_id}"
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="${storage_bucket}"
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${messaging_sender_id}"
-NEXT_PUBLIC_FIREBASE_APP_ID="${app_id}"
-NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="${measurement_id}"
+VITE_FIREBASE_API_KEY="${api_key}"
+VITE_FIREBASE_AUTH_DOMAIN="${auth_domain}"
+VITE_FIREBASE_PROJECT_ID="${project_id}"
+VITE_FIREBASE_STORAGE_BUCKET="${storage_bucket}"
+VITE_FIREBASE_MESSAGING_SENDER_ID="${messaging_sender_id}"
+VITE_FIREBASE_APP_ID="${app_id}"
+VITE_FIREBASE_MEASUREMENT_ID="${measurement_id}"
+
+# Google OAuth Configuration
+VITE_GOOGLE_CLIENT_ID="${google_client_id}"
+
+# Google Maps API Key
+VITE_GOOGLE_MAPS_API_KEY="${google_maps_key}"
+
+# Environment
+NODE_ENV=development
+
+# Firebase Messaging VAPID Key
+VITE_FIREBASE_VAPID_KEY="${vapid_key}"
 EOL
   
   echo "✅ .env file created successfully."

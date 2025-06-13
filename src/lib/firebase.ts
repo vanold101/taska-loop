@@ -21,18 +21,13 @@ import {
   signOut, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  connectAuthEmulator
+  connectAuthEmulator,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { getAnalytics } from "firebase/analytics";
 import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
-
-// Define the window _env_ type for global runtime environment variables
-declare global {
-  interface Window {
-    _env_?: Record<string, string>;
-  }
-}
 
 // Check if we're running in development mode
 const isDevelopment = () => {
@@ -41,77 +36,39 @@ const isDevelopment = () => {
     const hostname = window.location.hostname;
     return hostname === 'localhost' || hostname === '127.0.0.1';
   }
-  return process.env.NODE_ENV === 'development';
-};
-
-// Safe access to environment variables with fallbacks
-const getEnvVar = (key: string): string => {
-  // Check window._env_ first (commonly used for runtime env variables)
-  if (typeof window !== 'undefined' && window._env_ && window._env_[key]) {
-    return window._env_[key];
-  }
-  
-  // Then try process.env if it exists (server context or build-time env)
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key];
-  }
-  
-  // Default fallback values for development/testing
-  // This ensures the app doesn't break when env vars are missing
-  const fallbackValues: Record<string, string> = {
-    'NEXT_PUBLIC_FIREBASE_API_KEY': 'AIzaSyAHGQvFPkUxdRMiBdT6Q8srnqHBTjCl0sI',
-    'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN': 'taska-loop.firebaseapp.com',
-    'NEXT_PUBLIC_FIREBASE_PROJECT_ID': 'taska-loop',
-    'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET': 'taska-loop.appspot.com',
-    'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID': '567819033549',
-    'NEXT_PUBLIC_FIREBASE_APP_ID': '1:567819033549:web:62eba0211bb80639c8d456',
-    'NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID': 'G-TT3JQPNPT0',
-    'NODE_ENV': 'development'
-  };
-  
-  return fallbackValues[key] || '';
-};
-
-// Define a dummy version of services for development
-const createDummyService = (name: string) => {
-  // Silent in production
-  if (!isDevelopment()) return { dummy: true };
-  return { dummy: true };
-};
-
-// Attempt to initialize messaging if supported
-const initializeMessaging = async (app: any) => {
-  if (isDevelopment()) {
-    return createDummyService('messaging');
-  }
-  
-  try {
-    if (await isSupported()) {
-      const messagingInstance = getMessaging(app);
-      return messagingInstance;
-    }
-    return null;
-  } catch (error) {
-    return null;
-  }
+  return import.meta.env.DEV;
 };
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: getEnvVar('NEXT_PUBLIC_FIREBASE_API_KEY'),
-  authDomain: getEnvVar('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'),
-  projectId: getEnvVar('NEXT_PUBLIC_FIREBASE_PROJECT_ID'),
-  storageBucket: getEnvVar('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: getEnvVar('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
-  appId: getEnvVar('NEXT_PUBLIC_FIREBASE_APP_ID'),
-  measurementId: getEnvVar('NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID'),
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-if (!firebaseConfig.apiKey) {
-  console.error('Firebase API key is missing! Authentication will fail.');
+// Validate required environment variables
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN', 
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars);
+  console.error('Please create a .env file with the required Firebase configuration.');
+  console.error('See env.example for the required variables.');
 }
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -120,14 +77,21 @@ const storage = getStorage(app);
 // Check if we're in development mode
 const isDev = isDevelopment();
 
+// Flag to control whether to use auth emulator (set to false for real Google login)
+const USE_AUTH_EMULATOR = false; // Disabled to use real Firebase auth
+
 // Connect to emulators in development mode
 if (isDev) {
   try {
-    connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-    connectFirestoreEmulator(db, 'localhost', 8080);
+    // Only connect auth emulator if flag is enabled
+    if (USE_AUTH_EMULATOR) {
+      connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+    }
+    connectFirestoreEmulator(db, 'localhost', 8081);
     connectStorageEmulator(storage, 'localhost', 9199);
   } catch (error) {
-    // Silent fail
+    // Silent fail - emulators might not be running
+    console.log('Emulator connection failed, using production services');
   }
 }
 
@@ -135,21 +99,21 @@ if (isDev) {
 let analytics = null;
 let messagingInstance = null;
 
-// Only initialize analytics and messaging in the browser and in production
 if (typeof window !== 'undefined') {
   try {
-    if (!isDev) {
+    // Only initialize analytics in production
+    if (!isDev && firebaseConfig.measurementId) {
       analytics = getAnalytics(app);
-    } else {
-      analytics = createDummyService('analytics');
     }
     
-    // Initialize messaging
-    messagingInstance = initializeMessaging(app);
+    // Initialize messaging if supported
+    isSupported().then((supported) => {
+      if (supported) {
+        messagingInstance = getMessaging(app);
+      }
+    });
   } catch (error) {
-    // Create dummy services as fallback
-    analytics = createDummyService('analytics');
-    messagingInstance = createDummyService('messaging');
+    console.log('Analytics/Messaging initialization failed:', error);
   }
 }
 
@@ -177,6 +141,8 @@ export {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
   getToken,
   onMessage
 };

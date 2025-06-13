@@ -41,14 +41,17 @@ import { useTaskContext } from "@/context/TaskContext"
 import { useToast } from "@/hooks/use-toast"
 import { AppLayout } from "@/components/AppLayout"
 import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, parseISO, addMonths, subMonths } from 'date-fns'
+import { CreateTaskModal } from "@/components/CreateTaskModal"
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { tasks: contextTasks, trips: contextTrips, updateTask, deleteTask } = useTaskContext();
+  const { tasks: contextTasks, trips: contextTrips, updateTask, deleteTask, addTask } = useTaskContext();
   const [activeTab, setActiveTab] = useState("all");
   const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState<any>(null);
   
   // Count today's tasks
   const todayTasks = contextTasks.filter(task => {
@@ -106,11 +109,7 @@ export default function HomePage() {
 
   // Handler functions for buttons
   const handleNewTask = () => {
-    navigate('/dashboard');
-    toast({
-      title: "New Task",
-      description: "Navigating to dashboard to create a new task"
-    });
+    setIsCreateTaskModalOpen(true);
   };
 
   const handleViewAllTasks = () => {
@@ -693,6 +692,17 @@ export default function HomePage() {
           </TabsContent>
         </Tabs>
       </div>
+      {isCreateTaskModalOpen && (
+        <CreateTaskModal
+          isOpen={isCreateTaskModalOpen}
+          onClose={() => setIsCreateTaskModalOpen(false)}
+          onSubmit={(newTask: any) => {
+            addTask(newTask);
+            setIsCreateTaskModalOpen(false);
+          }}
+          taskToEdit={taskToEdit}
+        />
+      )}
     </AppLayout>
   )
 } 

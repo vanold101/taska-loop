@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { LogOut, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 import {
   Dialog,
@@ -23,17 +23,14 @@ const SignOutDialog = ({ open, onOpenChange }: SignOutDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   const handleSignOut = async () => {
     try {
       setIsLoading(true);
       
-      // Simulate sign out process
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Clear any stored user data, tokens, etc.
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
+      // Use real Firebase logout from AuthContext
+      await logout();
       
       // Show success toast
       toast({

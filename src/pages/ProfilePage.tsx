@@ -1,7 +1,12 @@
-import { Button } from "../components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card"
-import { Input } from "../components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
+import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '../hooks/use-toast';
+import { AppLayout } from '../components/AppLayout';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Bell,
   Calculator,
@@ -21,6 +26,10 @@ import {
   ShoppingCart,
   User,
   Users,
+  Mail,
+  Phone,
+  Edit,
+  Clock
 } from "lucide-react"
 import { Link } from "react-router-dom"
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
@@ -28,9 +37,34 @@ import { Switch } from "../components/ui/switch"
 import { Label } from "../components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
 import { Badge } from "../components/ui/badge"
-import { AppLayout } from "../components/AppLayout"
 
 export default function ProfilePage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      toast({
+        title: "Successfully signed out",
+        description: "You have been signed out of your account.",
+      });
+      navigate('/');
+    } catch (error) {
+      console.error("Sign out failed:", error);
+      toast({
+        title: "Sign out failed",
+        description: "There was a problem signing you out. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="p-4 md:p-8">
@@ -477,9 +511,9 @@ export default function ProfilePage() {
                   <h4 className="font-medium text-slate-800">Sign Out</h4>
                   <p className="text-sm text-slate-500">Sign out from your account</p>
                 </div>
-                <Button variant="outline" className="border-slate-200">
+                <Button variant="outline" className="border-slate-200" onClick={handleSignOut} disabled={isLoggingOut}>
                   <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
+                  {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                 </Button>
               </div>
             </CardContent>

@@ -4,8 +4,13 @@ import { app, db, auth, collection, addDoc, updateDoc, doc, getDoc, arrayUnion, 
 // Initialize Firebase Cloud Messaging
 const messaging = getMessaging(app);
 
-// Your VAPID key from Firebase Console
-const VAPID_KEY = 'BHgGDXZJXOXFG_oYPIXiG3Y_NRQfEHvqhB0xG-GhQrFR9U6mRZ3OqPsvYyYHqeBGki0JgRqNEQTZQ3jHXq5xFrM';
+// Your VAPID key from environment variables
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
+
+if (!VAPID_KEY) {
+  console.warn('Firebase VAPID key is not set. Push notifications may not work properly.');
+  console.warn('Please set VITE_FIREBASE_VAPID_KEY in your environment variables.');
+}
 
 export interface PushNotification {
   title: string;

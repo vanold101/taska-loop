@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { auth, GoogleAuthProvider, signInWithPopup } from '../lib/firebase';
+import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser, signInWithEmailAndPassword } from 'firebase/auth';
 
 // Define the User type
 export interface ChorePreference {
@@ -12,6 +14,7 @@ export interface User {
   email?: string;
   avatar?: string;
   chorePreferences?: ChorePreference[]; // Added chore preferences
+  isAdmin?: boolean; // Added admin flag
 }
 
 // Define the AuthContext state
@@ -20,8 +23,10 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>; // Added email login
   logout: () => Promise<void>;
   updateChorePreferences: (preferences: ChorePreference[]) => Promise<void>; // Added function signature
+  isAdmin: boolean; // Added admin check
 }
 
 // Create the AuthContext
@@ -35,91 +40,121 @@ interface AuthProviderProps {
 // Local storage key for auth user
 const AUTH_USER_KEY = 'authUser';
 
+// Admin email addresses (you can add more)
+const ADMIN_EMAILS = [
+  'devansh.home@gmail.com', // Your main email
+  'admin@taskaloop.com', // Test admin account
+  'demo@taskaloop.com', // Demo admin account
+  'test.admin@gmail.com', // Test admin account
+  // Add more admin emails as needed
+];
+
+// Check if user is admin
+const checkIsAdmin = (email?: string): boolean => {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+};
+
 // Create the AuthProvider component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Check for saved auth on initial load
+  // Listen for Firebase auth state changes
   useEffect(() => {
-    try {
-      setIsLoading(true);
-      const storedUser = localStorage.getItem(AUTH_USER_KEY);
-      
-      // For development: Create a default user if none exists
-      const defaultUser: User = {
-        id: 'default_user',
-        name: 'Default User',
-        email: 'default@example.com',
-        avatar: 'https://ui-avatars.com/api/?name=Default+User&background=random',
-        chorePreferences: [],
-      };
-
-      if (storedUser) {
-        const parsedUser: User = JSON.parse(storedUser);
-        setUser({
-          ...parsedUser,
-          chorePreferences: parsedUser.chorePreferences || []
-        });
+    setIsLoading(true);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // Set user info from Firebase
+        const { uid, displayName, email, photoURL } = firebaseUser;
+        const userObj: User = {
+          id: uid,
+          name: displayName || email || 'User',
+          email: email || undefined,
+          avatar: photoURL || `https://ui-avatars.com/api/?name=${displayName || email || 'User'}&background=random`,
+          chorePreferences: [],
+          isAdmin: checkIsAdmin(email || undefined),
+        };
+        setUser(userObj);
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userObj));
       } else {
-        // For development: Auto-login with default user
-        setUser(defaultUser);
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(defaultUser));
+        setUser(null);
+        localStorage.removeItem(AUTH_USER_KEY);
       }
-    } catch (e) {
-      console.error("Error loading auth state:", e);
-      localStorage.removeItem(AUTH_USER_KEY);
-    } finally {
       setIsLoading(false);
-    }
+    });
+    return () => unsubscribe();
   }, []);
 
-  // Simulated Google sign-in
+  // Real Google sign-in
   const loginWithGoogle = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      setError(null);
+      const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Attempting Google sign-in...');
+      const result = await signInWithPopup(auth, provider);
+      console.log('Google sign-in successful:', result.user);
       
-      // Create mock user (in a real app, this would be the Google auth response)
-      const mockUser: User = {
-        id: 'google_' + Math.random().toString(36).substring(2, 9),
-        name: 'Demo User',
-        email: 'demo@example.com',
-        avatar: 'https://ui-avatars.com/api/?name=Demo+User&background=random',
-        chorePreferences: [],
-      };
+    } catch (error: any) {
+      console.error('Login error:', error);
       
-      // Store the user in state and localStorage
-      setUser(mockUser);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(mockUser));
-      
-    } catch (error) {
-      console.error("Google login error:", error);
-      setError("Failed to login with Google. Please try again.");
+      // Handle specific error cases
+      if (error.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in was cancelled. Please try again.');
+      } else if (error.code === 'auth/popup-blocked') {
+        setError('Pop-up was blocked by your browser. Please allow pop-ups and try again.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized for Google sign-in.');
+      } else if (error.code === 'auth/configuration-not-found') {
+        setError('Firebase Authentication is not configured. Please enable it in Firebase Console: https://console.firebase.google.com/project/taska-9ee86/authentication');
+      } else {
+        setError(`Failed to login: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Logout function
-  const logout = async () => {
+  // Email/password login for emulator testing
+  const loginWithEmail = async (email: string, password: string) => {
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Clear auth state
-      localStorage.removeItem(AUTH_USER_KEY);
+      console.log('Attempting email sign-in...');
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Email sign-in successful:', result.user);
+    } catch (error: any) {
+      console.error('Email login error:', error);
+      if (error.code === 'auth/user-not-found') {
+        setError('No account found with this email.');
+      } else if (error.code === 'auth/wrong-password') {
+        setError('Incorrect password.');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Invalid email address.');
+      } else {
+        setError(`Login failed: ${error.message}`);
+      }
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Real logout
+  const logout = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await firebaseSignOut(auth);
       setUser(null);
-      
+      localStorage.removeItem(AUTH_USER_KEY);
     } catch (error) {
-      console.error("Logout error:", error);
-      setError("Failed to logout. Please try again.");
+      setError('Failed to logout. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -156,8 +191,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     error,
     loginWithGoogle,
+    loginWithEmail,
     logout,
-    updateChorePreferences
+    updateChorePreferences,
+    isAdmin: checkIsAdmin(user?.email),
   };
 
   return (

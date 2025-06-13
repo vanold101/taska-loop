@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "generate-sw": "node scripts/generate-sw.js"
+    "generate-sw": "node scripts/generate-sw.js",
+    "setup-admins": "node scripts/setup-admin-accounts.js",
+    "setup-env": "node scripts/setup-env.js"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.1.2",

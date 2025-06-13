@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 export interface PantryItem {
   id: string;
@@ -26,9 +27,53 @@ const initialPantryItems: PantryItem[] = [
 ];
 
 export const PantryProvider = ({ children }: { children: ReactNode }) => {
-  const [pantryItems, setPantryItems] = useState<PantryItem[]>(initialPantryItems);
+  const { user } = useAuth();
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+
+  // Get storage key for current user
+  const getStorageKey = () => {
+    return user ? `pantry_${user.id}` : 'pantry_default';
+  };
+
+  // Load pantry items for current user
+  useEffect(() => {
+    if (user) {
+      const storageKey = getStorageKey();
+      const storedItems = localStorage.getItem(storageKey);
+      
+      if (storedItems) {
+        try {
+          setPantryItems(JSON.parse(storedItems));
+        } catch (error) {
+          console.error('Error loading pantry items:', error);
+          // Provide initial data based on user type
+          const initialItems = user.isAdmin ? initialPantryItems : [];
+          setPantryItems(initialItems);
+          localStorage.setItem(storageKey, JSON.stringify(initialItems));
+        }
+      } else {
+        // First time user - give admins sample data, regular users get blank pantry
+        const initialItems = user.isAdmin ? initialPantryItems : [];
+        setPantryItems(initialItems);
+        localStorage.setItem(storageKey, JSON.stringify(initialItems));
+      }
+    } else {
+      // No user logged in - clear pantry
+      setPantryItems([]);
+    }
+  }, [user]);
+
+  // Save pantry items whenever they change
+  useEffect(() => {
+    if (user && pantryItems.length > 0) {
+      const storageKey = getStorageKey();
+      localStorage.setItem(storageKey, JSON.stringify(pantryItems));
+    }
+  }, [pantryItems, user]);
 
   const addPantryItem = (item: Omit<PantryItem, 'id'>) => {
+    if (!user) return; // Don't allow adding items without login
+
     // Check if item already exists
     const existingItem = pantryItems.find(
       existing => existing.name.toLowerCase() === item.name.toLowerCase()
@@ -45,17 +90,21 @@ export const PantryProvider = ({ children }: { children: ReactNode }) => {
       );
     } else {
       // Add new item
-      setPantryItems(prev => [...prev, { ...item, id: Date.now().toString() }]);
+      setPantryItems(prev => [...prev, { ...item, id: `${user.id}_${Date.now()}` }]);
     }
   };
 
   const updatePantryItem = (id: string, updates: Partial<PantryItem>) => {
+    if (!user) return; // Don't allow updates without login
+
     setPantryItems(prev =>
       prev.map(item => (item.id === id ? { ...item, ...updates } : item))
     );
   };
 
   const removePantryItem = (id: string) => {
+    if (!user) return; // Don't allow removal without login
+
     setPantryItems(prev => prev.filter(item => item.id !== id));
   };
 

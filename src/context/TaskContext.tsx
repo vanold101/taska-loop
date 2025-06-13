@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 // Define the task type that will be shared across the app
 export interface Task {
@@ -215,37 +216,90 @@ export interface TaskContextType {
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
-  const [trips, setTrips] = useState<Trip[]>(mockTrips);
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [budget, setBudget] = useState(500);
 
-  // Load tasks and trips from localStorage on initial render
-  useEffect(() => {
-    const storedTasks = localStorage.getItem('tasks');
-    const storedTrips = localStorage.getItem('trips');
-    
-    if (storedTasks) {
-      try {
-        setTasks(JSON.parse(storedTasks));
-      } catch (e) {
-        console.error('Error parsing stored tasks:', e);
-      }
-    }
-    
-    if (storedTrips) {
-      try {
-        const parsedTrips = JSON.parse(storedTrips);
-        setTrips(parsedTrips);
-      } catch (e) {
-        console.error('Error parsing stored trips:', e);
-      }
-    }
-  }, []);
+  // Get storage keys for current user
+  const getStorageKey = (type: 'tasks' | 'trips' | 'budget') => {
+    return user ? `${type}_${user.id}` : `${type}_default`;
+  };
 
-  // Save tasks and trips to localStorage whenever they change
+  // Load user-specific data when user changes
   useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]);
+    if (user) {
+      // Load tasks
+      const tasksKey = getStorageKey('tasks');
+      const storedTasks = localStorage.getItem(tasksKey);
+      if (storedTasks) {
+        try {
+          setTasks(JSON.parse(storedTasks));
+        } catch (e) {
+          console.error('Error parsing stored tasks:', e);
+          // Provide initial data based on user type
+          const initialTasks = user.isAdmin ? mockTasks : [];
+          setTasks(initialTasks);
+          localStorage.setItem(tasksKey, JSON.stringify(initialTasks));
+        }
+      } else {
+        // First time user - give admins sample data, regular users get blank slate
+        const initialTasks = user.isAdmin ? mockTasks : [];
+        setTasks(initialTasks);
+        localStorage.setItem(tasksKey, JSON.stringify(initialTasks));
+      }
+
+      // Load trips
+      const tripsKey = getStorageKey('trips');
+      const storedTrips = localStorage.getItem(tripsKey);
+      if (storedTrips) {
+        try {
+          const parsedTrips = JSON.parse(storedTrips);
+          setTrips(parsedTrips);
+        } catch (e) {
+          console.error('Error parsing stored trips:', e);
+          // Provide initial data based on user type
+          const initialTrips = user.isAdmin ? mockTrips : [];
+          setTrips(initialTrips);
+          localStorage.setItem(tripsKey, JSON.stringify(initialTrips));
+        }
+      } else {
+        // First time user - give admins sample data, regular users get blank slate
+        const initialTrips = user.isAdmin ? mockTrips : [];
+        setTrips(initialTrips);
+        localStorage.setItem(tripsKey, JSON.stringify(initialTrips));
+      }
+
+      // Load budget
+      const budgetKey = getStorageKey('budget');
+      const storedBudget = localStorage.getItem(budgetKey);
+      if (storedBudget) {
+        try {
+          setBudget(JSON.parse(storedBudget));
+        } catch (e) {
+          console.error('Error parsing stored budget:', e);
+          // Default budget for all users
+          setBudget(500);
+        }
+      } else {
+        // Default budget for all users
+        setBudget(500);
+      }
+    } else {
+      // No user logged in - clear all data
+      setTasks([]);
+      setTrips([]);
+      setBudget(500);
+    }
+  }, [user]);
+
+  // Save tasks to localStorage whenever they change
+  useEffect(() => {
+    if (user && tasks.length > 0) {
+      const tasksKey = getStorageKey('tasks');
+      localStorage.setItem(tasksKey, JSON.stringify(tasks));
+    }
+  }, [tasks, user]);
 
   // Function to handle special values during JSON serialization
   const replacer = (key: string, value: any) => {
@@ -256,27 +310,35 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     return value;
   };
 
+  // Save trips to localStorage whenever they change
   useEffect(() => {
-    try {
-      localStorage.setItem('trips', JSON.stringify(trips, replacer));
-    } catch (error) {
-      console.error('Error saving trips to localStorage:', error);
+    if (user && trips.length > 0) {
+      try {
+        const tripsKey = getStorageKey('trips');
+        localStorage.setItem(tripsKey, JSON.stringify(trips, replacer));
+      } catch (error) {
+        console.error('Error saving trips to localStorage:', error);
+      }
     }
-  }, [trips]);
+  }, [trips, user]);
 
   // Save budget to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('budget', JSON.stringify(budget));
-  }, [budget]);
+    if (user) {
+      const budgetKey = getStorageKey('budget');
+      localStorage.setItem(budgetKey, JSON.stringify(budget));
+    }
+  }, [budget, user]);
 
   // Add a new task
   const addTask = (task: Omit<Task, 'id'>) => {
+    if (!user) return; // Don't allow adding tasks without login
+
     const newTask: Task = {
       ...task,
-      id: Date.now().toString(),
-      completed: task.completed !== undefined ? task.completed : false,
+      id: `${user.id}_task_${Date.now()}`,
     };
-    setTasks([...tasks, newTask]);
+    setTasks(prev => [...prev, newTask]);
   };
 
   // Update an existing task
@@ -293,14 +355,16 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   // Add a new trip
   const addTrip = (tripData: Omit<Trip, 'id' | 'status'> & { items?: Item[] }) => {
+    if (!user) return; // Don't allow adding trips without login
+
     const newTrip: Trip = {
-      id: Math.random().toString(36).substr(2, 9),
       ...tripData,
+      id: `${user.id}_trip_${Date.now()}`,
       items: tripData.items || [],
       status: 'pending',
       shopper: tripData.shopper || { name: 'You', avatar: 'https://example.com/you.jpg' }
     };
-    setTrips(prevTrips => [...prevTrips, newTrip]);
+    setTrips(prev => [...prev, newTrip]);
     return newTrip;
   };
 

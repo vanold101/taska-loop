@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { Task } from "@/context/TaskContext";
 import { stores, findStoreByName } from "@/data/stores";
+import { GOOGLE_MAPS_API_KEY } from '@/config/maps';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -77,7 +78,7 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
       }
       
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8&libraries=places,geometry`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,geometry`;
       script.async = true;
       script.defer = true;
       script.onload = initializePlacesServices;
