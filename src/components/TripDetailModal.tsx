@@ -1,58 +1,87 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
-  ShoppingCart, 
-  Clock, 
+  MapPin, 
+  Users, 
   Plus, 
   Trash2, 
-  UserPlus, 
-  Share2, 
+  Check, 
+  ShoppingCart, 
+  Calendar,
+  DollarSign,
+  Star,
+  Package,
+  Edit,
+  Share2,
+  BarChart3,
+  Download,
+  MessageCircle,
+  Clock,
+  Navigation,
+  Mic,
+  Scan,
+  X,
+  AlertTriangle,
+  Crown,
+  Camera,
+  Zap,
+  BookOpen,
+  Search,
+  UserPlus,
   CheckCircle,
   AlertCircle,
-  Check,
-  DollarSign,
   SplitSquareVertical,
   Sparkles,
   BarChart2,
   ListPlus,
   Store
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { format, isToday, isTomorrow, isYesterday } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import PriceInput from "./PriceInput";
-import { recordPrice } from "@/services/PriceHistoryService";
-import ItemSplitSelector from "./ItemSplitSelector";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import BarcodeScannerButton from "./BarcodeScannerButton";
-import TripBarcodeAdder from "./TripBarcodeAdder";
-import { findProductByBarcode, Product } from "@/services/ProductService";
-import BarcodeProductSaveDialog from "./BarcodeProductSaveDialog";
-import { detectDuplicateOrSimilar, ItemSuggestion } from "@/services/DuplicateDetectionService";
-import DuplicateItemDialog from "./DuplicateItemDialog";
-import UnitSelector from "./UnitSelector";
-import { guessUnitForItem, formatValueWithUnit } from "@/services/UnitConversionService";
 import { useTaskContext } from "@/context/TaskContext";
-import ReceiptScannerButton from "./ReceiptScannerButton";
+import { usePantry, PantryItem } from "@/context/PantryContext";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { calculateNextDueDate, RecurrenceFrequency } from "@/services/RecurrenceService";
-import ExportButton from "./ExportButton";
+import BarcodeScannerButton from "./BarcodeScannerButton";
+import BarcodeItemAdder from "./BarcodeItemAdder";
+import TripBarcodeAdder from "./TripBarcodeAdder";
+import PriceInput from "./PriceInput";
+import UnitSelector from "./UnitSelector";
 import SmartListParser from "./SmartListParser";
-import { Link } from "react-router-dom";
+import ItemSplitSelector from "./ItemSplitSelector";
+import BarcodeProductSaveDialog from "./BarcodeProductSaveDialog";
+import DuplicateItemDialog from "./DuplicateItemDialog";
+import ReceiptScannerButton from "./ReceiptScannerButton";
+import ExportButton from "./ExportButton";
 import PriceRecommendationsPanel from "./PriceRecommendation";
 import CostSplitSummary from "./CostSplitSummary";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import AutocompleteInput from "./AutocompleteInput";
+import { guessUnitForItem, formatValueWithUnit } from "@/services/UnitConversionService";
+import { calculateNextDueDate, RecurrenceFrequency } from "@/services/RecurrenceService";
+import { recordPrice } from "@/services/PriceHistoryService";
+import { findProductByBarcode, Product } from "@/services/ProductService";
+import { detectDuplicateOrSimilar, ItemSuggestion } from "@/services/DuplicateDetectionService";
 import { fruits } from "@/data/fruits";
 import { vegetables } from "@/data/vegetables";
-import { usePantry, PantryItem } from "@/context/PantryContext";
 
 // Add success variant to BadgeProps
 declare module "@/components/ui/badge" {
@@ -168,9 +197,9 @@ const TripDetailModal = ({
   const [newItemIsRecurring, setNewItemIsRecurring] = useState(false);
   const [newItemRecurrenceFrequency, setNewItemRecurrenceFrequency] = useState<RecurrenceFrequencyType>(undefined);
   const [showSmartParser, setShowSmartParser] = useState(false);
-  const { toast } = useToast();
   const { pantryItems } = usePantry();
   const [pantrySearchQuery, setPantrySearchQuery] = useState("");
+  const { toast } = useToast();
   
   const suggestions = useMemo(() => {
     const pantryNames = pantryItems.map(item => item.name);
@@ -204,11 +233,6 @@ const TripDetailModal = ({
     if (!trip) return;
     
     if (!newItemName.trim()) {
-      toast({
-        title: "Item Name Required",
-        description: "Please enter a name for the item.",
-        variant: "destructive",
-      });
       return;
     }
     
@@ -271,10 +295,10 @@ const TripDetailModal = ({
       navigator.vibrate(50);
     }
     
-    // Show success toast
+    // Provide user feedback
     toast({
       title: "Item Added",
-      description: `${itemToAdd.name} has been added to your trip.`
+      description: `"${itemToAdd.name}" has been added to the trip.`,
     });
   };
   
@@ -419,11 +443,6 @@ const TripDetailModal = ({
     
     // Process each item and add to trip if not a duplicate
     if (items.length === 0) {
-      toast({
-        title: "No items to add",
-        description: "No items were received from the parser.",
-        variant: "destructive"
-      });
       return;
     }
     
@@ -453,21 +472,30 @@ const TripDetailModal = ({
         onAddItem(trip.id, item);
       });
     }
-    
-    toast({
-      title: `${addedCount} items added`,
-      description: skippedCount > 0 
-        ? `Added ${addedCount} items. ${skippedCount} items were skipped because they already exist in the trip.` 
-        : `Added ${addedCount} items to your trip.`
-    });
   };
   
   const handleAddItemFromPantry = (pantryItem: PantryItem) => {
     if (!trip) return;
 
+    // Check if item already exists in trip
+    const existingItem = trip.items.find(item => 
+      item.name.toLowerCase() === pantryItem.name.toLowerCase()
+    );
+
+    if (existingItem) {
+      // Item already exists, show warning toast
+      toast({
+        title: "Item Already Added",
+        description: `"${pantryItem.name}" is already in this trip.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newItem: Omit<TripItem, 'id'> = {
       name: pantryItem.name,
-      quantity: 1, // Default quantity
+      quantity: 1, // Default quantity when adding from pantry
+      unit: 'ea', // Default unit
       checked: false,
       addedBy: {
         name: "You",
@@ -475,11 +503,19 @@ const TripDetailModal = ({
       },
     };
 
-    addItemToTrip(newItem);
+    // Call the parent component's onAddItem function directly
+    onAddItem(trip.id, newItem);
+    
+    // Provide user feedback with toast
     toast({
-      title: "Item Added",
-      description: `${newItem.name} has been added to your trip from the pantry.`,
+      title: "Added from Pantry",
+      description: `"${pantryItem.name}" has been added to your trip.`,
     });
+    
+    // Add haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
   };
   
   if (!trip) return null;
@@ -499,154 +535,258 @@ const TripDetailModal = ({
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl h-[90vh] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <DialogHeader className="animate-fade-in">
           <DialogTitle className="flex items-center gap-2">
             <Store /> {trip.store}
           </DialogTitle>
         </DialogHeader>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4 animate-slide-up">
+          <TabsList className="dark:bg-slate-800">
             <TabsTrigger value="items">Items</TabsTrigger>
             <TabsTrigger value="pantry">Add from Pantry</TabsTrigger>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="cost">Cost Split</TabsTrigger>
           </TabsList>
           <TabsContent value="items" className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Add new item form */}
-              <div>
-                <h3 className="text-lg font-medium">Add Item</h3>
-                <form onSubmit={handleAddItem} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Item Name</Label>
-                      <AutocompleteInput
-                        suggestions={suggestions}
-                        value={newItemName}
-                        onChange={setNewItemName}
-                        onSelect={setNewItemName}
-                        placeholder="Enter item name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="quantity">Quantity</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="quantity"
-                          type="number"
-                          value={newItemQuantity}
-                          onChange={(e) => setNewItemQuantity(Number(e.target.value))}
-                          min={1}
-                          className="w-24"
+            <div className="bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 dark:from-blue-900/50 dark:via-indigo-900/50 dark:to-purple-900/50 rounded-xl p-6 border-2 border-blue-200 dark:border-blue-700/50 shadow-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Add new item form */}
+                <div className="animate-slide-in">
+                  <h3 className="text-lg font-medium dark:text-slate-200 mb-4">Add Item</h3>
+                  <form onSubmit={handleAddItem} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="dark:text-slate-300">Item Name</Label>
+                        <AutocompleteInput
+                          suggestions={suggestions}
+                          value={newItemName}
+                          onChange={setNewItemName}
+                          onSelect={setNewItemName}
+                          placeholder="Enter item name"
                         />
-                        <Select value={newItemUnit} onValueChange={setNewItemUnit}>
-                          <SelectTrigger className="w-24">
-                            <SelectValue placeholder="Unit" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="quantity" className="dark:text-slate-300">Quantity</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="quantity"
+                            type="number"
+                            value={newItemQuantity}
+                            onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                            min={1}
+                            className="w-24 dark:bg-slate-800 dark:border-slate-700"
+                          />
+                          <Select value={newItemUnit} onValueChange={setNewItemUnit}>
+                            <SelectTrigger className="w-24 dark:bg-slate-800 dark:border-slate-700">
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent className="dark:bg-slate-800 dark:border-slate-700">
+                              {units.map(unit => (
+                                <SelectItem key={unit.id} value={unit.id}>
+                                  {unit.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="price" className="dark:text-slate-300">Price (optional)</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          value={newItemPrice || ''}
+                          onChange={(e) => setNewItemPrice(Number(e.target.value))}
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0"
+                          className="dark:bg-slate-800 dark:border-slate-700"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="recurring"
+                        checked={newItemIsRecurring}
+                        onCheckedChange={(checked) => setNewItemIsRecurring(checked as boolean)}
+                      />
+                      <Label htmlFor="recurring" className="dark:text-slate-300">Add to recurring items</Label>
+                    </div>
+                    {newItemIsRecurring && (
+                      <div className="space-y-2 animate-fade-in">
+                        <Label htmlFor="frequency" className="dark:text-slate-300">Recurrence Frequency</Label>
+                        <Select
+                          value={newItemRecurrenceFrequency || ''}
+                          onValueChange={(value) => setNewItemRecurrenceFrequency(value as RecurrenceFrequencyType)}
+                        >
+                          <SelectTrigger className="dark:bg-slate-800 dark:border-slate-700">
+                            <SelectValue placeholder="Select frequency" />
                           </SelectTrigger>
-                          <SelectContent>
-                            {units.map(unit => (
-                              <SelectItem key={unit.id} value={unit.id}>
-                                {unit.name}
+                          <SelectContent className="dark:bg-slate-800 dark:border-slate-700">
+                            {recurrenceFrequencies.map(freq => (
+                              <SelectItem key={freq.value} value={freq.value}>
+                                {freq.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setShowSmartParser(true)} className="hover:scale-105 transition-transform duration-200 dark:border-slate-600 dark:text-slate-300">
+                        <ListPlus className="h-4 w-4 mr-2" />
+                        Smart Add
+                      </Button>
+                      <Button type="submit" className="hover:scale-105 transition-transform duration-200">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Item
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="price">Price (optional)</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        value={newItemPrice || ''}
-                        onChange={(e) => setNewItemPrice(Number(e.target.value))}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="recurring"
-                      checked={newItemIsRecurring}
-                      onCheckedChange={(checked) => setNewItemIsRecurring(checked as boolean)}
-                    />
-                    <Label htmlFor="recurring">Add to recurring items</Label>
-                  </div>
-                  {newItemIsRecurring && (
-                    <div className="space-y-2">
-                      <Label htmlFor="frequency">Recurrence Frequency</Label>
-                      <Select
-                        value={newItemRecurrenceFrequency || ''}
-                        onValueChange={(value) => setNewItemRecurrenceFrequency(value as RecurrenceFrequencyType)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {recurrenceFrequencies.map(freq => (
-                            <SelectItem key={freq.value} value={freq.value}>
-                              {freq.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setShowSmartParser(true)}>
-                      <ListPlus className="h-4 w-4 mr-2" />
-                      Smart Add
-                    </Button>
-                    <Button type="submit">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Item
-                    </Button>
-                  </div>
-                </form>
+                  </form>
+                </div>
               </div>
             </div>
           </TabsContent>
           <TabsContent value="pantry" className="mt-4">
-            <div>
+            <div className="bg-gradient-to-br from-emerald-100 via-green-100 to-teal-100 dark:from-emerald-900/50 dark:via-green-900/50 dark:to-teal-900/50 rounded-xl p-6 border-2 border-emerald-200 dark:border-emerald-700/50 shadow-lg">
+              <h3 className="text-lg font-medium dark:text-slate-200 mb-4">Add from Pantry</h3>
               <Input
                 type="search"
-                placeholder="Search pantry..."
+                placeholder="Search pantry items..."
                 value={pantrySearchQuery}
                 onChange={(e) => setPantrySearchQuery(e.target.value)}
-                className="mb-4"
+                className="mb-4 dark:bg-slate-800 dark:border-slate-700"
               />
               <div className="max-h-[60vh] overflow-y-auto">
-                {pantryItems
-                  .filter(pItem => 
+                {(() => {
+                  const availablePantryItems = pantryItems.filter(pItem => 
                     pItem.name.toLowerCase().includes(pantrySearchQuery.toLowerCase()) &&
                     !trip.items.some(tItem => tItem.name.toLowerCase() === pItem.name.toLowerCase())
-                  )
-                  .map(pantryItem => (
-                    <div key={pantryItem.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{pantryItem.name}</p>
-                        <p className="text-sm text-muted-foreground">In stock: {pantryItem.quantity}</p>
+                  );
+
+                  if (pantryItems.length === 0) {
+                    return (
+                      <div className="text-center py-8 animate-fade-in">
+                        <Package className="h-12 w-12 mx-auto text-emerald-400 dark:text-emerald-500 mb-4" />
+                        <h4 className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-2">No Pantry Items</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                          You don't have any items in your pantry yet.
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => window.open('/pantry', '_blank')}
+                          className="hover:scale-105 transition-transform duration-200"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Items to Pantry
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAddItemFromPantry(pantryItem)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" /> Add
-                      </Button>
+                    );
+                  }
+
+                  if (availablePantryItems.length === 0) {
+                    return (
+                      <div className="text-center py-8 animate-fade-in">
+                        <Search className="h-12 w-12 mx-auto text-emerald-400 dark:text-emerald-500 mb-4" />
+                        <h4 className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-2">
+                          {pantrySearchQuery ? 'No Matching Items' : 'All Items Already Added'}
+                        </h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                          {pantrySearchQuery 
+                            ? `No pantry items match "${pantrySearchQuery}"`
+                            : 'All your pantry items are already in this trip'
+                          }
+                        </p>
+                        {pantrySearchQuery && (
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setPantrySearchQuery('')}
+                            className="hover:scale-105 transition-transform duration-200"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Clear Search
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {availablePantryItems.map((pantryItem, index) => (
+                        <div 
+                          key={pantryItem.id} 
+                          className="flex items-center justify-between p-3 hover:bg-white/50 dark:hover:bg-slate-800/50 rounded-lg border border-emerald-200/50 dark:border-emerald-700/30 transition-all duration-200 animate-slide-in"
+                          style={{animationDelay: `${index * 50}ms`}}
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-800 dark:text-slate-200">{pantryItem.name}</p>
+                            <div className="flex items-center gap-4 mt-1">
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                In stock: <span className="font-medium">{pantryItem.quantity}</span>
+                              </p>
+                              {pantryItem.category && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {pantryItem.category}
+                                </Badge>
+                              )}
+                              {pantryItem.lowStock && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Low Stock
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAddItemFromPantry(pantryItem)}
+                            className="hover:scale-105 transition-transform duration-200 border-emerald-300 hover:border-emerald-400 hover:bg-emerald-50 dark:border-emerald-600 dark:hover:border-emerald-500 dark:hover:bg-emerald-900/20"
+                          >
+                            <Plus className="h-4 w-4 mr-2" /> Add
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                ))}
+                  );
+                })()}
               </div>
             </div>
           </TabsContent>
           <TabsContent value="details" className="mt-4">
-            {/* Details Content */}
+            <div className="bg-gradient-to-br from-amber-100 via-orange-100 to-red-100 dark:from-amber-900/50 dark:via-orange-900/50 dark:to-red-900/50 rounded-xl p-6 border-2 border-amber-200 dark:border-amber-700/50 shadow-lg">
+              <h3 className="text-lg font-medium dark:text-slate-200 mb-4">Trip Details</h3>
+              {/* Details Content */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Store</Label>
+                    <p className="text-lg font-semibold">{trip.store}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                    <Badge variant={trip.status === 'completed' ? 'success' : 'default'} className="ml-2">
+                      {trip.status}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Date</Label>
+                    <p className="text-lg">{format(new Date(trip.date), 'PPP')}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">ETA</Label>
+                    <p className="text-lg">{trip.eta}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </TabsContent>
           <TabsContent value="cost" className="mt-4">
-            <CostSplitSummary items={trip.items} participants={trip.participants} />
+            <div className="bg-gradient-to-br from-violet-100 via-purple-100 to-fuchsia-100 dark:from-violet-900/50 dark:via-purple-900/50 dark:to-fuchsia-900/50 rounded-xl p-6 border-2 border-violet-200 dark:border-violet-700/50 shadow-lg">
+              <h3 className="text-lg font-medium dark:text-slate-200 mb-4">Cost Split</h3>
+              <CostSplitSummary items={trip.items} participants={trip.participants} />
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

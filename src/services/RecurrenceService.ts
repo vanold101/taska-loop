@@ -1,4 +1,6 @@
 import { addDays, addWeeks, addMonths } from 'date-fns';
+import { recurringItemsService } from './RecurringItemsService';
+import { Trip } from '../context/TaskContext';
 
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'bi-weekly' | 'monthly';
 
@@ -35,21 +37,132 @@ export function calculateNextDueDate(lastDueDate: string | Date, frequency: Recu
 }
 
 /**
- * Placeholder for logic that processes recurring items.
- * This would typically run on app start or at certain intervals.
+ * Process recurring items and add them to appropriate trips.
+ * This function should be called on app start or at regular intervals.
+ * 
+ * @param existingTrips Current trips from the context
+ * @param onAddItemToTrip Callback to add item to existing trip
+ * @param onCreateTrip Callback to create new trip with items
+ * @returns Processing results with statistics
  */
-export function processRecurringItems() {
-  // TODO:
-  // 1. Get all trip items from context or storage.
-  // 2. Filter for items where isRecurring is true.
-  // 3. For each recurring item:
-  //    a. Check if its nextDueDate is past or today.
-  //    b. If yes, consider adding it to a relevant new or existing trip.
-  //       - This might involve finding an open trip to the same store or creating a new one.
-  //       - The item added to the trip would be a new instance (new ID, checked=false), 
-  //         possibly linking back to the baseItemId of the recurring template.
-  //    c. Update the original recurring item template:
-  //       - Set its lastAddedToTripDate to today.
-  //       - Calculate and set its new nextDueDate using calculateNextDueDate.
-  console.log('Processing recurring items (placeholder)...');
+export function processRecurringItems(
+  existingTrips: Trip[],
+  onAddItemToTrip: (tripId: string, item: any) => void,
+  onCreateTrip: (tripData: any) => void
+): {
+  itemsProcessed: number;
+  tripsUpdated: number;
+  newTripsCreated: number;
+  errors: string[];
+} {
+  console.log('Processing recurring items...');
+  
+  try {
+    // Load templates and process them
+    recurringItemsService.loadTemplates();
+    const result = recurringItemsService.processRecurringItems(existingTrips);
+    
+    const stats = {
+      itemsProcessed: 0,
+      tripsUpdated: 0,
+      newTripsCreated: 0,
+      errors: [] as string[]
+    };
+
+    // Add items to existing trips
+    for (const itemToAdd of result.itemsToAdd) {
+      if (itemToAdd.targetTripId) {
+        try {
+          onAddItemToTrip(itemToAdd.targetTripId, {
+            ...itemToAdd.item,
+            id: Date.now().toString() + Math.random().toString(36).substring(2)
+          });
+          stats.itemsProcessed++;
+          stats.tripsUpdated++;
+        } catch (error) {
+          stats.errors.push(`Failed to add ${itemToAdd.item.name} to trip: ${error}`);
+        }
+      }
+    }
+
+    // Create new trips for items that don't have a target trip
+    for (const newTrip of result.newTripsToCreate) {
+      try {
+        const tripData = {
+          store: newTrip.store,
+          date: new Date().toISOString(),
+          time: "10:00",
+          status: 'open' as const,
+          items: newTrip.items.map(item => ({
+            ...item,
+            id: Date.now().toString() + Math.random().toString(36).substring(2)
+          })),
+          participants: [
+            { id: '1', name: 'You', avatar: "https://example.com/you.jpg" }
+          ],
+          shopper: { name: 'You', avatar: 'https://example.com/you.jpg' },
+          notes: 'Auto-created for recurring items'
+        };
+        
+        onCreateTrip(tripData);
+        stats.itemsProcessed += newTrip.items.length;
+        stats.newTripsCreated++;
+      } catch (error) {
+        stats.errors.push(`Failed to create trip for ${newTrip.store}: ${error}`);
+      }
+    }
+
+    console.log('Recurring items processing completed:', stats);
+    return stats;
+    
+  } catch (error) {
+    console.error('Error processing recurring items:', error);
+    return {
+      itemsProcessed: 0,
+      tripsUpdated: 0,
+      newTripsCreated: 0,
+      errors: [`Processing failed: ${error}`]
+    };
+  }
+}
+
+/**
+ * Initialize recurring items processing with automatic scheduling
+ * This sets up the system to automatically process recurring items
+ */
+export function initializeRecurringItemsProcessing(
+  getTrips: () => Trip[],
+  onAddItemToTrip: (tripId: string, item: any) => void,
+  onCreateTrip: (tripData: any) => void
+): () => void {
+  console.log('Initializing recurring items processing...');
+  
+  // Process immediately on initialization
+  const initialTrips = getTrips();
+  processRecurringItems(initialTrips, onAddItemToTrip, onCreateTrip);
+  
+  // Set up daily processing at 8 AM
+  const scheduleNextProcessing = () => {
+    const now = new Date();
+    const tomorrow8AM = new Date();
+    tomorrow8AM.setDate(now.getDate() + 1);
+    tomorrow8AM.setHours(8, 0, 0, 0);
+    
+    const timeUntilNext = tomorrow8AM.getTime() - now.getTime();
+    
+    return setTimeout(() => {
+      const currentTrips = getTrips();
+      processRecurringItems(currentTrips, onAddItemToTrip, onCreateTrip);
+      
+      // Schedule the next processing
+      scheduleNextProcessing();
+    }, timeUntilNext);
+  };
+  
+  const timeoutId = scheduleNextProcessing();
+  
+  // Return cleanup function
+  return () => {
+    clearTimeout(timeoutId);
+  };
 } 

@@ -1,30 +1,146 @@
 import { loadScript } from '../utils/scriptLoader';
-import { GOOGLE_MAPS_API_KEY } from '../config/maps';
+
+// Use the API key from the environment, with a fallback for development
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8';
 
 const loadedLibraries: Set<string> = new Set();
+let isGoogleMapsLoaded = false;
 
 async function loadGoogleMapsLibrary(library: string): Promise<void> {
-  const libraries = new Set([...loadedLibraries, library]);
-  const libraryString = Array.from(libraries).join(',');
-
-  const isLoaded = (lib: string) => {
-    switch(lib) {
-      case 'places': return !!window.google.maps.places;
-      case 'directions': return !!window.google.maps.DirectionsService;
-      case 'geometry': return !!window.google.maps.geometry;
-      default: return false;
+  // Check if Google Maps is already loaded
+  if (window.google && window.google.maps && isGoogleMapsLoaded) {
+    const isLoaded = (lib: string) => {
+      switch(lib) {
+        case 'places': return !!window.google.maps.places;
+        case 'geometry': return !!window.google.maps.geometry;
+        case 'core': return !!window.google.maps.DirectionsService; // DirectionsService is part of core
+        default: return false;
+      }
+    };
+    
+    if (isLoaded(library)) {
+      loadedLibraries.add(library);
+      return;
     }
-  };
+  }
 
-  if (!window.google || !window.google.maps || !isLoaded(library)) {
-    await loadScript(`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${libraryString}`);
-    libraries.forEach(lib => loadedLibraries.add(lib));
+  // If not loaded, load the script with all required libraries
+  const libraries = new Set([...loadedLibraries, library]);
+  // Remove 'core' from libraries string since it's not a real library
+  const validLibraries = Array.from(libraries).filter(lib => lib !== 'core');
+  const libraryString = validLibraries.length > 0 ? validLibraries.join(',') : '';
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    throw new Error('Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
+  }
+
+  try {
+    const scriptUrl = libraryString 
+      ? `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${libraryString}`
+      : `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
+    
+    await loadScript(scriptUrl);
+    
+    // Wait for Google Maps to be fully loaded
+    await new Promise<void>((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 100; // 10 seconds with 100ms intervals
+      
+      const checkLoaded = () => {
+        attempts++;
+        
+        if (window.google && window.google.maps) {
+          // Check if the specific library is loaded
+          const isLoaded = (lib: string) => {
+            switch(lib) {
+              case 'places': return !!window.google.maps.places;
+              case 'geometry': return !!window.google.maps.geometry;
+              case 'core': return !!window.google.maps.DirectionsService;
+              default: return true;
+            }
+          };
+          
+          if (isLoaded(library)) {
+            isGoogleMapsLoaded = true;
+            libraries.forEach(lib => loadedLibraries.add(lib));
+            console.log(`Google Maps API loaded successfully with ${library} library`);
+            resolve();
+            return;
+          }
+        }
+        
+        if (attempts >= maxAttempts) {
+          reject(new Error('Google Maps API failed to load within 10 seconds'));
+          return;
+        }
+        
+        setTimeout(checkLoaded, 100);
+      };
+      
+      // Start checking immediately
+      checkLoaded();
+    });
+  } catch (error) {
+    console.error('Failed to load Google Maps API:', error);
+    throw error;
   }
 }
 
 export const initGoogleMapsPlaces = () => loadGoogleMapsLibrary('places');
-export const initGoogleMapsDirections = () => loadGoogleMapsLibrary('directions');
+export const initGoogleMapsDirections = () => loadGoogleMapsLibrary('core'); // Use 'core' instead of 'directions'
 export const initGoogleMapsGeometry = () => loadGoogleMapsLibrary('geometry');
+
+// Simple function to initialize core Google Maps API (includes DirectionsService)
+export const initGoogleMapsCore = async (): Promise<void> => {
+  console.log("Loading Google Maps API...");
+  
+  if (window.google && window.google.maps && window.google.maps.DirectionsService) {
+    console.log("Google Maps API already loaded");
+    return; // Already loaded
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    throw new Error('Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
+  }
+
+  try {
+    const scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
+    console.log("Loading Google Maps script...");
+    
+    await loadScript(scriptUrl);
+    console.log("Script loaded, waiting for Google Maps to initialize...");
+    
+    // Wait for Google Maps to be fully loaded
+    await new Promise<void>((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 100; // 10 seconds with 100ms intervals
+      
+      const checkLoaded = () => {
+        attempts++;
+        
+        if (window.google && window.google.maps && window.google.maps.DirectionsService) {
+          console.log('Google Maps API loaded successfully');
+          resolve();
+          return;
+        }
+        
+        if (attempts >= maxAttempts) {
+          console.error("Google Maps API failed to load within 10 seconds");
+          reject(new Error('Google Maps API failed to load within 10 seconds. This usually indicates an invalid API key or billing issue.'));
+          return;
+        }
+        
+        setTimeout(checkLoaded, 100);
+      };
+      
+      // Start checking immediately
+      checkLoaded();
+    });
+  } catch (error) {
+    console.error('Failed to load Google Maps API:', error);
+    throw new Error('Failed to load Google Maps API. Please check your API key and billing settings.');
+  }
+};
 
 interface PlaceResult {
   name: string;

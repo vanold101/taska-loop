@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { calculateOptimalRoute } from '../utils/routeOptimization';
 import { RoutePreferences, OptimizedRoute, StopTimeWindow } from '../types/routing';
 import RoutePreferencesComponent from '../components/RoutePreferences';
-import { initGoogleMapsDirections, initGoogleMapsGeometry } from "@/services/googlePlaces";
+import { initGoogleMapsCore } from "@/services/googlePlaces";
 
 export default function MapComponent() {
   const { toast } = useToast();
@@ -86,36 +86,87 @@ export default function MapComponent() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // Initialize Google Maps once location is available
+  // Initialize map when component mounts
   useEffect(() => {
     if (loading) return;
 
     const initializeMap = async () => {
-      if (!mapRef.current || googleMapRef.current) return;
+      if (!mapRef.current) {
+        console.error("Map container not ready");
+        return;
+      }
+      
+      if (googleMapRef.current) {
+        console.log("Map already initialized");
+        return;
+      }
 
       try {
-        await initGoogleMapsDirections();
-        await initGoogleMapsGeometry();
+        console.log("Initializing Google Maps...");
+        await initGoogleMapsCore();
         
-        googleMapRef.current = new window.google.maps.Map(mapRef.current, {
+        console.log("Creating map instance...");
+        googleMapRef.current = new google.maps.Map(mapRef.current, {
           center: location,
           zoom: 12,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
-          zoomControl: true
+          zoomControl: true,
+          styles: [
+            {
+              featureType: "poi",
+              elementType: "labels",
+              stylers: [{ visibility: "off" }]
+            }
+          ]
         });
 
-        infoWindowRef.current = new window.google.maps.InfoWindow();
+        infoWindowRef.current = new google.maps.InfoWindow();
         
+        console.log("Adding markers...");
         addLocationMarkers();
         addUserLocationMarker();
         
+        toast({
+          title: "Map loaded",
+          description: "Google Maps has been loaded successfully."
+        });
+        
       } catch (error) {
         console.error("Failed to initialize Google Maps", error);
+        
+        // Show a helpful error message about the API key
+        if (mapRef.current) {
+          mapRef.current.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50 rounded-lg">
+              <div class="mb-4">
+                <svg class="w-16 h-16 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7"></path>
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800 mb-2">Google Maps API Key Required</h3>
+              <p class="text-gray-600 mb-4 max-w-md">
+                To display the map, you need a valid Google Maps API key. The current API key is invalid or expired.
+              </p>
+              <div class="text-sm text-gray-500 space-y-2">
+                <p><strong>To fix this:</strong></p>
+                <ol class="text-left space-y-1">
+                  <li>1. Go to <a href="https://console.cloud.google.com" target="_blank" class="text-blue-600 hover:underline">Google Cloud Console</a></li>
+                  <li>2. Create a new project or select existing one</li>
+                  <li>3. Enable the Maps JavaScript API</li>
+                  <li>4. Create an API key</li>
+                  <li>5. Enable billing (required for Google Maps)</li>
+                  <li>6. Update the VITE_GOOGLE_MAPS_API_KEY in your .env file</li>
+                </ol>
+              </div>
+            </div>
+          `;
+        }
+        
         toast({
           title: "Map Error",
-          description: "Could not load the map. Please try again later.",
+          description: "Google Maps API key is invalid or expired. Please check the console for setup instructions.",
           variant: "destructive"
         });
       }
@@ -123,11 +174,11 @@ export default function MapComponent() {
 
     initializeMap();
 
-  }, [loading, location, tasks, trips]); // Add trips to dependency array
+  }, [loading, location]);
 
   // Add markers for tasks and trips on the map
   const addLocationMarkers = () => {
-    if (!googleMapRef.current || !window.google) return;
+    if (!googleMapRef.current || !google.maps) return;
     
     console.log("Adding location markers...");
     
@@ -136,7 +187,7 @@ export default function MapComponent() {
     markersRef.current = [];
     
     // Create a bounds object
-    const bounds = new window.google.maps.LatLngBounds();
+    const bounds = new google.maps.LatLngBounds();
     bounds.extend(location); // Include user location in bounds
     
     let markerIndex = 1;
@@ -146,7 +197,7 @@ export default function MapComponent() {
       if (task.coordinates) {
         try {
           // Create marker for this task
-          const marker = new window.google.maps.Marker({
+          const marker = new google.maps.Marker({
             position: { lat: task.coordinates.lat, lng: task.coordinates.lng },
             map: googleMapRef.current,
             title: task.title,
@@ -157,13 +208,13 @@ export default function MapComponent() {
               fontWeight: 'bold'
             },
             icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
+              path: google.maps.SymbolPath.CIRCLE,
               fillColor: getPriorityColor(task.priority),
               fillOpacity: 1,
               strokeWeight: 2,
               strokeColor: '#FFFFFF',
               scale: 12,
-              labelOrigin: new window.google.maps.Point(0, 0)
+              labelOrigin: new google.maps.Point(0, 0)
             }
           });
           
@@ -207,7 +258,7 @@ export default function MapComponent() {
       if (trip.coordinates) {
         try {
           // Create marker for this trip
-          const marker = new window.google.maps.Marker({
+          const marker = new google.maps.Marker({
             position: { lat: trip.coordinates.lat, lng: trip.coordinates.lng },
             map: googleMapRef.current,
             title: `Trip to ${trip.store}`,
@@ -218,13 +269,13 @@ export default function MapComponent() {
               fontWeight: 'bold'
             },
             icon: {
-              path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+              path: google.maps.SymbolPath.CIRCLE,
               fillColor: '#3B82F6', // Blue color for trips
               fillOpacity: 1,
               strokeWeight: 2,
               strokeColor: '#FFFFFF',
               scale: 12,
-              labelOrigin: new window.google.maps.Point(0, 0)
+              labelOrigin: new google.maps.Point(0, 0)
             }
           });
           
@@ -280,15 +331,15 @@ export default function MapComponent() {
   
   // Add user location marker
   const addUserLocationMarker = () => {
-    if (!googleMapRef.current || !window.google) return;
+    if (!googleMapRef.current || !google.maps) return;
     
     try {
-      const userMarker = new window.google.maps.Marker({
+      const userMarker = new google.maps.Marker({
         position: location,
         map: googleMapRef.current,
         title: "Your Location",
         icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
+          path: google.maps.SymbolPath.CIRCLE,
           fillColor: '#4285F4',
           fillOpacity: 1,
           strokeWeight: 2,
@@ -320,107 +371,212 @@ export default function MapComponent() {
     if (!googleMapRef.current) {
       toast({
         title: "Map not ready",
-        description: "Please wait for the map to initialize"
+        description: "Please wait for the map to initialize",
+        variant: "destructive"
       });
       return;
     }
     
-    if (!window.google || !window.google.maps) {
+    if (!google.maps || !google.maps.DirectionsService) {
       toast({
         title: "Google Maps not loaded",
-        description: "Please wait for Google Maps to load completely"
+        description: "Please wait for Google Maps to load completely",
+        variant: "destructive"
       });
       return;
     }
     
     const tasksWithCoordinates = tasks.filter(task => task.coordinates);
+    const tripsWithCoordinates = trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled');
+    const allDestinations = [...tasksWithCoordinates, ...tripsWithCoordinates];
     
-    if (tasksWithCoordinates.length === 0) {
+    if (allDestinations.length === 0) {
       toast({
         title: "No locations to route",
-        description: "Add tasks with locations to generate a route"
+        description: "Add tasks or trips with locations to generate a route",
+        variant: "destructive"
       });
       return;
     }
+
+    // Limit to 25 waypoints (Google Maps API limit)
+    if (allDestinations.length > 25) {
+      toast({
+        title: "Too many destinations",
+        description: `Only the first 25 destinations will be included in the route optimization. You have ${allDestinations.length} destinations.`,
+        variant: "default"
+      });
+    }
+
+    const limitedDestinations = allDestinations.slice(0, 25);
     
     try {
       setLoading(true);
-      console.log("Calculating optimized route...");
+      console.log("Calculating optimized route for", limitedDestinations.length, "destinations...");
       
-      // Create a DirectionsRenderer if needed
-      if (!directionsRendererRef.current) {
-        directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-          suppressMarkers: true, // Use our custom markers
-          polylineOptions: {
-            strokeColor: '#4285F4',
-            strokeWeight: 5,
-            strokeOpacity: 0.8
-          }
-        });
+      // Clear any existing route first
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
       }
+      
+      // Create a new DirectionsRenderer
+      directionsRendererRef.current = new google.maps.DirectionsRenderer({
+        suppressMarkers: false, // Show route markers
+        draggable: false,
+        polylineOptions: {
+          strokeColor: '#4285F4',
+          strokeWeight: 5,
+          strokeOpacity: 0.8
+        },
+        markerOptions: {
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#4285F4',
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: '#FFFFFF',
+            scale: 8
+          }
+        }
+      });
       
       // Attach the renderer to the map
       directionsRendererRef.current.setMap(googleMapRef.current);
       
-      // Convert tasks to StopTimeWindow format
-      const stops: StopTimeWindow[] = tasksWithCoordinates.map(task => ({
-        location: {
-          lat: task.coordinates!.lat,
-          lng: task.coordinates!.lng
-        },
-        duration: 15, // Default 15 minutes per stop
-        priority: task.priority,
-        dueDate: new Date(task.dueDate)
+      // Create origin
+      const origin = new google.maps.LatLng(location.lat, location.lng);
+      
+      // Create waypoints from destinations
+      const waypoints = limitedDestinations.map(dest => ({
+        location: new google.maps.LatLng(dest.coordinates!.lat, dest.coordinates!.lng),
+        stopover: true
       }));
       
-      // Create origin LatLng
-      const origin = new window.google.maps.LatLng(location.lat, location.lng);
+      // Use DirectionsService to get optimized route
+      const directionsService = new google.maps.DirectionsService();
       
-      // Calculate optimal route
-      const route = await calculateOptimalRoute(origin, stops, routePreferences);
-      setOptimizedRoute(route);
+      console.log("Requesting directions with", waypoints.length, "waypoints...");
       
-      console.log("Route calculated:", route);
-      
-      // Use DirectionsService to get directions for visualization
-      const directionsService = new window.google.maps.DirectionsService();
-      
-      // Convert waypoints to Google Maps waypoints
-      const waypointLocations = route.waypoints.map(wp => ({
-        location: new window.google.maps.LatLng(wp.location.lat, wp.location.lng),
-        stopover: wp.stopover
-      }));
-      
-      console.log("Requesting directions with waypoints:", waypointLocations);
-      
-      // Request directions
-      const result = await directionsService.route({
-        origin,
-        destination: routePreferences.returnToStart ? origin : waypointLocations[waypointLocations.length - 1].location,
-        waypoints: routePreferences.returnToStart ? waypointLocations : waypointLocations.slice(0, -1),
-        optimizeWaypoints: true,
-        travelMode: window.google.maps.TravelMode[routePreferences.transportMode || 'DRIVING'],
-        avoidHighways: routePreferences.avoidHighways,
-        avoidTolls: routePreferences.avoidTolls
+      // Request directions with optimization
+      const result = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
+        const requestConfig: google.maps.DirectionsRequest = {
+          origin,
+          destination: routePreferences.returnToStart ? origin : waypoints[waypoints.length - 1].location,
+          waypoints: routePreferences.returnToStart ? waypoints : waypoints.slice(0, -1),
+          optimizeWaypoints: true,
+          travelMode: google.maps.TravelMode[routePreferences.transportMode || 'DRIVING'],
+          avoidHighways: routePreferences.avoidHighways || false,
+          avoidTolls: routePreferences.avoidTolls || false,
+          unitSystem: google.maps.UnitSystem.IMPERIAL
+        };
+
+        directionsService.route(requestConfig, (result, status) => {
+          console.log("Directions API response:", status, result);
+          
+          if (status === 'OK' && result) {
+            resolve(result);
+          } else {
+            let errorMessage = `Directions request failed: ${status}`;
+            switch (status) {
+              case 'ZERO_RESULTS':
+                errorMessage = 'No route could be found between the origin and destination.';
+                break;
+              case 'OVER_QUERY_LIMIT':
+                errorMessage = 'Too many requests. Please try again later.';
+                break;
+              case 'REQUEST_DENIED':
+                errorMessage = 'Directions request was denied. Please check your API key.';
+                break;
+              case 'INVALID_REQUEST':
+                errorMessage = 'Invalid directions request. Please check your locations.';
+                break;
+              case 'UNKNOWN_ERROR':
+                errorMessage = 'Unknown error occurred. Please try again.';
+                break;
+            }
+            reject(new Error(errorMessage));
+          }
+        });
       });
       
-      console.log("Direction service returned result:", result.status);
+      console.log("Directions service returned successfully");
       
       // Show directions on the map
-      if (directionsRendererRef.current) {
+      if (directionsRendererRef.current && result) {
         directionsRendererRef.current.setDirections(result);
+        
+        // Fit the map to show the entire route
+        const bounds = new google.maps.LatLngBounds();
+        result.routes[0].legs.forEach(leg => {
+          bounds.extend(leg.start_location);
+          bounds.extend(leg.end_location);
+        });
+        googleMapRef.current.fitBounds(bounds);
       }
       
+      // Calculate total distance and duration
+      let totalDistance = 0;
+      let totalDuration = 0;
+      
+      if (result.routes[0] && result.routes[0].legs) {
+        result.routes[0].legs.forEach(leg => {
+          totalDistance += leg.distance?.value || 0;
+          totalDuration += leg.duration?.value || 0;
+        });
+      }
+      
+      // Create optimized route info using the waypoint order from the result
+      const waypointOrder = result.routes[0].waypoint_order || [];
+      const orderedDestinations = waypointOrder.map(index => limitedDestinations[index]);
+      
+      const optimizedRouteInfo = {
+        totalDistance,
+        totalDuration,
+        waypoints: orderedDestinations.map(dest => ({
+          location: dest.coordinates!,
+          stopover: true
+        })),
+        segments: result.routes[0].legs.map((leg, index) => ({
+          distance: leg.distance?.text || '0 km',
+          duration: leg.duration?.text || '0 mins',
+          priority: (orderedDestinations[index] as any)?.priority || 'medium',
+          startLocation: {
+            lat: leg.start_location.lat(),
+            lng: leg.start_location.lng()
+          },
+          endLocation: {
+            lat: leg.end_location.lat(),
+            lng: leg.end_location.lng()
+          }
+        }))
+      };
+      
+      setOptimizedRoute(optimizedRouteInfo as any);
+      
+      // Show success message with route details
+      const routeOrder = orderedDestinations.map(dest => 
+        'title' in dest ? dest.title : `Trip to ${(dest as any).store}`
+      ).join(' → ');
+      
       toast({
-        title: "Route optimized",
-        description: `Total travel time: ${Math.round(route.totalDuration / 60)} mins, Distance: ${(route.totalDistance / 1000).toFixed(1)} km`,
+        title: "Route optimized successfully!",
+        description: `Total: ${Math.round(totalDuration / 60)} mins, ${(totalDistance / 1000).toFixed(1)} km\nRoute: ${routeOrder}`,
+        duration: 5000
       });
+      
     } catch (error) {
       console.error('Error showing optimized route:', error);
       toast({
         title: "Route optimization failed",
-        description: "Could not calculate the optimal route"
+        description: error instanceof Error ? error.message : "Could not calculate the optimal route. Please try again.",
+        variant: "destructive"
       });
+      
+      // Clear any partial route display
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = null;
+      }
     } finally {
       setLoading(false);
     }
@@ -433,6 +589,42 @@ export default function MapComponent() {
       directionsRendererRef.current = null;
     }
     setOptimizedRoute(null);
+    
+    // Restore original markers and map bounds
+    if (googleMapRef.current) {
+      addLocationMarkers();
+      
+      // Fit map to show all original markers
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(location); // Include user location
+      
+      // Add task and trip coordinates to bounds
+      tasks.forEach(task => {
+        if (task.coordinates) {
+          bounds.extend({ lat: task.coordinates.lat, lng: task.coordinates.lng });
+        }
+      });
+      
+      trips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled').forEach(trip => {
+        if (trip.coordinates) {
+          bounds.extend({ lat: trip.coordinates.lat, lng: trip.coordinates.lng });
+        }
+      });
+      
+      googleMapRef.current.fitBounds(bounds);
+      
+      // If only one location, zoom out a bit
+      const totalLocations = tasks.filter(t => t.coordinates).length + 
+                           trips.filter(t => t.coordinates && t.status !== 'completed' && t.status !== 'cancelled').length;
+      if (totalLocations === 1) {
+        googleMapRef.current.setZoom(14);
+      }
+    }
+    
+    toast({
+      title: "Route cleared",
+      description: "The optimized route has been removed from the map."
+    });
   };
   
   // Handle route preferences change
@@ -487,7 +679,10 @@ export default function MapComponent() {
                 onClick={showOptimizedRoute}
                 variant={optimizedRoute ? "default" : "outline"}
                 className="flex items-center"
-                disabled={tasks.filter(t => t.coordinates).length === 0}
+                disabled={
+                  tasks.filter(t => t.coordinates).length === 0 && 
+                  trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length === 0
+                }
               >
                 <Navigation className="mr-2 h-4 w-4" />
                 {optimizedRoute ? "Update Route" : "Show Optimized Route"}
@@ -581,17 +776,18 @@ export default function MapComponent() {
               </Card>
             )}
             
-            {/* Task list */}
+            {/* Task and Trip list */}
             <Card className="shadow-md">
               <CardHeader className="py-3">
-                <CardTitle>Nearby Tasks</CardTitle>
+                <CardTitle>Locations</CardTitle>
               </CardHeader>
               <CardContent>
-                {tasks.length > 0 ? (
+                {(tasks.length > 0 || trips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled').length > 0) ? (
                   <div className="space-y-2">
+                    {/* Tasks */}
                     {tasks.map((task, index) => (
                       <div
-                        key={task.id}
+                        key={`task-${task.id}`}
                         className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
                         onClick={() => {
                           if (task.coordinates && googleMapRef.current) {
@@ -604,8 +800,8 @@ export default function MapComponent() {
                                    m.getPosition()?.lng() === task.coordinates?.lng
                             );
                             
-                            if (marker && window.google) {
-                              window.google.maps.event.trigger(marker, 'click');
+                            if (marker && google.maps) {
+                              google.maps.event.trigger(marker, 'click');
                             }
                             
                             // Set the selected task to show task details
@@ -637,9 +833,58 @@ export default function MapComponent() {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Trips */}
+                    {trips.filter(trip => trip.status !== 'completed' && trip.status !== 'cancelled').map((trip, index) => {
+                      const tripIndex = tasks.length + index + 1;
+                      return (
+                        <div
+                          key={`trip-${trip.id}`}
+                          className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer border-blue-200 bg-blue-50/30"
+                          onClick={() => {
+                            if (trip.coordinates && googleMapRef.current) {
+                              googleMapRef.current.panTo({ lat: trip.coordinates.lat, lng: trip.coordinates.lng });
+                              googleMapRef.current.setZoom(15);
+                              
+                              // Find and click the corresponding marker
+                              const marker = markersRef.current.find(
+                                m => m.getPosition()?.lat() === trip.coordinates?.lat && 
+                                     m.getPosition()?.lng() === trip.coordinates?.lng
+                              );
+                              
+                              if (marker && google.maps) {
+                                google.maps.event.trigger(marker, 'click');
+                              }
+                            }
+                          }}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start">
+                              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-500 text-white text-xs font-bold mr-3">{tripIndex}</span>
+                              <div>
+                                <h3 className="font-medium">Trip to {trip.store}</h3>
+                                <p className="text-sm text-gray-500 flex items-center">
+                                  <MapPin className="h-3 w-3 mr-1" /> {trip.store}
+                                </p>
+                                <p className="text-sm text-gray-500 flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" /> {format(new Date(trip.date), 'PPP')}
+                                </p>
+                              </div>
+                            </div>
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium 
+                              ${trip.status === 'shopping' ? 'bg-blue-100 text-blue-800' : 
+                                'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {trip.status}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-4">No tasks found</p>
+                  <p className="text-gray-500 text-center py-4">No locations found</p>
                 )}
               </CardContent>
             </Card>

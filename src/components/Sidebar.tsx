@@ -16,6 +16,7 @@ import {
   Home,
   X,
   Menu,
+  RefreshCw,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
@@ -83,6 +84,7 @@ const navigationItems = [
   { path: "/map", icon: <MapPin className="h-5 w-5" />, label: "Map" },
   { path: "/trips", icon: <Users className="h-5 w-5" />, label: "Trips" },
   { path: "/pantry", icon: <Package className="h-5 w-5" />, label: "Pantry" },
+  { path: "/recurring-items", icon: <RefreshCw className="h-5 w-5" />, label: "Recurring Items" },
   { path: "/ledger", icon: <PieChart className="h-5 w-5" />, label: "Ledger" },
   { path: "/dashboard", icon: <ShoppingCart className="h-5 w-5" />, label: "Dashboard" },
   { path: "/profile", icon: <User className="h-5 w-5" />, label: "Profile" },

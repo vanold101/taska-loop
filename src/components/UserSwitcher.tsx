@@ -3,13 +3,14 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { LogOut, User, Shield, Users, AlertTriangle, ExternalLink } from 'lucide-react';
+import { LogOut, User, Shield, Users, AlertTriangle, ExternalLink, Minimize2, Maximize2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 
 const UserSwitcher: React.FC = () => {
   const { user, logout, loginWithEmail, loginWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
   const { toast } = useToast();
 
   // Test accounts for easy switching
@@ -138,13 +139,41 @@ const UserSwitcher: React.FC = () => {
     return null;
   }
 
+  // Minimized view - just a small icon
+  if (isMinimized) {
+    return (
+      <div className="fixed top-4 right-4 z-50">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsMinimized(false)}
+          className="h-10 w-10 p-0 bg-blue-50/90 backdrop-blur border-2 border-blue-200 hover:bg-blue-100/90 shadow-lg"
+          title="Expand User Switcher"
+        >
+          <Users className="h-4 w-4 text-blue-600" />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <Card className="fixed top-4 right-4 w-80 z-50 shadow-lg border-2 border-blue-200 bg-blue-50/90 backdrop-blur">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          User Switcher (Dev Only)
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            User Switcher (Dev Only)
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsMinimized(true)}
+            className="h-6 w-6 p-0 hover:bg-blue-100"
+            title="Minimize"
+          >
+            <Minimize2 className="h-3 w-3" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Error Display */}

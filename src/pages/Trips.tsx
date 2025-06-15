@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { haptics } from "@/lib/haptics";
 import type { Store as StoreType } from "@/types/store";
 import { ActiveTripAnimation } from "@/components/ActiveTripAnimation";
+import { findStoreByName } from '@/data/stores';
 
 // New component for trip selection dialog
 const TripSelectDialog = ({ 
@@ -186,13 +187,22 @@ const TripsPage = () => {
           avatar: trip.shopper?.avatar || "https://example.com/you.jpg"
         },
         eta: trip.eta || '',
-        status: trip.status,
+        status: trip.status === 'pending' ? 'open' : trip.status as 'open' | 'shopping' | 'completed' | 'cancelled',
         items: trip.items.map(item => ({
-          ...item,
-          recurrenceFrequency: item.recurrenceFrequency || null,
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          price: item.price,
+          checked: item.checked,
+          isRecurring: (item as any).isRecurring,
+          recurrenceFrequency: (item as any).recurrenceFrequency || null,
+          nextDueDate: (item as any).nextDueDate,
+          baseItemId: (item as any).baseItemId,
+          lastAddedToTripDate: (item as any).lastAddedToTripDate,
           addedBy: {
-            name: item.addedBy.name,
-            avatar: item.addedBy.avatar || "https://example.com/default-avatar.jpg"
+            name: item.addedBy?.name || "You",
+            avatar: item.addedBy?.avatar || "https://example.com/default-avatar.jpg"
           }
         })),
         participants: trip.participants.map(p => ({
@@ -243,12 +253,12 @@ const TripsPage = () => {
   };
   
   // Create a new trip
-  const handleCreateTrip = (data: { store: string; eta: string; date: string }) => {
-    // Create a new trip with default values
+  const handleCreateTrip = (data: { store: string; eta: string; date: string; coordinates: { lat: number; lng: number } }) => {
+    // Create a new trip with coordinates from the modal
     const newTrip: Omit<ContextTrip, 'id' | 'createdAt'> = {
       store: data.store,
       location: data.store,
-      coordinates: { lat: 39.9650, lng: -83.0200 }, // Default coordinates
+      coordinates: data.coordinates,
       eta: data.eta,
       status: 'open',
       items: [],
@@ -299,7 +309,23 @@ const TripsPage = () => {
     if (selectedTrip && selectedTrip.id === tripId) {
       const updatedTrip = {
         ...selectedTrip,
-        items: updatedItems
+        items: updatedItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          price: item.price,
+          checked: item.checked,
+          isRecurring: (item as any).isRecurring,
+          recurrenceFrequency: (item as any).recurrenceFrequency || null,
+          nextDueDate: (item as any).nextDueDate,
+          baseItemId: (item as any).baseItemId,
+          lastAddedToTripDate: (item as any).lastAddedToTripDate,
+          addedBy: {
+            name: item.addedBy?.name || "You",
+            avatar: item.addedBy?.avatar || "https://example.com/default-avatar.jpg"
+          }
+        }))
       };
       setSelectedTrip(updatedTrip);
     }
@@ -602,10 +628,27 @@ const TripsPage = () => {
       });
       
       // Update the selectedTrip immediately with all new items
-      setSelectedTrip({
+      const updatedTrip = {
         ...selectedTrip,
-        items: updatedItems
-      });
+        items: updatedItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          price: item.price,
+          checked: item.checked,
+          isRecurring: (item as any).isRecurring,
+          recurrenceFrequency: (item as any).recurrenceFrequency || null,
+          nextDueDate: (item as any).nextDueDate,
+          baseItemId: (item as any).baseItemId,
+          lastAddedToTripDate: (item as any).lastAddedToTripDate,
+          addedBy: {
+            name: item.addedBy?.name || "You",
+            avatar: item.addedBy?.avatar || "https://example.com/default-avatar.jpg"
+          }
+        }))
+      };
+      setSelectedTrip(updatedTrip);
     }
     
     toast({
@@ -812,32 +855,40 @@ const TripsPage = () => {
               <ShoppingCart className="mr-2 h-4 w-4" />
               New Trip
             </Button>
-            <QuickTripButton store="Kroger" onClick={() => {
+            <Button variant="outline" className="h-8 text-xs" onClick={() => {
+              const storeInfo = findStoreByName("Kroger");
               handleCreateTrip({ 
                 store: "Kroger", 
                 eta: "20", 
-                date: new Date().toISOString().split('T')[0] 
+                date: new Date().toISOString().split('T')[0],
+                coordinates: storeInfo ? { lat: storeInfo.lat, lng: storeInfo.lng } : { lat: 39.9650, lng: -83.0200 }
               });
             }} />
-            <QuickTripButton store="Target" onClick={() => {
+            <Button variant="outline" className="h-8 text-xs" onClick={() => {
+              const storeInfo = findStoreByName("Target");
               handleCreateTrip({ 
                 store: "Target", 
                 eta: "25", 
-                date: new Date().toISOString().split('T')[0] 
+                date: new Date().toISOString().split('T')[0],
+                coordinates: storeInfo ? { lat: storeInfo.lat, lng: storeInfo.lng } : { lat: 39.9650, lng: -83.0200 }
               });
             }} />
-            <QuickTripButton store="Walmart" onClick={() => {
+            <Button variant="outline" className="h-8 text-xs" onClick={() => {
+              const storeInfo = findStoreByName("Walmart");
               handleCreateTrip({ 
                 store: "Walmart", 
                 eta: "15", 
-                date: new Date().toISOString().split('T')[0]
+                date: new Date().toISOString().split('T')[0],
+                coordinates: storeInfo ? { lat: storeInfo.lat, lng: storeInfo.lng } : { lat: 39.9650, lng: -83.0200 }
               });
             }} />
-            <QuickTripButton store="Costco" onClick={() => {
+            <Button variant="outline" className="h-8 text-xs" onClick={() => {
+              const storeInfo = findStoreByName("Costco");
               handleCreateTrip({ 
                 store: "Costco", 
                 eta: "30", 
-                date: new Date().toISOString().split('T')[0] 
+                date: new Date().toISOString().split('T')[0],
+                coordinates: storeInfo ? { lat: storeInfo.lat, lng: storeInfo.lng } : { lat: 39.9650, lng: -83.0200 }
               });
             }} />
           </div>
@@ -1033,9 +1084,8 @@ const TripsPage = () => {
       {/* Modals */}
       {showCalendarView && (
         <TripCalendarView
-          trips={[...trips, ...pastTrips]}
+          isOpen={showCalendarView}
           onClose={() => setShowCalendarView(false)}
-          onTripClick={handleTripClick}
         />
       )}
 

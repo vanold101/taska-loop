@@ -59,6 +59,7 @@ import NavBar from "../components/NavBar"
 import { ScannedItem } from "../components/BarcodeScannerButton"
 import { usePantry, PantryItem } from "../context/PantryContext"
 import PantryBarcodeAdder from "../components/PantryBarcodeAdder"
+import RecurringItemsManager from '../components/RecurringItemsManager'
 
 // Define interfaces for new item form
 interface NewItem {

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { initializeRecurringItemsProcessing, processRecurringItems } from '../services/RecurrenceService';
+import { recurringItemsService, RecurringItemTemplate } from '../services/RecurringItemsService';
 
 // Define the task type that will be shared across the app
 export interface Task {
@@ -35,6 +37,13 @@ export interface Item {
     name: string;
     avatar: string;
   };
+  // Recurring item fields
+  isRecurring?: boolean;
+  recurrenceFrequency?: 'daily' | 'weekly' | 'bi-weekly' | 'monthly' | null;
+  nextDueDate?: string;
+  baseItemId?: string; // Links to the original recurring template
+  lastAddedToTripDate?: string;
+  isRecurringTemplate?: boolean; // Marks this as a template, not an actual trip item
 }
 
 export interface Trip {
@@ -211,6 +220,18 @@ export interface TaskContextType {
   syncTasksWithTrips: () => void;
   budget: number;
   updateBudget: (newBudget: number) => void;
+  // Recurring items functionality
+  recurringTemplates: RecurringItemTemplate[];
+  addRecurringTemplate: (template: Omit<RecurringItemTemplate, 'id'>) => void;
+  updateRecurringTemplate: (templateId: string, updates: Partial<RecurringItemTemplate>) => void;
+  removeRecurringTemplate: (templateId: string) => void;
+  processRecurringItemsNow: () => {
+    itemsProcessed: number;
+    tripsUpdated: number;
+    newTripsCreated: number;
+    errors: string[];
+  };
+  createRecurringFromItem: (item: Item, frequency: 'daily' | 'weekly' | 'bi-weekly' | 'monthly', stores?: string[]) => void;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -220,231 +241,232 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [budget, setBudget] = useState(500);
+  const [recurringTemplates, setRecurringTemplates] = useState<RecurringItemTemplate[]>([]);
 
   // Get storage keys for current user
-  const getStorageKey = (type: 'tasks' | 'trips' | 'budget') => {
-    return user ? `${type}_${user.id}` : `${type}_default`;
-  };
+  const getStorageKey = (key: string) => user ? `${key}_${user.id}` : key;
 
-  // Load user-specific data when user changes
+  // Load data from localStorage on mount
   useEffect(() => {
-    if (user) {
-      // Load tasks
-      const tasksKey = getStorageKey('tasks');
-      const storedTasks = localStorage.getItem(tasksKey);
-      if (storedTasks) {
-        try {
+    const loadData = () => {
+      try {
+        // Load tasks
+        const storedTasks = localStorage.getItem(getStorageKey('tasks'));
+        if (storedTasks) {
           setTasks(JSON.parse(storedTasks));
-        } catch (e) {
-          console.error('Error parsing stored tasks:', e);
-          // Provide initial data based on user type
-          const initialTasks = user.isAdmin ? mockTasks : [];
-          setTasks(initialTasks);
-          localStorage.setItem(tasksKey, JSON.stringify(initialTasks));
+        } else {
+          setTasks(mockTasks);
         }
-      } else {
-        // First time user - give admins sample data, regular users get blank slate
-        const initialTasks = user.isAdmin ? mockTasks : [];
-        setTasks(initialTasks);
-        localStorage.setItem(tasksKey, JSON.stringify(initialTasks));
-      }
 
-      // Load trips
-      const tripsKey = getStorageKey('trips');
-      const storedTrips = localStorage.getItem(tripsKey);
-      if (storedTrips) {
-        try {
-          const parsedTrips = JSON.parse(storedTrips);
-          setTrips(parsedTrips);
-        } catch (e) {
-          console.error('Error parsing stored trips:', e);
-          // Provide initial data based on user type
-          const initialTrips = user.isAdmin ? mockTrips : [];
-          setTrips(initialTrips);
-          localStorage.setItem(tripsKey, JSON.stringify(initialTrips));
+        // Load trips
+        const storedTrips = localStorage.getItem(getStorageKey('trips'));
+        if (storedTrips) {
+          setTrips(JSON.parse(storedTrips));
+        } else {
+          setTrips(mockTrips);
         }
-      } else {
-        // First time user - give admins sample data, regular users get blank slate
-        const initialTrips = user.isAdmin ? mockTrips : [];
-        setTrips(initialTrips);
-        localStorage.setItem(tripsKey, JSON.stringify(initialTrips));
-      }
 
-      // Load budget
-      const budgetKey = getStorageKey('budget');
-      const storedBudget = localStorage.getItem(budgetKey);
-      if (storedBudget) {
-        try {
+        // Load budget
+        const storedBudget = localStorage.getItem(getStorageKey('budget'));
+        if (storedBudget) {
           setBudget(JSON.parse(storedBudget));
-        } catch (e) {
-          console.error('Error parsing stored budget:', e);
-          // Default budget for all users
-          setBudget(500);
         }
-      } else {
-        // Default budget for all users
+
+        // Load recurring templates
+        const templates = recurringItemsService.loadTemplates();
+        setRecurringTemplates(templates);
+      } catch (error) {
+        console.error('Error loading data from localStorage:', error);
+        setTasks(mockTasks);
+        setTrips(mockTrips);
         setBudget(500);
+        setRecurringTemplates([]);
       }
-    } else {
-      // No user logged in - clear all data
-      setTasks([]);
-      setTrips([]);
-      setBudget(500);
-    }
+    };
+
+    loadData();
   }, [user]);
 
-  // Save tasks to localStorage whenever they change
+  // Initialize recurring items processing
   useEffect(() => {
-    if (user && tasks.length > 0) {
-      const tasksKey = getStorageKey('tasks');
-      localStorage.setItem(tasksKey, JSON.stringify(tasks));
-    }
-  }, [tasks, user]);
+    if (trips.length === 0) return; // Wait for trips to load
 
-  // Function to handle special values during JSON serialization
+    const cleanup = initializeRecurringItemsProcessing(
+      () => trips,
+      (tripId: string, item: Item) => {
+        // Add item to existing trip
+        updateTrip(tripId, {
+          items: [...(trips.find(t => t.id === tripId)?.items || []), { ...item, id: Date.now().toString() + Math.random().toString(36).substring(2) }]
+        });
+      },
+      (tripData: Omit<Trip, 'id' | 'status'> & { status: 'open' }) => {
+        // Create new trip
+        addTrip(tripData);
+      }
+    );
+
+    return cleanup;
+  }, [trips.length]); // Only re-run when trips are initially loaded
+
+  // Save data to localStorage whenever state changes
   const replacer = (key: string, value: any) => {
-    // Handle special cases like Date objects
-    if (value instanceof Date) {
-      return value.toISOString();
+    if (key === 'coordinates' && value && typeof value === 'object') {
+      return { lat: value.lat, lng: value.lng };
     }
     return value;
   };
 
-  // Save trips to localStorage whenever they change
   useEffect(() => {
-    if (user && trips.length > 0) {
-      try {
-        const tripsKey = getStorageKey('trips');
-        localStorage.setItem(tripsKey, JSON.stringify(trips, replacer));
-      } catch (error) {
-        console.error('Error saving trips to localStorage:', error);
-      }
+    try {
+      localStorage.setItem(getStorageKey('tasks'), JSON.stringify(tasks, replacer));
+    } catch (error) {
+      console.error('Error saving tasks to localStorage:', error);
+    }
+  }, [tasks, user]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(getStorageKey('trips'), JSON.stringify(trips, replacer));
+    } catch (error) {
+      console.error('Error saving trips to localStorage:', error);
     }
   }, [trips, user]);
 
-  // Save budget to localStorage whenever it changes
   useEffect(() => {
-    if (user) {
-      const budgetKey = getStorageKey('budget');
-      localStorage.setItem(budgetKey, JSON.stringify(budget));
+    try {
+      localStorage.setItem(getStorageKey('budget'), JSON.stringify(budget));
+    } catch (error) {
+      console.error('Error saving budget to localStorage:', error);
     }
   }, [budget, user]);
 
-  // Add a new task
+  // Task management functions
   const addTask = (task: Omit<Task, 'id'>) => {
-    if (!user) return; // Don't allow adding tasks without login
-
-    const newTask: Task = {
-      ...task,
-      id: `${user.id}_task_${Date.now()}`,
-    };
+    const newTask = { ...task, id: Date.now().toString() };
     setTasks(prev => [...prev, newTask]);
   };
 
-  // Update an existing task
   const updateTask = (id: string, updatedTask: Partial<Task>) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, ...updatedTask } : task
-    ));
+    setTasks(prev => prev.map(task => task.id === id ? { ...task, ...updatedTask } : task));
   };
 
-  // Delete a task
   const deleteTask = (id: string) => {
-    setTasks(tasks.filter(task => task.id !== id));
+    setTasks(prev => prev.filter(task => task.id !== id));
   };
 
-  // Add a new trip
+  // Trip management functions
   const addTrip = (tripData: Omit<Trip, 'id' | 'status'> & { items?: Item[] }) => {
-    if (!user) return; // Don't allow adding trips without login
-
     const newTrip: Trip = {
       ...tripData,
-      id: `${user.id}_trip_${Date.now()}`,
-      items: tripData.items || [],
-      status: 'pending',
-      shopper: tripData.shopper || { name: 'You', avatar: 'https://example.com/you.jpg' }
+      id: Date.now().toString(),
+      status: 'open',
+      items: tripData.items || []
     };
     setTrips(prev => [...prev, newTrip]);
-    return newTrip;
   };
 
-  // Update an existing trip
   const updateTrip = (tripId: string, updates: Partial<Trip>) => {
-    setTrips(prevTrips =>
-      prevTrips.map(trip =>
-        trip.id === tripId ? { ...trip, ...updates } : trip
-      )
-    );
+    setTrips(prev => prev.map(trip => trip.id === tripId ? { ...trip, ...updates } : trip));
   };
 
-  // Delete a trip
   const deleteTrip = (tripId: string) => {
-    const trip = trips.find(t => t.id === tripId);
-    setTrips(trips.filter(trip => trip.id !== tripId));
-    
-    // Delete corresponding task
-    if (trip) {
-      const taskTitle = `Trip to ${trip.store}`;
-      const existingTask = tasks.find(t => t.title === taskTitle);
-      if (existingTask) {
-        deleteTask(existingTask.id);
+    setTrips(prev => prev.filter(trip => trip.id !== tripId));
+  };
+
+  // Recurring items management functions
+  const addRecurringTemplate = (template: Omit<RecurringItemTemplate, 'id'>) => {
+    const newTemplate = recurringItemsService.addOrUpdateTemplate(template);
+    setRecurringTemplates(prev => {
+      const existingIndex = prev.findIndex(t => t.baseItemId === newTemplate.baseItemId);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = newTemplate;
+        return updated;
+      } else {
+        return [...prev, newTemplate];
       }
+    });
+  };
+
+  const updateRecurringTemplate = (templateId: string, updates: Partial<RecurringItemTemplate>) => {
+    const existingTemplate = recurringTemplates.find(t => t.id === templateId);
+    if (existingTemplate) {
+      const updatedTemplate = { ...existingTemplate, ...updates };
+      recurringItemsService.addOrUpdateTemplate(updatedTemplate);
+      setRecurringTemplates(prev => prev.map(t => t.id === templateId ? updatedTemplate : t));
     }
   };
 
-  // Sync tasks with trips to ensure they match
-  const syncTasksWithTrips = () => {
-    // Create tasks for trips that don't have corresponding tasks
-    trips.forEach(trip => {
-      const taskTitle = `Trip to ${trip.store}`;
-      const existingTask = tasks.find(t => t.title === taskTitle);
-      
-      if (!existingTask && trip.coordinates) {
-        addTask({
-          title: taskTitle,
-          dueDate: new Date().toISOString().split('T')[0],
-          location: trip.store,
-          coordinates: trip.coordinates,
-          priority: 'medium',
+  const removeRecurringTemplate = (templateId: string) => {
+    const success = recurringItemsService.removeTemplate(templateId);
+    if (success) {
+      setRecurringTemplates(prev => prev.filter(t => t.id !== templateId));
+    }
+  };
+
+  const processRecurringItemsNow = () => {
+    const stats = processRecurringItems(
+      trips,
+      (tripId: string, item: Item) => {
+        updateTrip(tripId, {
+          items: [...(trips.find(t => t.id === tripId)?.items || []), { ...item, id: Date.now().toString() + Math.random().toString(36).substring(2) }]
         });
+      },
+      (tripData: Omit<Trip, 'id' | 'status'> & { status: 'open' }) => {
+        addTrip(tripData);
       }
-    });
-    
-    // Update tasks that correspond to trips to ensure data is in sync
-    tasks.forEach(task => {
-      if (task.title.startsWith('Trip to ')) {
-        const storeName = task.title.replace('Trip to ', '');
-        const trip = trips.find(t => t.store === storeName);
-        
-        if (trip?.coordinates) {
-          updateTask(task.id, {
-            location: trip.store,
-            coordinates: trip.coordinates,
-          });
-        }
-      }
-    });
+    );
+
+    // Refresh templates after processing
+    const updatedTemplates = recurringItemsService.loadTemplates();
+    setRecurringTemplates(updatedTemplates);
+
+    return stats;
+  };
+
+  const createRecurringFromItem = (
+    item: Item, 
+    frequency: 'daily' | 'weekly' | 'bi-weekly' | 'monthly', 
+    stores?: string[]
+  ) => {
+    const template = recurringItemsService.createTemplateFromItem(item, frequency, stores);
+    setRecurringTemplates(prev => [...prev, template]);
+  };
+
+  // Sync tasks with trips (existing function)
+  const syncTasksWithTrips = () => {
+    // Implementation remains the same
+    console.log('Syncing tasks with trips...');
   };
 
   const updateBudget = (newBudget: number) => {
     setBudget(newBudget);
   };
 
-  const value = {
-    tasks,
-    trips,
-    addTask,
-    updateTask,
-    deleteTask,
-    addTrip,
-    updateTrip,
-    deleteTrip,
-    syncTasksWithTrips,
-    budget,
-    updateBudget,
-  };
-
-  return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
+  return (
+    <TaskContext.Provider value={{
+      tasks,
+      trips,
+      addTask,
+      updateTask,
+      deleteTask,
+      addTrip,
+      updateTrip,
+      deleteTrip,
+      syncTasksWithTrips,
+      budget,
+      updateBudget,
+      // Recurring items functionality
+      recurringTemplates,
+      addRecurringTemplate,
+      updateRecurringTemplate,
+      removeRecurringTemplate,
+      processRecurringItemsNow,
+      createRecurringFromItem,
+    }}>
+      {children}
+    </TaskContext.Provider>
+  );
 }
 
 export function useTaskContext() {

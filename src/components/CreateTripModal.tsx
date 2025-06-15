@@ -11,11 +11,12 @@ import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { findStoreByName } from '@/data/stores';
 
 type CreateTripModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { store: string; eta: string; date: string }) => void;
+  onSubmit: (data: { store: string; eta: string; date: string; coordinates: { lat: number; lng: number } }) => void;
 };
 
 // Common store suggestions for convenience
@@ -93,10 +94,17 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
       return;
     }
     
+    // Find store coordinates from stores data
+    const storeInfo = findStoreByName(store);
+    const coordinates = storeInfo ? 
+      { lat: storeInfo.lat, lng: storeInfo.lng } : 
+      { lat: 39.9622, lng: -83.0007 }; // Default Columbus coordinates
+    
     onSubmit({
       store,
       eta,
-      date: date.toISOString()
+      date: date.toISOString(),
+      coordinates
     });
     setStore("");
     setEta("20");

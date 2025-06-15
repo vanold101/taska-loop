@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTaskContext } from "@/context/TaskContext";
+import { findStoreByName } from '@/data/stores';
 
 type QuickTripButtonProps = {
   onCreateTrip?: (data: { store: string; eta: string }) => void;
@@ -77,6 +78,12 @@ const QuickTripButton = ({
       return;
     }
     
+    // Find store coordinates from stores data
+    const storeInfo = findStoreByName(storeInput);
+    const coordinates = storeInfo ? 
+      { lat: storeInfo.lat, lng: storeInfo.lng } : 
+      { lat: 39.9622, lng: -83.0007 }; // Default Columbus coordinates
+    
     // If onCreateTrip prop is provided, use it
     if (onCreateTrip) {
       onCreateTrip({ store: storeInput, eta });
@@ -90,9 +97,12 @@ const QuickTripButton = ({
         participants: [
           { id: '1', name: 'You', avatar: '' }
         ],
-        coordinates: {
-          lat: 39.9622,
-          lng: -83.0007
+        coordinates: coordinates,
+        location: storeInput,
+        date: new Date().toISOString(),
+        shopper: {
+          name: 'You',
+          avatar: ''
         }
       };
 

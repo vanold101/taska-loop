@@ -11,7 +11,10 @@ import {
   Plus,
   ShoppingCart,
   Users,
-  ListTodo
+  ListTodo,
+  Edit,
+  Trash2,
+  CheckCircle
 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
@@ -25,9 +28,14 @@ import {
 } from "../components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
 import { Sidebar } from "../components/Sidebar"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog"
+import { Label } from "../components/ui/label"
+import { useState } from "react"
 
 export default function CalendarPage() {
   const navigate = useNavigate();
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [isEventDetailModalOpen, setIsEventDetailModalOpen] = useState(false);
   
   // Current month and year
   const currentMonth = "May"
@@ -35,6 +43,59 @@ export default function CalendarPage() {
 
   // Days of the week
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+  // Sample events data
+  const sampleEvents: Record<number, Array<{
+    id: number;
+    title: string;
+    time: string;
+    type: string;
+    location?: string;
+    description: string;
+    status: string;
+  }>> = {
+    20: [
+      { 
+        id: 1,
+        title: "Grocery Shopping", 
+        time: "3:30 PM", 
+        type: "shopping",
+        location: "Trader Joe's",
+        description: "Weekly grocery shopping for household items",
+        status: "scheduled"
+      },
+      { 
+        id: 2,
+        title: "Dinner with Alex", 
+        time: "7:00 PM", 
+        type: "social",
+        location: "Italian Restaurant",
+        description: "Catch up dinner with Alex",
+        status: "scheduled"
+      },
+    ],
+    22: [
+      { 
+        id: 3,
+        title: "Pay Internet Bill", 
+        time: "All day", 
+        type: "task",
+        description: "Monthly internet bill payment",
+        status: "pending"
+      }
+    ],
+    25: [
+      { 
+        id: 4,
+        title: "Household Supplies", 
+        time: "11:00 AM", 
+        type: "shopping",
+        location: "Target",
+        description: "Buy cleaning supplies and toiletries",
+        status: "scheduled"
+      }
+    ]
+  };
 
   // Calendar days (simplified for example)
   const calendarDays = Array.from({ length: 35 }, (_, i) => {
@@ -44,19 +105,36 @@ export default function CalendarPage() {
       day: day,
       isCurrentMonth: day > 0 && day <= 31,
       hasEvents: [1, 5, 10, 15, 20, 22, 25].includes(day),
-      events:
-        day === 20
-          ? [
-              { title: "Grocery Shopping", time: "3:30 PM", type: "shopping" },
-              { title: "Dinner with Alex", time: "7:00 PM", type: "social" },
-            ]
-          : day === 22
-            ? [{ title: "Pay Internet Bill", time: "All day", type: "task" }]
-            : day === 15
-              ? [{ title: "Household Supplies", time: "11:00 AM", type: "shopping" }]
-              : [],
+      events: sampleEvents[day] || [],
     }
   })
+
+  const handleEventClick = (event: any) => {
+    setSelectedEvent(event);
+    setIsEventDetailModalOpen(true);
+  };
+
+  const handleEditEvent = (event: any) => {
+    // Navigate to appropriate page based on event type
+    if (event.type === 'shopping') {
+      navigate('/trips');
+    } else {
+      // For other events, you could navigate to a general event editor
+      console.log('Edit event:', event);
+    }
+  };
+
+  const handleCompleteTask = (event: any) => {
+    // Mark task as completed
+    console.log('Complete task:', event);
+    setIsEventDetailModalOpen(false);
+  };
+
+  const handleDeleteEvent = (event: any) => {
+    // Delete event
+    console.log('Delete event:', event);
+    setIsEventDetailModalOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -148,16 +226,17 @@ export default function CalendarPage() {
 
                     {/* Events */}
                     <div className="mt-1 space-y-1">
-                      {day.events.map((event, eventIndex) => (
+                      {day.events.map((event: any, eventIndex: number) => (
                         <div
                           key={eventIndex}
-                          className={`text-xs p-1 rounded truncate ${
+                          className={`text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 transition-opacity ${
                             event.type === "shopping"
                               ? "bg-blue-100 text-blue-800"
                               : event.type === "social"
                                 ? "bg-purple-100 text-purple-800"
                                 : "bg-amber-100 text-amber-800"
                           }`}
+                          onClick={() => handleEventClick(event)}
                         >
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -190,7 +269,10 @@ export default function CalendarPage() {
                 <CardContent className="pb-2">
                   <div className="space-y-3">
                     {/* Event 1 */}
-                    <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <div 
+                      className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                      onClick={() => handleEventClick(sampleEvents[20][0])}
+                    >
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                         <ShoppingCart className="h-5 w-5 text-blue-600" />
                       </div>
@@ -207,21 +289,24 @@ export default function CalendarPage() {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={(e) => e.stopPropagation()}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit Event</DropdownMenuItem>
-                          <DropdownMenuItem>View Shopping List</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditEvent(sampleEvents[20][0])}>Edit Event</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate('/trips')}>View Shopping List</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">Cancel</DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteEvent(sampleEvents[20][0])}>Cancel</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
 
                     {/* Event 2 */}
-                    <div className="flex items-start gap-3 p-3 rounded-lg bg-purple-50 border border-purple-100">
+                    <div 
+                      className="flex items-start gap-3 p-3 rounded-lg bg-purple-50 border border-purple-100 cursor-pointer hover:bg-purple-100 transition-colors"
+                      onClick={() => handleEventClick(sampleEvents[20][1])}
+                    >
                       <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
                         <Users className="h-5 w-5 text-purple-600" />
                       </div>
@@ -238,15 +323,15 @@ export default function CalendarPage() {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={(e) => e.stopPropagation()}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit Event</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditEvent(sampleEvents[20][1])}>Edit Event</DropdownMenuItem>
                           <DropdownMenuItem>Send Message</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">Cancel</DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteEvent(sampleEvents[20][1])}>Cancel</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -266,7 +351,10 @@ export default function CalendarPage() {
                 <CardContent className="pb-2">
                   <div className="space-y-3">
                     {/* Upcoming Event 1 */}
-                    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div 
+                      className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => handleEventClick(sampleEvents[22][0])}
+                    >
                       <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                         <ListTodo className="h-5 w-5 text-amber-600" />
                       </div>
@@ -281,13 +369,16 @@ export default function CalendarPage() {
                           <span className="text-sm text-slate-500">All day</span>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="border-slate-200">
+                      <Button variant="outline" size="sm" className="border-slate-200" onClick={(e) => e.stopPropagation()}>
                         Remind Me
                       </Button>
                     </div>
 
                     {/* Upcoming Event 2 */}
-                    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div 
+                      className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => handleEventClick(sampleEvents[25][0])}
+                    >
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                         <ShoppingCart className="h-5 w-5 text-blue-600" />
                       </div>
@@ -302,7 +393,7 @@ export default function CalendarPage() {
                           <span className="text-sm text-slate-500">11:00 AM</span>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="border-slate-200">
+                      <Button variant="outline" size="sm" className="border-slate-200" onClick={(e) => e.stopPropagation()}>
                         Remind Me
                       </Button>
                     </div>
@@ -318,6 +409,91 @@ export default function CalendarPage() {
           </div>
         </div>
       </main>
+
+      {/* Event Detail Modal */}
+      <Dialog open={isEventDetailModalOpen} onOpenChange={setIsEventDetailModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedEvent?.type === 'shopping' && <ShoppingCart className="h-5 w-5" />}
+              {selectedEvent?.type === 'social' && <Users className="h-5 w-5" />}
+              {selectedEvent?.type === 'task' && <ListTodo className="h-5 w-5" />}
+              Event Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedEvent && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Title</Label>
+                <p className="text-lg font-semibold">{selectedEvent.title}</p>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Time</Label>
+                <p className="text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {selectedEvent.time}
+                </p>
+              </div>
+
+              {selectedEvent.location && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Location</Label>
+                  <p className="text-sm flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    {selectedEvent.location}
+                  </p>
+                </div>
+              )}
+
+              {selectedEvent.description && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Description</Label>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{selectedEvent.description}</p>
+                </div>
+              )}
+              
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Type</Label>
+                <Badge variant={selectedEvent.type === 'shopping' ? 'default' : selectedEvent.type === 'social' ? 'secondary' : 'outline'}>
+                  {selectedEvent.type}
+                </Badge>
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                {selectedEvent.type === 'task' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCompleteTask(selectedEvent)}
+                    className="flex-1"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Mark Complete
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsEventDetailModalOpen(false);
+                    handleEditEvent(selectedEvent);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteEvent(selectedEvent)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

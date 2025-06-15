@@ -37,7 +37,6 @@ import { AppLayout } from "@/components/AppLayout"
 import TripCalendarView from "@/components/TripCalendarView"
 import BudgetAdjustmentDialog from "@/components/BudgetAdjustmentDialog"
 import { useTaskContext } from "@/context/TaskContext"
-import { toast } from "@/components/ui/use-toast"
 import NewTripDialog from "@/components/NewTripDialog"
 import { AddTripDialog } from "@/components/AddTripDialog"
 import TripDetailModal, { TripData } from "@/components/TripDetailModal"
@@ -181,11 +180,6 @@ export default function TripsPage() {
         }
         
         console.error('Error getting location:', error);
-        toast({
-          title: "Location Error",
-          description: message,
-          variant: "destructive",
-        });
         setLocationError(message);
         setIsLoadingLocation(false);
       },
@@ -251,19 +245,9 @@ export default function TripsPage() {
   // Update the handleViewOnMap function
   const handleViewOnMap = () => {
     if (locationError) {
-      toast({
-        title: "Location Not Available",
-        description: "Please allow location access or retry to use the map feature.",
-        variant: "destructive"
-      });
       return;
     }
     if (!userLocation || nearbyStores.length === 0) {
-      toast({
-        title: "Cannot Open Map",
-        description: "Current location or store information is not available",
-        variant: "destructive"
-      });
       return;
     }
 
@@ -279,10 +263,6 @@ export default function TripsPage() {
   // Handler for "View all items" button
   const handleViewAllItems = () => {
     // This would typically expand the list or navigate to a detailed view
-    toast({
-      title: "All Items",
-      description: "Expanding view to show all items in your shopping list",
-    });
     // Navigate to trips page with expanded view or open a dedicated items modal
     navigate("/trips?view=all-items");
   };
@@ -305,22 +285,9 @@ export default function TripsPage() {
           status: 'shopping' as const
         };
         
-        // Update using the context function (you'll need to implement this in TaskContext)
-        // For now, just show a toast message
-        toast({
-          title: "Trip Started",
-          description: `Started shopping trip to ${trip.store}`,
-        });
-        
         // Navigate to the trip detail page
         navigate(`/trip/${tripId}`);
       }
-    } else {
-      toast({
-        title: "Start Shopping",
-        description: "Please select a trip to start shopping",
-        variant: "destructive"
-      });
     }
   };
 
@@ -341,10 +308,6 @@ export default function TripsPage() {
     
     // In a real app, this would fetch more data from the server
     // For now, we'll just show a message since we're using static data
-    toast({
-      title: "Load More",
-      description: `Showing ${currentCount} completed trips. In a real app, this would load ${increment} more trips from the server.`,
-    });
     
     // Future implementation would update state to show more trips
     // setDisplayLimit(prev => prev + increment);
@@ -379,8 +342,8 @@ export default function TripsPage() {
           <p className="text-xs text-slate-500">Location services not available</p>
         </div>
       ) : nearbyStores.length > 0 ? (
-        nearbyStores.slice(0, 3).map((store) => (
-          <div key={store.tripId} className="flex justify-between items-center py-1">
+        nearbyStores.slice(0, 3).map((store, index) => (
+          <div key={store.tripId} className="flex justify-between items-center py-1 animate-fade-in" style={{animationDelay: `${index * 100}ms`}}>
             <div className="flex items-center gap-1.5">
               <Store className="h-3 w-3 text-slate-500" />
               <span className="text-xs text-slate-700 truncate">{store.name}</span>
@@ -402,406 +365,394 @@ export default function TripsPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 md:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">Shopping Trips</h1>
-            <p className="text-slate-500">Plan and manage your shopping trips</p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              className="border-slate-200"
-              onClick={handleSchedule}
-            >
-              <CalendarDays className="h-4 w-4 mr-2" />
-              Schedule
-            </Button>
-            <Button 
-              className="bg-teal-600 hover:bg-teal-700"
-              onClick={handleNewTrip}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Trip
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="border-none shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Upcoming Trips</CardTitle>
-              <CardDescription className="text-sm">You have {activeTrips.length} trips scheduled</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">This week</span>
-                <span className="text-slate-500">{activeTrips.filter(trip => {
-                  const tripDate = new Date(trip.date);
-                  const today = new Date();
-                  const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-                  return tripDate >= today && tripDate <= weekFromNow;
-                }).length} trips</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">Next week</span>
-                <span className="text-slate-500">{activeTrips.filter(trip => {
-                  const tripDate = new Date(trip.date);
-                  const nextWeekStart = new Date();
-                  nextWeekStart.setDate(nextWeekStart.getDate() + 7);
-                  const nextWeekEnd = new Date();
-                  nextWeekEnd.setDate(nextWeekEnd.getDate() + 14);
-                  return tripDate >= nextWeekStart && tripDate <= nextWeekEnd;
-                }).length} trips</span>
-              </div>
-            </CardContent>
-            <CardFooter className="pt-3">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="p-4 md:p-8 animate-fade-in">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-slide-down">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200">Shopping Trips</h1>
+              <p className="text-slate-500 dark:text-slate-400">Plan and manage your shopping trips</p>
+            </div>
+            <div className="flex gap-2">
               <Button 
                 variant="outline" 
-                className="w-full border-slate-200 h-8 text-sm" 
-                onClick={handleViewCalendar}
+                className="border-slate-200 dark:border-slate-600 dark:text-slate-300 hover:scale-105 transition-transform duration-200"
+                onClick={handleSchedule}
               >
-                <CalendarDays className="h-3 w-3 mr-2" />
-                View Calendar
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Schedule
               </Button>
-            </CardFooter>
-          </Card>
-
-          <Card className="border-none shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Budget Overview</CardTitle>
-              <CardDescription className="text-sm">May spending across all trips</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">Spent so far</span>
-                <span className="font-medium text-slate-800">$289.45</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">Monthly budget</span>
-                <span className="font-medium text-slate-800">${monthlyBudget.toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">Remaining</span>
-                <span className="font-medium text-green-600">${(monthlyBudget - 289.45).toFixed(2)}</span>
-              </div>
-            </CardContent>
-            <CardFooter className="pt-3">
               <Button 
-                variant="outline" 
-                className="w-full border-slate-200 h-8 text-sm" 
-                onClick={handleAdjustBudget}
+                className="bg-teal-600 hover:bg-teal-700 dark:bg-teal-600 dark:hover:bg-teal-700 hover:scale-105 transition-transform duration-200"
+                onClick={handleNewTrip}
               >
-                <Calculator className="h-3 w-3 mr-2" />
-                Adjust Budget
+                <Plus className="h-4 w-4 mr-2" />
+                New Trip
               </Button>
-            </CardFooter>
-          </Card>
-
-          <Card className="border-none shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Nearby Stores</CardTitle>
-              <CardDescription className="text-sm">Sorted by distance from your location</CardDescription>
-            </CardHeader>
-            <CardContent className="min-h-[80px]">
-              {isLoadingLocation ? (
-                <div className="flex items-center justify-center p-3">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                  <span className="text-sm">Getting location...</span>
-                </div>
-              ) : locationError ? (
-                <div className="text-center p-3">
-                  <p className="text-destructive text-sm">{locationError}</p>
-                  <Button onClick={() => getLocation()} className="mt-2 h-7 text-xs">Retry</Button>
-                </div>
-              ) : nearbyStores.length > 0 ? (
-                renderStoresList()
-              ) : (
-                <p className="text-sm text-gray-500 text-center py-3">No active trips with stores nearby.</p>
-              )}
-            </CardContent>
-            <CardFooter className="pt-3">
-              <Button 
-                variant="outline" 
-                className="w-full border-slate-200 h-8 text-sm" 
-                onClick={handleViewOnMap}
-                disabled={isLoadingLocation || !userLocation || nearbyStores.length === 0}
-              >
-                <MapPin className="h-3 w-3 mr-2" />
-                {isLoadingLocation 
-                  ? 'Getting Location...' 
-                  : !userLocation 
-                    ? 'Location Not Available'
-                    : nearbyStores.length === 0
-                      ? 'No Stores to Show'
-                      : 'View on Map'}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-
-        {/* Trips Tabs */}
-        <Tabs defaultValue="active" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
-            <TabsList className="w-full md:w-auto">
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-            </TabsList>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
-              <Input 
-                type="search" 
-                placeholder="Search trips..." 
-                className="pl-9 w-full md:w-[300px]" 
-                value={searchQuery}
-                onChange={handleSearchChange}
-              />
             </div>
           </div>
 
-          <TabsContent value="active" className="space-y-4">
-            {activeTrips.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {activeTrips.map(trip => (
-                  <Card key={trip.id} className="cursor-pointer hover:shadow-md transition-shadow border-slate-200 hover:border-slate-300" onClick={() => handleViewDetails(trip.id)}>
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <CardTitle className="text-base font-semibold">{trip.store}</CardTitle>
-                          <CardDescription className="text-xs text-slate-600">{new Date(trip.date).toLocaleDateString()} at {trip.time}</CardDescription>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-slide-up">
+            <Card className="border-none shadow-sm dark:bg-slate-800 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base dark:text-slate-200">Upcoming Trips</CardTitle>
+                <CardDescription className="text-sm dark:text-slate-400">You have {activeTrips.length} trips scheduled</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between text-sm animate-fade-in">
+                  <span className="text-slate-700 dark:text-slate-300">This week</span>
+                  <span className="text-slate-500 dark:text-slate-400">{activeTrips.filter(trip => {
+                    const tripDate = new Date(trip.date);
+                    const today = new Date();
+                    const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    return tripDate >= today && tripDate <= weekFromNow;
+                  }).length} trips</span>
+                </div>
+                <div className="flex items-center justify-between text-sm animate-fade-in" style={{animationDelay: '100ms'}}>
+                  <span className="text-slate-700 dark:text-slate-300">Next week</span>
+                  <span className="text-slate-500 dark:text-slate-400">{activeTrips.filter(trip => {
+                    const tripDate = new Date(trip.date);
+                    const nextWeekStart = new Date();
+                    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+                    const nextWeekEnd = new Date();
+                    nextWeekEnd.setDate(nextWeekEnd.getDate() + 14);
+                    return tripDate >= nextWeekStart && tripDate <= nextWeekEnd;
+                  }).length} trips</span>
+                </div>
+              </CardContent>
+              <CardFooter className="pt-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full border-slate-200 dark:border-slate-700 dark:text-slate-300 h-8 text-sm hover:scale-105 transition-transform duration-200" 
+                  onClick={handleViewCalendar}
+                >
+                  <CalendarDays className="h-3 w-3 mr-2" />
+                  View Calendar
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card className="border-none shadow-sm dark:bg-slate-800 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base dark:text-slate-200">Budget Overview</CardTitle>
+                <CardDescription className="text-sm dark:text-slate-400">May spending across all trips</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between text-sm animate-fade-in">
+                  <span className="text-slate-700 dark:text-slate-300">Spent so far</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">$289.45</span>
+                </div>
+                <div className="flex items-center justify-between text-sm animate-fade-in" style={{animationDelay: '100ms'}}>
+                  <span className="text-slate-700 dark:text-slate-300">Monthly budget</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">${monthlyBudget.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm animate-fade-in" style={{animationDelay: '200ms'}}>
+                  <span className="text-slate-700 dark:text-slate-300">Remaining</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">${(monthlyBudget - 289.45).toFixed(2)}</span>
+                </div>
+              </CardContent>
+              <CardFooter className="pt-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full border-slate-200 dark:border-slate-700 dark:text-slate-300 h-8 text-sm hover:scale-105 transition-transform duration-200" 
+                  onClick={handleAdjustBudget}
+                >
+                  <Calculator className="h-3 w-3 mr-2" />
+                  Adjust Budget
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card className="border-none shadow-sm dark:bg-slate-800 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base dark:text-slate-200">Nearby Stores</CardTitle>
+                <CardDescription className="text-sm dark:text-slate-400">Sorted by distance from your location</CardDescription>
+              </CardHeader>
+              <CardContent className="min-h-[80px]">
+                {renderStoresList()}
+              </CardContent>
+              <CardFooter className="pt-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full border-slate-200 dark:border-slate-700 dark:text-slate-300 h-8 text-sm hover:scale-105 transition-transform duration-200" 
+                  onClick={handleViewOnMap}
+                  disabled={isLoadingLocation || !userLocation || nearbyStores.length === 0}
+                >
+                  <MapPin className="h-3 w-3 mr-2" />
+                  {isLoadingLocation 
+                    ? 'Getting Location...' 
+                    : !userLocation 
+                      ? 'Location Not Available'
+                      : nearbyStores.length === 0
+                        ? 'No Stores to Show'
+                        : 'View on Map'}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+
+          {/* Trips Tabs */}
+          <Tabs defaultValue="active" className="w-full animate-fade-in" value={activeTab} onValueChange={setActiveTab}>
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+              <TabsList className="w-full md:w-auto dark:bg-slate-800">
+                <TabsTrigger value="active">Active</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+              </TabsList>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Input 
+                  type="search" 
+                  placeholder="Search trips..." 
+                  className="pl-9 w-full md:w-[300px] dark:bg-slate-800 dark:border-slate-700" 
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                />
+              </div>
+            </div>
+
+            <TabsContent value="active" className="space-y-4">
+              {activeTrips.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {activeTrips.map((trip, index) => (
+                    <Card key={trip.id} className="cursor-pointer hover:shadow-md transition-all duration-300 border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 hover:scale-105 animate-slide-in" style={{animationDelay: `${index * 100}ms`}} onClick={() => handleViewDetails(trip.id)}>
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <CardTitle className="text-base font-semibold dark:text-slate-200">{trip.store}</CardTitle>
+                            <CardDescription className="text-xs text-slate-600 dark:text-slate-400">{new Date(trip.date).toLocaleDateString()} at {trip.time}</CardDescription>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={trip.status === 'shopping' ? "default" : "outline"} className="text-xs">{trip.status}</Badge>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0 hover:scale-110 transition-transform duration-200" 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                handleStartTrip(trip.id);
+                              }}
+                              title="Start shopping"
+                            >
+                              <ShoppingBag className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={trip.status === 'shopping' ? "default" : "outline"} className="text-xs">{trip.status}</Badge>
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center">
+                                <Users className="h-3 w-3 mr-1" />
+                                <span>{(trip.participants || []).length}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <ShoppingCart className="h-3 w-3 mr-1" />
+                                <span>{trip.items.length}</span>
+                              </div>
+                              {trip.budget && (
+                                <div className="flex items-center">
+                                  <span className="text-green-600 dark:text-green-400">${trip.budget.toFixed(0)}</span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-green-600 font-medium dark:text-green-400">
+                              {trip.items.filter(i => i.checked).length}/{trip.items.length}
+                            </span>
+                          </div>
+                          
+                          {/* Compact Progress bar */}
+                          {trip.items.length > 0 && (
+                            <Progress value={(trip.items.filter(i => i.checked).length / trip.items.length) * 100} className="h-1" />
+                          )}
+
+                          {/* Show first few items in a more compact way */}
+                          {trip.items.length > 0 && (
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              <span className="font-medium">Items: </span>
+                              {trip.items.slice(0, 3).map((item, index) => (
+                                <span key={item.id} className={item.checked ? 'line-through text-gray-400 dark:text-gray-500' : ''}>
+                                  {item.name}{index < Math.min(2, trip.items.length - 1) ? ', ' : ''}
+                                </span>
+                              ))}
+                              {trip.items.length > 3 && <span className="text-gray-400 dark:text-gray-500"> +{trip.items.length - 3} more</span>}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex justify-between items-center pt-1 pb-2">
+                        <div className="flex -space-x-1">
+                          {(trip.participants || []).slice(0, 2).map(p => (
+                            <Avatar key={p.id} className="h-5 w-5 border border-background">
+                              <AvatarImage src={p.avatar} />
+                              <AvatarFallback className="text-xs">{p.name[0]}</AvatarFallback>
+                            </Avatar>
+                          ))}
+                          {(trip.participants || []).length > 2 && (
+                            <div className="h-5 w-5 rounded-full bg-gray-200 dark:bg-gray-700 border border-background flex items-center justify-center">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">+{(trip.participants || []).length - 2}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-6 w-6 p-0" 
+                            className="h-6 px-2 text-xs hover:scale-105 transition-transform duration-200" 
                             onClick={(e) => { 
                               e.stopPropagation(); 
-                              handleStartTrip(trip.id);
+                              navigate(`/trip/${trip.id}`);
                             }}
-                            title="Start shopping"
                           >
-                            <ShoppingBag className="h-3 w-3" />
+                            Open
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-6 px-2 text-xs hover:scale-105 transition-transform duration-200" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              handleGetDirections();
+                            }}
+                          >
+                            Directions
                           </Button>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pb-2">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center">
-                              <Users className="h-3 w-3 mr-1" />
-                              <span>{(trip.participants || []).length}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <ShoppingCart className="h-3 w-3 mr-1" />
-                              <span>{trip.items.length}</span>
-                            </div>
-                            {trip.budget && (
-                              <div className="flex items-center">
-                                <span className="text-green-600">${trip.budget.toFixed(0)}</span>
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-green-600 font-medium">
-                            {trip.items.filter(i => i.checked).length}/{trip.items.length}
-                          </span>
-                        </div>
-                        
-                        {/* Compact Progress bar */}
-                        {trip.items.length > 0 && (
-                          <Progress value={(trip.items.filter(i => i.checked).length / trip.items.length) * 100} className="h-1" />
-                        )}
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 animate-fade-in">
+                  <p className="text-gray-500 dark:text-gray-400 mb-3 text-sm">No active trips</p>
+                  <Button onClick={() => setIsAddTripDialogOpen(true)} className="h-8 text-sm hover:scale-105 transition-transform duration-200">
+                    <Plus className="h-3 w-3 mr-2" />
+                    Create New Trip
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
 
-                        {/* Show first few items in a more compact way */}
-                        {trip.items.length > 0 && (
-                          <div className="text-xs text-gray-600">
-                            <span className="font-medium">Items: </span>
-                            {trip.items.slice(0, 3).map((item, index) => (
-                              <span key={item.id} className={item.checked ? 'line-through text-gray-400' : ''}>
-                                {item.name}{index < Math.min(2, trip.items.length - 1) ? ', ' : ''}
-                              </span>
-                            ))}
-                            {trip.items.length > 3 && <span className="text-gray-400"> +{trip.items.length - 3} more</span>}
+            <TabsContent value="completed" className="space-y-4">
+              {completedTrips.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {completedTrips.map((trip, index) => (
+                    <Card key={trip.id} className="cursor-pointer hover:shadow-md transition-all duration-300 border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 hover:scale-105 animate-slide-in" style={{animationDelay: `${index * 100}ms`}} onClick={() => handleViewDetails(trip.id)}>
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <CardTitle className="text-base font-semibold dark:text-slate-200">{trip.store}</CardTitle>
+                            <CardDescription className="text-xs text-slate-600 dark:text-slate-400">{new Date(trip.date).toLocaleDateString()} at {trip.time}</CardDescription>
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between items-center pt-1 pb-2">
-                      <div className="flex -space-x-1">
-                        {(trip.participants || []).slice(0, 2).map(p => (
-                          <Avatar key={p.id} className="h-5 w-5 border border-background">
-                            <AvatarImage src={p.avatar} />
-                            <AvatarFallback className="text-xs">{p.name[0]}</AvatarFallback>
-                          </Avatar>
-                        ))}
-                        {(trip.participants || []).length > 2 && (
-                          <div className="h-5 w-5 rounded-full bg-gray-200 border border-background flex items-center justify-center">
-                            <span className="text-xs text-gray-600">+{(trip.participants || []).length - 2}</span>
+                          <Badge variant="secondary" className="text-xs">{trip.status}</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center">
+                                <Users className="h-3 w-3 mr-1" />
+                                <span>{(trip.participants || []).length}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <ShoppingCart className="h-3 w-3 mr-1" />
+                                <span>{trip.items.length}</span>
+                              </div>
+                              {trip.actualSpent && (
+                                <div className="flex items-center">
+                                  <span className="text-green-600 font-medium dark:text-green-400">${trip.actualSpent.toFixed(0)}</span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-green-600 font-medium dark:text-green-400">
+                              {trip.items.filter(i => i.checked).length}/{trip.items.length} completed
+                            </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex gap-1">
+
+                          {/* Show purchased items in a compact way */}
+                          {trip.items.length > 0 && (
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              <span className="font-medium">Purchased: </span>
+                              {trip.items.filter(i => i.checked).slice(0, 3).map((item, index, arr) => (
+                                <span key={item.id}>
+                                  {item.name}{item.price ? ` ($${item.price.toFixed(2)})` : ''}{index < arr.length - 1 ? ', ' : ''}
+                                </span>
+                              ))}
+                              {trip.items.filter(i => i.checked).length > 3 && (
+                                <span className="text-gray-400 dark:text-gray-500"> +{trip.items.filter(i => i.checked).length - 3} more</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex justify-between items-center pt-1 pb-2">
+                        <div className="flex -space-x-1">
+                          {(trip.participants || []).slice(0, 2).map(p => (
+                            <Avatar key={p.id} className="h-5 w-5 border border-background">
+                              <AvatarImage src={p.avatar} />
+                              <AvatarFallback className="text-xs">{p.name[0]}</AvatarFallback>
+                            </Avatar>
+                          ))}
+                          {(trip.participants || []).length > 2 && (
+                            <div className="h-5 w-5 rounded-full bg-gray-200 dark:bg-gray-700 border border-background flex items-center justify-center">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">+{(trip.participants || []).length - 2}</span>
+                            </div>
+                          )}
+                        </div>
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="h-6 px-2 text-xs" 
+                          className="h-6 px-2 text-xs hover:scale-105 transition-transform duration-200" 
                           onClick={(e) => { 
                             e.stopPropagation(); 
                             navigate(`/trip/${trip.id}`);
                           }}
                         >
-                          Open
+                          View Details
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-6 px-2 text-xs" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            handleGetDirections();
-                          }}
-                        >
-                          Directions
-                        </Button>
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-3 text-sm">No active trips</p>
-                <Button onClick={() => setIsAddTripDialogOpen(true)} className="h-8 text-sm">
-                  <Plus className="h-3 w-3 mr-2" />
-                  Create New Trip
-                </Button>
-              </div>
-            )}
-          </TabsContent>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 animate-fade-in">
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">No completed trips</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
 
-          <TabsContent value="completed" className="space-y-4">
-            {completedTrips.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {completedTrips.map(trip => (
-                  <Card key={trip.id} className="cursor-pointer hover:shadow-md transition-shadow border-slate-200 hover:border-slate-300" onClick={() => handleViewDetails(trip.id)}>
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <CardTitle className="text-base font-semibold">{trip.store}</CardTitle>
-                          <CardDescription className="text-xs text-slate-600">{new Date(trip.date).toLocaleDateString()} at {trip.time}</CardDescription>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">{trip.status}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pb-2">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center">
-                              <Users className="h-3 w-3 mr-1" />
-                              <span>{(trip.participants || []).length}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <ShoppingCart className="h-3 w-3 mr-1" />
-                              <span>{trip.items.length}</span>
-                            </div>
-                            {trip.actualSpent && (
-                              <div className="flex items-center">
-                                <span className="text-green-600 font-medium">${trip.actualSpent.toFixed(0)}</span>
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-green-600 font-medium">
-                            {trip.items.filter(i => i.checked).length}/{trip.items.length} completed
-                          </span>
-                        </div>
-
-                        {/* Show purchased items in a compact way */}
-                        {trip.items.length > 0 && (
-                          <div className="text-xs text-gray-600">
-                            <span className="font-medium">Purchased: </span>
-                            {trip.items.filter(i => i.checked).slice(0, 3).map((item, index, arr) => (
-                              <span key={item.id}>
-                                {item.name}{item.price ? ` ($${item.price.toFixed(2)})` : ''}{index < arr.length - 1 ? ', ' : ''}
-                              </span>
-                            ))}
-                            {trip.items.filter(i => i.checked).length > 3 && (
-                              <span className="text-gray-400"> +{trip.items.filter(i => i.checked).length - 3} more</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between items-center pt-1 pb-2">
-                      <div className="flex -space-x-1">
-                        {(trip.participants || []).slice(0, 2).map(p => (
-                          <Avatar key={p.id} className="h-5 w-5 border border-background">
-                            <AvatarImage src={p.avatar} />
-                            <AvatarFallback className="text-xs">{p.name[0]}</AvatarFallback>
-                          </Avatar>
-                        ))}
-                        {(trip.participants || []).length > 2 && (
-                          <div className="h-5 w-5 rounded-full bg-gray-200 border border-background flex items-center justify-center">
-                            <span className="text-xs text-gray-600">+{(trip.participants || []).length - 2}</span>
-                          </div>
-                        )}
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 px-2 text-xs" 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          navigate(`/trip/${trip.id}`);
-                        }}
-                      >
-                        View Details
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500 text-sm">No completed trips</p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      <TripCalendarView 
-        isOpen={isCalendarOpen}
-        onClose={() => setIsCalendarOpen(false)}
-      />
-      
-      <BudgetAdjustmentDialog
-        isOpen={isBudgetDialogOpen}
-        onClose={() => setIsBudgetDialogOpen(false)}
-        currentBudget={monthlyBudget}
-        onSave={handleSaveBudget}
-      />
-
-      <AddTripDialog
-        open={isAddTripDialogOpen}
-        onOpenChange={setIsAddTripDialogOpen}
-      />
-
-      {selectedTrip && (
-        <TripDetailModal
-          isOpen={isDetailModalOpen}
-          onClose={() => setIsDetailModalOpen(false)}
-          trip={selectedTrip}
-          onAddItem={() => {}}
-          onRemoveItem={() => {}}
-          onToggleItemCheck={() => {}}
-          onInviteParticipant={() => {}}
-          onCompleteTrip={() => {}}
+        <TripCalendarView 
+          isOpen={isCalendarOpen}
+          onClose={() => setIsCalendarOpen(false)}
         />
-      )}
+        
+        <BudgetAdjustmentDialog
+          isOpen={isBudgetDialogOpen}
+          onClose={() => setIsBudgetDialogOpen(false)}
+          currentBudget={monthlyBudget}
+          onSave={handleSaveBudget}
+        />
+
+        <AddTripDialog
+          open={isAddTripDialogOpen}
+          onOpenChange={setIsAddTripDialogOpen}
+        />
+
+        {selectedTrip && (
+          <TripDetailModal
+            isOpen={isDetailModalOpen}
+            onClose={() => setIsDetailModalOpen(false)}
+            trip={selectedTrip}
+            onAddItem={() => {}}
+            onRemoveItem={() => {}}
+            onToggleItemCheck={() => {}}
+            onInviteParticipant={() => {}}
+            onCompleteTrip={() => {}}
+          />
+        )}
+      </div>
     </AppLayout>
   );
 } 

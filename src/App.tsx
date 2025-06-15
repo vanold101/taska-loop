@@ -17,6 +17,7 @@ import HomePage from "./pages/Home";
 import TripsPage from "./pages/TripsPage";
 import MapPage from "./pages/Map";
 import PantryPage from "./pages/PantryPage";
+import RecurringItemsPage from "./pages/RecurringItemsPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import LedgerPage from "./pages/Ledger";
@@ -58,7 +59,7 @@ const App = () => {
               <NotificationProvider>
                 <PantryProvider>
                   <HashRouter>
-                    <div className="min-h-screen flex flex-col bg-gradient-radial from-blue-500/15 via-green-500/15 to-purple-500/20 dark:from-blue-900/40 dark:via-green-900/30 dark:to-purple-900/50 animate-gradient-slow relative">
+                    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
                       <div className="pattern-overlay"></div>
                       <UserSwitcher />
                       <Routes>
@@ -137,6 +138,11 @@ const App = () => {
                         } />
                         <Route path="/history" element={
                           <Navigate to="/trips?view=past" replace />
+                        } />
+                        <Route path="/recurring-items" element={
+                          <ProtectedRoute>
+                            <RecurringItemsPage />
+                          </ProtectedRoute>
                         } />
                         
                         {/* Catch all route */}
