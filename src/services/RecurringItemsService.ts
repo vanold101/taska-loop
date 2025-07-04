@@ -31,6 +31,7 @@ export interface RecurringItemProcessingResult {
 export class RecurringItemsService {
   private static instance: RecurringItemsService;
   private templates: RecurringItemTemplate[] = [];
+  private currentUserId: string | null = null;
 
   private constructor() {}
 
@@ -42,13 +43,36 @@ export class RecurringItemsService {
   }
 
   /**
+   * Set the current user ID for user-specific storage
+   */
+  setCurrentUser(userId: string | null): void {
+    this.currentUserId = userId;
+    // Reload templates when user changes
+    if (userId) {
+      this.loadTemplates();
+    } else {
+      this.templates = [];  
+    }
+  }
+
+  /**
+   * Get user-specific storage key
+   */
+  private getStorageKey(): string {
+    return this.currentUserId ? `recurringItemTemplates_${this.currentUserId}` : 'recurringItemTemplates';
+  }
+
+  /**
    * Load recurring item templates from storage
    */
   loadTemplates(): RecurringItemTemplate[] {
     try {
-      const stored = localStorage.getItem('recurringItemTemplates');
+      const stored = localStorage.getItem(this.getStorageKey());
       if (stored) {
         this.templates = JSON.parse(stored);
+      } else {
+        // Start with empty templates for new users
+        this.templates = [];
       }
     } catch (error) {
       console.error('Error loading recurring item templates:', error);
@@ -62,7 +86,7 @@ export class RecurringItemsService {
    */
   private saveTemplates(): void {
     try {
-      localStorage.setItem('recurringItemTemplates', JSON.stringify(this.templates));
+      localStorage.setItem(this.getStorageKey(), JSON.stringify(this.templates));
     } catch (error) {
       console.error('Error saving recurring item templates:', error);
     }

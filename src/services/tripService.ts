@@ -1,9 +1,9 @@
-import { Trip, TripItem } from "@/context/TaskContext";
+import { Trip, Item } from "@/context/TaskContext";
 import { recordStoreVisit } from "@/services/StoreAnalyticsService";
 
 // Constants
 const TRIPS_STORAGE_KEY = 'taska_trips';
-const DEFAULT_AVATAR = '/img/default-avatar.png'; // Placeholder for default avatar
+const DEFAULT_AVATAR = 'https://ui-avatars.com/api/?name=User&background=random'; // Better default avatar
 const DEFAULT_ADDED_BY_USER = { name: 'System', avatar: DEFAULT_AVATAR }; // Placeholder for addedBy user object
 
 // Types
@@ -76,7 +76,7 @@ export const addTrip = (data: CreateTripData): Trip => {
     status: 'open',
     items: [],
     participants: data.participants?.map(p => ({ id: p.id, name: p.name, avatar: p.avatar || DEFAULT_AVATAR })) || [],
-    shopper: data.shopper ? { name: data.shopper.name, avatar: data.shopper.avatar || DEFAULT_AVATAR } : undefined,
+    shopper: data.shopper ? { name: data.shopper.name, avatar: data.shopper.avatar || DEFAULT_AVATAR } : { name: 'User', avatar: DEFAULT_AVATAR },
     date: new Date().toISOString(),
   };
   
@@ -163,7 +163,7 @@ export const addItemToTrip = (tripId: string, itemData: CreateTripItemData): Tri
   if (index === -1) return null;
   
   const trip = trips[index];
-  const newItem: TripItem = {
+  const newItem: Item = {
     id: Date.now().toString(),
     name: itemData.name,
     quantity: itemData.quantity || 1,
@@ -184,7 +184,7 @@ export const addItemToTrip = (tripId: string, itemData: CreateTripItemData): Tri
 export const updateTripItem = (
   tripId: string,
   itemId: string,
-  updates: Partial<Omit<TripItem, 'id'>>
+  updates: Partial<Omit<Item, 'id'>>
 ): Trip | null => {
   const trips = loadTrips();
   const tripIndex = trips.findIndex(t => t.id === tripId);

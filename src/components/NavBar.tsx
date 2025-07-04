@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ShoppingCart, Home, Map, User, Wallet, LayoutDashboard, Package, Plus } from "lucide-react";
+import { ShoppingCart, Home, Map, User, Wallet, LayoutDashboard, Package, Plus, MoreHorizontal } from "lucide-react";
 import { cn, haptics } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import DarkModeToggle from './DarkModeToggle';
 import NotificationCenter, { Notification } from './NotificationCenter';
 import { useToast } from "@/hooks/use-toast";
 import FileSystemNavigation from './FileSystemNavigation';
+import { useAuth } from '@/context/AuthContext';
 
 interface NavBarProps {
   activeItem?: string;
@@ -18,42 +19,62 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
   const [activeItem, setActiveItem] = useState(propActiveItem || location.pathname);
   const [showMenu, setShowMenu] = useState(false);
   const { toast } = useToast();
+  const { user, isAdmin } = useAuth();
   const isHomePage = location.pathname === '/home' || location.pathname === '/';
 
-  // Mock notifications
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'info',
-      title: 'Rachel added a new item',
-      message: 'Rachel added "Milk" to your shopping trip to Trader Joe\'s',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
-      read: false,
-      actionText: 'View Trip',
-      actionUrl: '/trips',
-      sender: {
-        name: 'Rachel',
-      }
-    },
-    {
-      id: '2',
-      type: 'success',
-      title: 'Trip Completed',
-      message: 'Your shopping trip to Kroger has been completed successfully',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      read: true
-    },
-    {
-      id: '3',
-      type: 'warning',
-      title: 'Item running low',
-      message: 'Pasta is running low in your pantry. Add it to your next shopping trip?',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      read: false,
-      actionText: 'Add to Trip',
-      actionUrl: '/trips/new'
+  // Notifications based on admin status
+  const [notifications, setNotifications] = useState<Notification[]>(() => {
+    if (isAdmin) {
+      // Admin accounts get example notifications for testing
+      return [
+        {
+          id: '1',
+          type: 'info',
+          title: 'Rachel added a new item',
+          message: 'Rachel added "Milk" to your shopping trip to Trader Joe\'s',
+          timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
+          read: false,
+          actionText: 'View Trip',
+          actionUrl: '/trips',
+          sender: {
+            name: 'Rachel',
+          }
+        },
+        {
+          id: '2',
+          type: 'success',
+          title: 'Trip Completed',
+          message: 'Your shopping trip to Kroger has been completed successfully',
+          timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+          read: true
+        },
+        {
+          id: '3',
+          type: 'warning',
+          title: 'Item running low',
+          message: 'Pasta is running low in your pantry. Add it to your next shopping trip?',
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+          read: false,
+          actionText: 'Add to Trip',
+          actionUrl: '/trips'
+        }
+      ];
+    } else {
+      // Regular users get welcome/onboarding notifications
+      return [
+        {
+          id: 'welcome-1',
+          type: 'info',
+          title: 'Welcome to TaskaLoop!',
+          message: 'Start by creating your first shopping trip or adding items to your pantry',
+          timestamp: new Date(Date.now() - 1000 * 60 * 10), // 10 minutes ago
+          read: false,
+          actionText: 'Create Trip',
+          actionUrl: '/trips'
+        }
+      ];
     }
-  ]);
+  });
 
   // Update active item when location or propActiveItem changes
   useEffect(() => {

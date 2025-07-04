@@ -40,26 +40,36 @@ export interface UserBalance {
   netBalance: number; // owedAmount - owesAmount
 }
 
-// Ledger storage key
-const LEDGER_STORAGE_KEY = 'taska_ledger_transactions';
+// Ledger storage key - now user-specific
+let currentUserId: string | null = null;
+
+const getLedgerStorageKey = () => {
+  return currentUserId ? `taska_ledger_transactions_${currentUserId}` : 'taska_ledger_transactions';
+};
+
+// Set current user for user-specific storage
+export const setCurrentUser = (userId: string | null) => {
+  currentUserId = userId;
+};
 
 // Load transactions from storage
 export const loadTransactions = (): Transaction[] => {
   try {
-    const stored = localStorage.getItem(LEDGER_STORAGE_KEY);
+    const stored = localStorage.getItem(getLedgerStorageKey());
     if (stored) {
       return JSON.parse(stored);
     }
   } catch (error) {
     console.error('Failed to load ledger transactions:', error);
   }
+  // Start with empty transactions for new users
   return [];
 };
 
 // Save transactions to storage
 export const saveTransactions = (transactions: Transaction[]): void => {
   try {
-    localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(transactions));
+    localStorage.setItem(getLedgerStorageKey(), JSON.stringify(transactions));
   } catch (error) {
     console.error('Failed to save ledger transactions:', error);
   }

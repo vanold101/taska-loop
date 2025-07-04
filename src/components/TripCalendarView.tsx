@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const locales = {
   'en-US': enUS
@@ -93,6 +94,7 @@ const getEventTime = (timeStr?: string): number => {
 
 export default function TripCalendarView({ isOpen, onClose }: TripCalendarViewProps) {
   const { trips, addTrip, updateTrip } = useTaskContext();
+  const { user } = useAuth();
   const [view, setView] = useState<View>('month');
   const [date, setDate] = useState(new Date());
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -125,9 +127,9 @@ export default function TripCalendarView({ isOpen, onClose }: TripCalendarViewPr
           notes: newItem.notes,
           checked: false,
           addedBy: {
-            name: "You",
+            name: user?.name || "User",
             id: "current-user",
-            avatar: "https://api.dicebear.com/7.x/avatars/svg?seed=current-user"
+            avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
           },
           addedAt: new Date().toISOString()
         } as Item
@@ -144,7 +146,7 @@ export default function TripCalendarView({ isOpen, onClose }: TripCalendarViewPr
       description: `${newItem.name} has been added to your trip.`,
       variant: "default"
     });
-  }, [selectedTrip, newItem, updateTrip]);
+  }, [selectedTrip, newItem, updateTrip, user]);
 
   // Convert trips to calendar events with proper time slots
   const events = trips.map(trip => {

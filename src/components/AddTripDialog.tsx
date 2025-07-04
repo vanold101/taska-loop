@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon, MapPin, X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AddTripDialogProps {
   open: boolean;
@@ -38,6 +40,8 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
 
   // Context
   const { addTrip } = useTaskContext();
+  const { toast } = useToast();
+  const { user, isAdmin } = useAuth();
 
   // Initialize Google Places services
   useEffect(() => {
@@ -159,32 +163,69 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validate required fields
-    if (!store || !date) {
+    
+    if (!store || !date || !time) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields (Store and Date)",
-        variant: "destructive"
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
       });
       return;
     }
 
     try {
-      setIsSubmitting(true);
+      // Create participants array based on admin status
+      let participants;
+      let shopper;
 
-      // Create trip object
+      if (isAdmin) {
+        // Admin accounts get example participants for testing
+        participants = [
+          { 
+            id: user?.id || '1', 
+            name: user?.name || 'You', 
+            avatar: user?.avatar || 'https://i.pravatar.cc/150?u=a042581f4e29026024d' 
+          },
+          { 
+            id: '2', 
+            name: 'Rachel', 
+            avatar: 'https://i.pravatar.cc/150?u=rachel' 
+          },
+          { 
+            id: '3', 
+            name: 'Dev', 
+            avatar: 'https://i.pravatar.cc/150?u=dev' 
+          }
+        ];
+        shopper = { 
+          name: user?.name || 'You', 
+          avatar: user?.avatar || 'https://i.pravatar.cc/150?u=a042581f4e29026024d' 
+        };
+      } else {
+        // Regular users only get themselves
+        participants = [{ 
+          id: user?.id || '1', 
+          name: user?.name || 'User', 
+          avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+        }];
+        shopper = { 
+          name: user?.name || 'User', 
+          avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+        };
+      }
+
       const tripData = {
         store,
         date: date.toISOString(),
-        time: time || undefined,
-        eta: duration,
-        budget: budget ? parseFloat(budget) : undefined,
+        time,
         notes,
-        location: store,
-        coordinates: coordinates || undefined,
-        participants: [{ id: '1', name: 'You', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026024d' }],
-        shopper: { name: 'You', avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026024d' }
+        budget: budget ? parseFloat(budget) : undefined,
+        eta: duration,
+        location: "",
+        coordinates: { lat: 0, lng: 0 },
+        participants,
+        shopper,
+        items: [] as any[]
       };
 
       // Add trip

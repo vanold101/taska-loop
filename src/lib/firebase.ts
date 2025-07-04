@@ -21,6 +21,7 @@ import {
   signOut, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
+  updateProfile,
   connectAuthEmulator,
   GoogleAuthProvider,
   signInWithPopup
@@ -77,8 +78,10 @@ const storage = getStorage(app);
 // Check if we're in development mode
 const isDev = isDevelopment();
 
-// Flag to control whether to use auth emulator (set to false for real Google login)
+// Flags to control whether to use emulators (set to false for real Firebase services)
 const USE_AUTH_EMULATOR = false; // Disabled to use real Firebase auth
+const USE_FIRESTORE_EMULATOR = false; // Disabled to use real Firebase Firestore
+const USE_STORAGE_EMULATOR = false; // Disabled to use real Firebase Storage
 
 // Connect to emulators in development mode
 if (isDev) {
@@ -87,8 +90,16 @@ if (isDev) {
     if (USE_AUTH_EMULATOR) {
       connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
     }
-    connectFirestoreEmulator(db, 'localhost', 8081);
-    connectStorageEmulator(storage, 'localhost', 9199);
+    
+    // Only connect Firestore emulator if flag is enabled
+    if (USE_FIRESTORE_EMULATOR) {
+      connectFirestoreEmulator(db, 'localhost', 8081);
+    }
+    
+    // Only connect Storage emulator if flag is enabled
+    if (USE_STORAGE_EMULATOR) {
+      connectStorageEmulator(storage, 'localhost', 9199);
+    }
   } catch (error) {
     // Silent fail - emulators might not be running
     console.log('Emulator connection failed, using production services');
@@ -141,6 +152,7 @@ export {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
   getToken,

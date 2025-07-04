@@ -43,12 +43,16 @@ export function calculateNextDueDate(lastDueDate: string | Date, frequency: Recu
  * @param existingTrips Current trips from the context
  * @param onAddItemToTrip Callback to add item to existing trip
  * @param onCreateTrip Callback to create new trip with items
+ * @param user Current authenticated user
+ * @param isAdmin Whether the current user is an admin
  * @returns Processing results with statistics
  */
 export function processRecurringItems(
   existingTrips: Trip[],
   onAddItemToTrip: (tripId: string, item: any) => void,
-  onCreateTrip: (tripData: any) => void
+  onCreateTrip: (tripData: any) => void,
+  user?: { id: string; name: string; avatar?: string },
+  isAdmin: boolean = false
 ): {
   itemsProcessed: number;
   tripsUpdated: number;
@@ -85,6 +89,46 @@ export function processRecurringItems(
       }
     }
 
+    // Create participants array based on admin status
+    let participants;
+    let shopper;
+
+    if (isAdmin) {
+      // Admin accounts get example participants for testing
+      participants = [
+        { 
+          id: user?.id || '1', 
+          name: user?.name || 'You', 
+          avatar: user?.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'You') + '&background=random'
+        },
+        { 
+          id: '2', 
+          name: 'Rachel', 
+          avatar: 'https://ui-avatars.com/api/?name=Rachel&background=ff6b6b'
+        },
+        { 
+          id: '3', 
+          name: 'Dev', 
+          avatar: 'https://ui-avatars.com/api/?name=Dev&background=4ecdc4'
+        }
+      ];
+      shopper = { 
+        name: user?.name || 'You', 
+        avatar: user?.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'You') + '&background=random'
+      };
+    } else {
+      // Regular users only get themselves - no sample participants
+      participants = [{ 
+        id: user?.id || '1', 
+        name: user?.name || 'User', 
+        avatar: user?.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'User') + '&background=random'
+      }];
+      shopper = { 
+        name: user?.name || 'User', 
+        avatar: user?.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'User') + '&background=random'
+      };
+    }
+
     // Create new trips for items that don't have a target trip
     for (const newTrip of result.newTripsToCreate) {
       try {
@@ -93,14 +137,12 @@ export function processRecurringItems(
           date: new Date().toISOString(),
           time: "10:00",
           status: 'open' as const,
-          items: newTrip.items.map(item => ({
+          items: newTrip.items.map((item: any) => ({
             ...item,
             id: Date.now().toString() + Math.random().toString(36).substring(2)
           })),
-          participants: [
-            { id: '1', name: 'You', avatar: "https://example.com/you.jpg" }
-          ],
-          shopper: { name: 'You', avatar: 'https://example.com/you.jpg' },
+          participants,
+          shopper,
           notes: 'Auto-created for recurring items'
         };
         
@@ -133,13 +175,15 @@ export function processRecurringItems(
 export function initializeRecurringItemsProcessing(
   getTrips: () => Trip[],
   onAddItemToTrip: (tripId: string, item: any) => void,
-  onCreateTrip: (tripData: any) => void
+  onCreateTrip: (tripData: any) => void,
+  user?: { id: string; name: string; avatar?: string },
+  isAdmin: boolean = false
 ): () => void {
   console.log('Initializing recurring items processing...');
   
   // Process immediately on initialization
   const initialTrips = getTrips();
-  processRecurringItems(initialTrips, onAddItemToTrip, onCreateTrip);
+  processRecurringItems(initialTrips, onAddItemToTrip, onCreateTrip, user, isAdmin);
   
   // Set up daily processing at 8 AM
   const scheduleNextProcessing = () => {
@@ -152,7 +196,7 @@ export function initializeRecurringItemsProcessing(
     
     return setTimeout(() => {
       const currentTrips = getTrips();
-      processRecurringItems(currentTrips, onAddItemToTrip, onCreateTrip);
+      processRecurringItems(currentTrips, onAddItemToTrip, onCreateTrip, user, isAdmin);
       
       // Schedule the next processing
       scheduleNextProcessing();

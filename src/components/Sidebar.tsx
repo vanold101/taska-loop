@@ -22,6 +22,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { cn } from "../lib/utils";
+import { useAuth } from "../context/AuthContext";
 
 // Define the sidebar context type
 type SidebarContextType = {
@@ -112,6 +113,8 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isOpen, closeSidebar } = useSidebar();
+  const { user, isAdmin } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
   const path = location.pathname;
 
   // Close sidebar on navigation on mobile
@@ -181,8 +184,10 @@ export function Sidebar() {
           <div className="flex items-center gap-3">
             <div onClick={() => handleNavigation("/profile")} className="cursor-pointer">
               <Avatar>
-                <AvatarImage src="/placeholder.svg?height=40&width=40" />
-                <AvatarFallback className="bg-teal-100 text-teal-700">JD</AvatarFallback>
+                <AvatarImage src={user?.avatar} />
+                <AvatarFallback className="bg-teal-100 text-teal-700">
+                  {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
               </Avatar>
             </div>
             <div className="flex-1 min-w-0">
@@ -190,9 +195,9 @@ export function Sidebar() {
                 onClick={() => handleNavigation("/profile")} 
                 className="text-sm font-medium text-slate-700 truncate cursor-pointer hover:underline"
               >
-                Jane Doe
+                {user?.name || "User"}
               </p>
-              <p className="text-xs text-slate-500 truncate">jane.doe@example.com</p>
+              <p className="text-xs text-slate-500 truncate">{user?.email || "No email"}</p>
             </div>
             <Button 
               variant="ghost" 

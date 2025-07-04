@@ -43,58 +43,6 @@ export interface PantryItem {
   lowStock: boolean;
 }
 
-// Mock pantry items for demo
-const mockPantryItems: PantryItem[] = [
-  {
-    id: '1',
-    name: 'Milk',
-    quantity: 1,
-    expiry: '2025-05-05',
-    category: 'Dairy',
-    lowStock: true
-  },
-  {
-    id: '2',
-    name: 'Eggs',
-    quantity: 6,
-    expiry: '2025-05-10',
-    category: 'Dairy',
-    lowStock: false
-  },
-  {
-    id: '3',
-    name: 'Bread',
-    quantity: 3,
-    expiry: '2025-05-04',
-    category: 'Bakery',
-    lowStock: false
-  },
-  {
-    id: '4',
-    name: 'Bananas',
-    quantity: 2,
-    expiry: '2025-05-03',
-    category: 'Produce',
-    lowStock: true
-  },
-  {
-    id: '5',
-    name: 'Pasta',
-    quantity: 4,
-    expiry: '2025-07-15',
-    category: 'Pantry',
-    lowStock: false
-  },
-  {
-    id: '6',
-    name: 'Tomato Sauce',
-    quantity: 1,
-    expiry: '2025-08-20',
-    category: 'Pantry',
-    lowStock: true
-  }
-];
-
 // Category icons mapping
 const categoryIcons: Record<string, React.ReactNode> = {
   'Dairy': <Refrigerator className="h-4 w-4 text-blue-500" />,
@@ -124,11 +72,12 @@ const COMMON_CATEGORIES = [
 ];
 
 const PantryPage = () => {
+  const { toast } = useToast();
   console.log("PantryPage component rendering");
   
   const [isLoaded, setIsLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [pantryItems, setPantryItems] = useState<PantryItem[]>(mockPantryItems);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
@@ -141,7 +90,6 @@ const PantryPage = () => {
     category: 'Pantry',
     lowStock: false
   });
-  const { toast } = useToast();
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number}>({ lat: 39.9622, lng: -83.0007 }); // Default to Columbus
 
   // Add debug logging for state changes
@@ -158,7 +106,7 @@ const PantryPage = () => {
     setIsLoaded(true);
     
     // Initialize all categories as expanded by default
-    const categories = Array.from(new Set(mockPantryItems.map(item => item.category)));
+    const categories = Array.from(new Set(pantryItems.map(item => item.category)));
     const initialExpandedState = categories.reduce((acc, category) => {
       acc[category] = true;
       return acc;
@@ -224,41 +172,20 @@ const PantryPage = () => {
     
     if (matchedItem) {
       // Find the item in the pantry
-      setPantryItems(currentItems => {
-        const existingItem = currentItems.find(
-          item => item.name.toLowerCase() === matchedItem.name.toLowerCase()
-        );
-        
-        if (existingItem) {
-          // Update quantity
-          toast({
-            title: "Quantity Updated",
-            description: `${matchedItem.name} quantity has been increased by ${matchedItem.quantity}.`
-          });
-          
-          return currentItems.map(item => 
-            item.id === existingItem.id
-              ? { ...item, quantity: item.quantity + matchedItem.quantity }
-              : item
-          );
-        }
-        
-        // Create new item
-        const newItem: PantryItem = {
+      setPantryItems(prevItems => [
+        ...prevItems,
+        {
           id: Date.now().toString(),
           name: matchedItem.name,
           quantity: matchedItem.quantity,
-          expiry: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
-          category: 'Pantry', // Default category
+          expiry: new Date().toISOString().split('T')[0],
+          category: 'Pantry',
           lowStock: matchedItem.quantity <= 1
-        };
-        
-        toast({
-          title: "New Item Added",
-          description: `${matchedItem.name} has been added to your pantry.`
-        });
-        
-        return [...currentItems, newItem];
+        }
+      ]);
+      toast({
+        title: "Quantity Updated",
+        description: `${matchedItem.name} quantity has been increased by ${matchedItem.quantity}.`
       });
     } else {
       toast({
@@ -310,32 +237,7 @@ const PantryPage = () => {
     };
 
     // Update state using functional update to ensure we have the latest state
-    setPantryItems(currentItems => {
-      // Check if item already exists
-      const existingItem = currentItems.find(
-        existing => existing.name.toLowerCase() === item.name.toLowerCase()
-      );
-
-      if (existingItem) {
-        toast({
-          title: "Item Updated",
-          description: `${item.name} quantity has been updated in your pantry.`
-        });
-        
-        return currentItems.map(existing =>
-          existing.id === existingItem.id
-            ? { ...existing, quantity: existing.quantity + (item.quantity || 1) }
-            : existing
-        );
-      } else {
-        toast({
-          title: "Item Added",
-          description: `${item.name} has been added to your pantry.`
-        });
-        
-        return [...currentItems, item];
-      }
-    });
+    setPantryItems(prevItems => [...prevItems, item]);
 
     // Reset form and close dialog
     setNewItem({
@@ -351,75 +253,46 @@ const PantryPage = () => {
   // Handle adding item via barcode scanner
   const handleAddPantryItem = (item: PantryItem) => {
     // Check if item already exists by name
-    setPantryItems(currentItems => {
-      const existingItem = currentItems.find(
-        existing => existing.name.toLowerCase() === item.name.toLowerCase()
-      );
-
-      if (existingItem) {
-        // Update existing item quantity
-        toast({
-          title: "Item Updated",
-          description: `${item.name} has been updated in your pantry.`
-        });
-        return currentItems.map(existing => 
-          existing.id === existingItem.id 
-            ? { ...existing, quantity: existing.quantity + item.quantity }
-            : existing
-        );
-      } else {
-        // Add as new item
-        toast({
-          title: "Item Added",
-          description: `${item.name} has been added to your pantry.`
-        });
-        return [...currentItems, item];
-      }
-    });
+    setPantryItems(prevItems => [...prevItems, item]);
   };
 
   // Increase item quantity
   const handleIncreaseQuantity = (itemId: string, amount = 1) => {
-    setPantryItems(currentItems => 
-      currentItems.map(item => {
-        if (item.id === itemId) {
-          const newQuantity = item.quantity + amount;
-          return {
-            ...item,
-            quantity: newQuantity,
-            lowStock: newQuantity <= 1
-          };
-        }
-        return item;
-      })
-    );
-
-    toast({
-      title: "Quantity Updated",
-      description: "Item quantity has been increased."
-    });
+    const item = pantryItems.find(item => item.id === itemId);
+    if (item) {
+      const newQuantity = item.quantity + amount;
+      setPantryItems(prevItems => prevItems.map(i =>
+        i.id === itemId ? { ...i, quantity: newQuantity, lowStock: newQuantity <= 1 } : i
+      ));
+      
+      toast({
+        title: "Quantity Updated",
+        description: `${item.name} quantity increased to ${newQuantity}.`
+      });
+    }
   };
 
   // Decrease item quantity
   const handleDecreaseQuantity = (itemId: string) => {
-    setPantryItems(currentItems => {
-      const updatedItems = currentItems.map(item => {
-        if (item.id === itemId) {
-          const newQuantity = Math.max(0, item.quantity - 1);
-          if (newQuantity === 0) {
-            return null;
-          }
-          return {
-            ...item,
-            quantity: newQuantity,
-            lowStock: newQuantity <= 1
-          };
-        }
-        return item;
-      }).filter(Boolean) as PantryItem[];
-
-      return updatedItems;
-    });
+    const item = pantryItems.find(item => item.id === itemId);
+    if (item) {
+      const newQuantity = Math.max(0, item.quantity - 1);
+      if (newQuantity === 0) {
+        setPantryItems(prevItems => prevItems.filter(i => i.id !== itemId));
+        toast({
+          title: "Item Removed",
+          description: `${item.name} has been removed from your pantry.`
+        });
+      } else {
+        setPantryItems(prevItems => prevItems.map(i =>
+          i.id === itemId ? { ...i, quantity: newQuantity, lowStock: newQuantity <= 1 } : i
+        ));
+        toast({
+          title: "Quantity Updated",
+          description: `${item.name} quantity decreased to ${newQuantity}.`
+        });
+      }
+    }
   };
 
   // Add item to shopping list
@@ -432,19 +305,7 @@ const PantryPage = () => {
 
   // Delete item from pantry
   const handleDeleteItem = (itemId: string) => {
-    setPantryItems(currentItems => {
-      const itemToDelete = currentItems.find(item => item.id === itemId);
-      const updatedItems = currentItems.filter(item => item.id !== itemId);
-      
-      if (itemToDelete) {
-        toast({
-          title: "Item Removed",
-          description: `${itemToDelete.name} has been removed from your pantry.`
-        });
-      }
-      
-      return updatedItems;
-    });
+    setPantryItems(prevItems => prevItems.filter(item => item.id !== itemId));
   };
 
   // Safety check for potentially undefined values
@@ -466,13 +327,22 @@ const PantryPage = () => {
   // Get unique categories for filter buttons
   const categories = Array.from(new Set(pantryItems.map(item => item.category)));
 
-  // Calculate days until expiry
+  // Calculate days until expiry with proper negative handling
   const getDaysUntilExpiry = (expiryDate: string) => {
+    if (!expiryDate) return null;
+    
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+    
     const expiry = new Date(expiryDate);
+    expiry.setHours(0, 0, 0, 0); // Reset time to start of day
+    
+    if (isNaN(expiry.getTime())) return null; // Invalid date
+    
     const diffTime = expiry.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    
+    return diffDays; // Can be negative for expired items
   };
 
   console.log("PantryItems:", pantryItems);
@@ -494,6 +364,7 @@ const PantryPage = () => {
 
   // Add function to clear the pantry (for testing the empty state)
   const handleClearPantry = () => {
+    // Remove all items
     setPantryItems([]);
     toast({
       title: "Pantry Cleared",
@@ -801,8 +672,8 @@ const PantryPage = () => {
                     <div className="space-y-3">
                       {items.map((item) => {
                         const daysUntilExpiry = getDaysUntilExpiry(item.expiry);
-                        const isExpiringSoon = daysUntilExpiry <= 3 && daysUntilExpiry > 0;
-                        const isExpired = daysUntilExpiry <= 0;
+                        const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 3 && daysUntilExpiry > 0;
+                        const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
                         
                         return (
                           <motion.div 
@@ -818,8 +689,12 @@ const PantryPage = () => {
                                     <div className="flex items-center text-sm text-gloop-text-muted mt-1">
                                       <Calendar className="h-3 w-3 mr-1" />
                                       <span>
-                                        {isExpired ? (
-                                          <span className="text-red-500">Expired</span>
+                                        {daysUntilExpiry === null ? (
+                                          <span className="text-gray-500">No expiry date</span>
+                                        ) : isExpired ? (
+                                          <span className="text-red-500">
+                                            {Math.abs(daysUntilExpiry) === 0 ? "Expired today" : `Expired ${Math.abs(daysUntilExpiry)} days ago`}
+                                          </span>
                                         ) : isExpiringSoon ? (
                                           <span className="text-amber-500">Expires in {daysUntilExpiry} days</span>
                                         ) : (

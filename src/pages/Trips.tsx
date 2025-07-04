@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import CreateTripModal from "@/components/CreateTripModal";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Clock, CheckCircle, Store as StoreIcon, ShoppingCart, Map, Calendar, Settings, X, Sparkles, ScanLine, DollarSign, Plus, MapPin } from "lucide-react";
+import { Search, Filter, Clock, CheckCircle, Store as StoreIcon, ShoppingCart, Map, Calendar, Settings, X, Sparkles, ScanLine, DollarSign, Plus, MapPin, CheckSquare, ArrowRight, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import QuickTripButton from "@/components/QuickTripButton";
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import EditTripModal from "@/components/EditTripModal";
 import TripCalendarView from '@/components/TripCalendarView';
 import TripMapView from '@/components/TripMapView';
-import { useTaskContext, Trip as ContextTrip } from "@/context/TaskContext";
+import { useTaskContext, Trip as ContextTrip, Task } from "@/context/TaskContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createSettlementTransaction, createPaymentTransaction, confirmPayment } from "@/services/LedgerService";
 import { calculateSplitAmounts, loadSplitConfig } from "@/services/CostSplitService";
@@ -34,6 +34,7 @@ import { haptics } from "@/lib/haptics";
 import type { Store as StoreType } from "@/types/store";
 import { ActiveTripAnimation } from "@/components/ActiveTripAnimation";
 import { findStoreByName } from '@/data/stores';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // New component for trip selection dialog
 const TripSelectDialog = ({ 
@@ -113,10 +114,13 @@ const TripsPage = () => {
   // Use the shared context for trips and tasks
   const { 
     trips: contextTrips, 
+    tasks,
     addTrip: addContextTrip, 
     updateTrip: updateContextTrip, 
     deleteTrip: deleteContextTrip, 
-    syncTasksWithTrips 
+    syncTasksWithTrips,
+    deleteTask,
+    updateTask
   } = useTaskContext();
   
   const navigate = useNavigate();
@@ -738,6 +742,21 @@ const TripsPage = () => {
     haptics.heavy();
   };
 
+  const handleSyncTasks = () => {
+    const stats = syncTasksWithTrips();
+    toast({
+      title: "Tasks Synced",
+      description: `${stats.tasksProcessed} tasks processed. Created ${stats.tripsCreated} trips, updated ${stats.tripsUpdated} trips.`,
+    });
+  };
+
+  // Filter tasks with locations that could become trips
+  const locationTasks = tasks.filter(task => 
+    task.location && 
+    task.coordinates &&
+    !task.completed
+  );
+
   // Add state for active trip
   const [activeTrip, setActiveTrip] = useState<TripData | null>(null);
 
@@ -900,6 +919,9 @@ const TripsPage = () => {
             <TabsTrigger value="active" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm">
               <span>Active Trips</span>
             </TabsTrigger>
+            <TabsTrigger value="tasks" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm">
+              <span>Tasks</span>
+            </TabsTrigger>
             <TabsTrigger value="past" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm">
               <span>Past Trips</span>
             </TabsTrigger>
@@ -971,6 +993,249 @@ const TripsPage = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+          </TabsContent>
+          
+          <TabsContent value="tasks" className="mt-0">
+            <div className="space-y-6">
+              {/* Tasks Header */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold flex items-center">
+                    <CheckSquare className="h-5 w-5 mr-2 text-blue-500" />
+                    Location-Based Tasks
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Manage tasks with locations that can be synced with shopping trips
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSyncTasks}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    disabled={locationTasks.length === 0}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Sync with Trips
+                  </Button>
+                  <Button 
+                    onClick={() => setTripModalOpen(true)}
+                    className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Task
+                  </Button>
+                </div>
+              </div>
+
+              {/* Sync Status Card */}
+              {locationTasks.length > 0 && (
+                <Card className="border-blue-200 bg-blue-50/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <ArrowRight className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-blue-900">
+                            {locationTasks.length} tasks can be synced with trips
+                          </h3>
+                          <p className="text-sm text-blue-700">
+                            Tasks with store locations will be automatically converted to shopping lists
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={handleSyncTasks}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        Sync Now
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tasks Grid */}
+              {locationTasks.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {locationTasks.map((task) => (
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 dark:border-gray-700 p-4 group"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-lg mb-1">{task.title}</h3>
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">{task.location}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant="outline" 
+                            className={`${
+                              task.priority === 'high' ? 'border-red-300 text-red-700 bg-red-50' :
+                              task.priority === 'medium' ? 'border-yellow-300 text-yellow-700 bg-yellow-50' :
+                              'border-green-300 text-green-700 bg-green-50'
+                            }`}
+                          >
+                            {task.priority}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <Calendar className="h-3 w-3" />
+                          <span>Due: {format(new Date(task.dueDate), 'MMM d, yyyy')}</span>
+                        </div>
+                        {task.notes && (
+                          <p className="text-sm text-gray-600 line-clamp-2">{task.notes}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => updateTask(task.id, { completed: !task.completed })}
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              task.completed 
+                                ? 'bg-green-500 border-green-500 text-white' 
+                                : 'border-gray-300 hover:border-green-400'
+                            }`}
+                          >
+                            {task.completed && <CheckSquare className="h-3 w-3" />}
+                          </button>
+                          <span className={`text-sm ${task.completed ? 'line-through text-gray-500' : ''}`}>
+                            {task.completed ? 'Completed' : 'Mark Complete'}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteTask(task.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => {
+                            // Find if there's already a trip for this location
+                            const existingTrip = contextTrips.find(trip => 
+                              trip.status === 'open' && 
+                              trip.store.toLowerCase().includes(task.location.toLowerCase().split(' ')[0])
+                            );
+                            
+                            if (existingTrip) {
+                              toast({
+                                title: "Trip exists",
+                                description: `There's already a trip to ${existingTrip.store}`,
+                              });
+                            } else {
+                              const tripData = {
+                                store: task.location,
+                                date: new Date().toISOString(),
+                                time: '12:00',
+                                items: [{
+                                  id: `task_${task.id}`,
+                                  name: task.title,
+                                  quantity: 1,
+                                  checked: false,
+                                  category: 'Task',
+                                  notes: `From task: ${task.notes || ''}`,
+                                  addedBy: {
+                                    name: 'User',
+                                    avatar: 'https://ui-avatars.com/api/?name=User&background=random'
+                                  }
+                                }],
+                                notes: `Created from task: ${task.title}`,
+                                eta: '30 minutes',
+                                coordinates: task.coordinates,
+                                participants: [{ 
+                                  id: '1', 
+                                  name: 'User', 
+                                  avatar: 'https://ui-avatars.com/api/?name=User&background=random'
+                                }],
+                                shopper: {
+                                  name: 'User',
+                                  avatar: 'https://ui-avatars.com/api/?name=User&background=random'
+                                }
+                              };
+                              
+                              addContextTrip(tripData);
+                              toast({
+                                title: "Trip created",
+                                description: `Created shopping trip to ${task.location}`,
+                              });
+                            }
+                          }}
+                        >
+                          <ShoppingCart className="h-3 w-3 mr-1" />
+                          Create Trip
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => {
+                            if (task.coordinates) {
+                              const url = `https://www.google.com/maps/dir/?api=1&destination=${task.coordinates.lat},${task.coordinates.lng}`;
+                              window.open(url, '_blank');
+                            }
+                          }}
+                        >
+                          <MapPin className="h-3 w-3 mr-1" />
+                          Directions
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-dashed border-gray-200 dark:border-gray-700"
+                >
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500/20 to-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckSquare className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">No location-based tasks</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 max-w-md mx-auto">
+                    Create tasks with store locations to sync them with your shopping trips automatically
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button 
+                      onClick={() => setTripModalOpen(true)}
+                      variant="outline"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Task
+                    </Button>
+                    <Button 
+                      onClick={() => setTripModalOpen(true)}
+                      className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
+                    >
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Create Trip
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </TabsContent>
           
           <TabsContent value="past" className="mt-0">

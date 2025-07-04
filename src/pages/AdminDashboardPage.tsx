@@ -60,19 +60,52 @@ const AdminDashboardPage: React.FC = () => {
   // Load tasks for a specific user
   const loadUserTasks = (userId: string) => {
     try {
-      // Retrieve tasks from localStorage
-      const tasksJson = localStorage.getItem('tasks');
+      // Retrieve tasks from user-specific localStorage
+      const tasksJson = localStorage.getItem(`tasks_${userId}`);
       if (!tasksJson) return [];
       
       const tasks = JSON.parse(tasksJson) as Task[];
       
-      // Filter tasks assigned to this user
-      return tasks.filter(task => 
-        task.assignees?.some(assignee => assignee.id === userId)
-      );
+      // Return all tasks for this user
+      return tasks;
     } catch (error) {
       console.error('Error loading user tasks:', error);
       return [];
+    }
+  };
+
+  // Calculate total tasks across all users
+  const calculateTotalTasks = () => {
+    try {
+      let totalTasks = 0;
+      users.forEach(user => {
+        const userTasks = loadUserTasks(user.id);
+        totalTasks += userTasks.length;
+      });
+      return totalTasks;
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  // Calculate total trips across all users
+  const calculateTotalTrips = () => {
+    try {
+      let totalTrips = 0;
+      users.forEach(user => {
+        try {
+          const tripsJson = localStorage.getItem(`trips_${user.id}`);
+          if (tripsJson) {
+            const trips = JSON.parse(tripsJson);
+            totalTrips += trips.length;
+          }
+        } catch (e) {
+          // Skip this user if there's an error
+        }
+      });
+      return totalTrips;
+    } catch (e) {
+      return 0;
     }
   };
 
@@ -117,17 +150,7 @@ const AdminDashboardPage: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Calculate total tasks from localStorage */}
-              <div className="text-3xl font-bold">
-                {(() => {
-                  try {
-                    const tasksJson = localStorage.getItem('tasks');
-                    return tasksJson ? JSON.parse(tasksJson).length : 0;
-                  } catch (e) {
-                    return 0;
-                  }
-                })()}
-              </div>
+              <div className="text-3xl font-bold">{calculateTotalTasks()}</div>
             </CardContent>
           </Card>
           
@@ -141,17 +164,7 @@ const AdminDashboardPage: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Calculate total trips from localStorage */}
-              <div className="text-3xl font-bold">
-                {(() => {
-                  try {
-                    const tripsJson = localStorage.getItem('trips');
-                    return tripsJson ? JSON.parse(tripsJson).length : 0;
-                  } catch (e) {
-                    return 0;
-                  }
-                })()}
-              </div>
+              <div className="text-3xl font-bold">{calculateTotalTrips()}</div>
             </CardContent>
           </Card>
         </div>

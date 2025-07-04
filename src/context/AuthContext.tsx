@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, GoogleAuthProvider, signInWithPopup } from '../lib/firebase';
-import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '../lib/firebase';
+import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
 
 // Define the User type
 export interface ChorePreference {
@@ -23,10 +23,11 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   loginWithGoogle: () => Promise<void>;
-  loginWithEmail: (email: string, password: string) => Promise<void>; // Added email login
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  registerWithEmail: (email: string, password: string, name: string) => Promise<void>; // Added registration
   logout: () => Promise<void>;
-  updateChorePreferences: (preferences: ChorePreference[]) => Promise<void>; // Added function signature
-  isAdmin: boolean; // Added admin check
+  updateChorePreferences: (preferences: ChorePreference[]) => Promise<void>;
+  isAdmin: boolean;
 }
 
 // Create the AuthContext
@@ -185,6 +186,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Register with email
+  const registerWithEmail = async (email: string, password: string, name: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Attempting email registration...');
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('Email registration successful:', result.user);
+      await updateProfile(result.user, { displayName: name });
+    } catch (error: any) {
+      console.error('Email registration error:', error);
+      if (error.code === 'auth/email-already-in-use') {
+        setError('This email is already in use.');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Invalid email address.');
+      } else if (error.code === 'auth/weak-password') {
+        setError('Password is too weak.');
+      } else {
+        setError(`Registration failed: ${error.message}`);
+      }
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Context value
   const value = {
     user,
@@ -192,6 +219,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
     loginWithGoogle,
     loginWithEmail,
+    registerWithEmail,
     logout,
     updateChorePreferences,
     isAdmin: checkIsAdmin(user?.email),

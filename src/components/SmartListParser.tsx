@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { TripItem } from "@/components/TripDetailModal";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/context/AuthContext";
 
 type SmartListParserProps = {
   isOpen: boolean;
@@ -24,6 +25,7 @@ const SmartListParser = ({ isOpen, onClose, onAddItems }: SmartListParserProps) 
   const [promptCopied, setPromptCopied] = useState(false);
   const [outputCopied, setOutputCopied] = useState(false);
   const [step, setStep] = useState<'input' | 'processing' | 'output'>('input');
+  const { user } = useAuth();
   
   const taskaPrompt = `#taska
 You are helping me create a structured grocery list from a block of unstructured text.
@@ -143,8 +145,8 @@ ${input}`;
             unit,
             checked: false,
             addedBy: {
-              name: "You",
-              avatar: "https://example.com/you.jpg"
+              name: user?.name || "User",
+              avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
             },
             isRecurring: false,
             recurrenceFrequency: null
@@ -172,8 +174,8 @@ ${input}`;
               unit,
               checked: false,
               addedBy: {
-                name: "You",
-                avatar: "https://example.com/you.jpg"
+                name: user?.name || "User",
+                avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
               },
               isRecurring: false,
               recurrenceFrequency: null
@@ -201,8 +203,8 @@ ${input}`;
               unit,
               checked: false,
               addedBy: {
-                name: "You",
-                avatar: "https://example.com/you.jpg"
+                name: user?.name || "User",
+                avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
               },
               isRecurring: false,
               recurrenceFrequency: null
@@ -223,8 +225,8 @@ ${input}`;
             unit: '',
             checked: false,
             addedBy: {
-              name: "You",
-              avatar: "https://example.com/you.jpg"
+              name: user?.name || "User",
+              avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
             },
             isRecurring: false,
             recurrenceFrequency: null

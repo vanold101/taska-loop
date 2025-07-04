@@ -25,7 +25,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Edit,
-  Calendar
+  Calendar,
+  Crown,
+  Zap
 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -47,10 +49,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useSubscription } from "@/context/SubscriptionContext"
+import SubscriptionManager from "@/components/SubscriptionManager"
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { tasks: contextTasks, trips: contextTrips, updateTask, deleteTask, addTask } = useTaskContext();
   const [activeTab, setActiveTab] = useState("all");
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -58,6 +62,8 @@ export default function HomePage() {
   const [taskToEdit, setTaskToEdit] = useState<any>(null);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
+  const { currentTier, limits } = useSubscription();
+  const [showSubscriptionManager, setShowSubscriptionManager] = useState(false);
   
   // Count today's tasks
   const todayTasks = contextTasks.filter(task => {
@@ -202,6 +208,34 @@ export default function HomePage() {
     handleViewTaskDetails(task.id);
   };
 
+  const getTierDisplayInfo = () => {
+    switch (currentTier) {
+      case 'free':
+        return {
+          name: 'Basic',
+          icon: <Users className="h-4 w-4" />,
+          color: 'bg-gray-100 text-gray-800',
+          upgradeColor: 'bg-blue-600 hover:bg-blue-700'
+        };
+      case 'plus':
+        return {
+          name: 'Plus',
+          icon: <Star className="h-4 w-4" />,
+          color: 'bg-blue-100 text-blue-800',
+          upgradeColor: 'bg-purple-600 hover:bg-purple-700'
+        };
+      case 'family':
+        return {
+          name: 'Family',
+          icon: <Crown className="h-4 w-4" />,
+          color: 'bg-purple-100 text-purple-800',
+          upgradeColor: ''
+        };
+    }
+  };
+
+  const tierInfo = getTierDisplayInfo();
+
   return (
     <AppLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
@@ -304,7 +338,9 @@ export default function HomePage() {
             <Card className="border-none shadow-md dark:bg-slate-800 hover:shadow-lg transition-all duration-300 hover:scale-105">
               <CardHeader className="pb-2">
                 <CardTitle className="dark:text-slate-200">Expense Splitting</CardTitle>
-                <CardDescription className="dark:text-slate-400">May expenses with roommates</CardDescription>
+                <CardDescription className="dark:text-slate-400">
+                  {isAdmin ? "May expenses with roommates" : "Track shared expenses"}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -317,42 +353,63 @@ export default function HomePage() {
                       </Avatar>
                       <span className="text-slate-700 dark:text-slate-300">You</span>
                     </div>
-                    <span className="font-medium text-slate-700 dark:text-slate-300">$63.69</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      {isAdmin ? "$63.69" : "$0.00"}
+                    </span>
                   </div>
-                  <div className="flex justify-between items-center animate-fade-in" style={{animationDelay: '100ms'}}>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">SM</AvatarFallback>
-                      </Avatar>
-                      <span className="text-slate-700 dark:text-slate-300">Sam</span>
+                  
+                  {isAdmin ? (
+                    // Admin accounts get example participants
+                    <>
+                      <div className="flex justify-between items-center animate-fade-in" style={{animationDelay: '100ms'}}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">SM</AvatarFallback>
+                          </Avatar>
+                          <span className="text-slate-700 dark:text-slate-300">Sam</span>
+                        </div>
+                        <span className="font-medium text-green-600 dark:text-green-400">+$12.45</span>
+                      </div>
+                      <div className="flex justify-between items-center animate-fade-in" style={{animationDelay: '200ms'}}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">AL</AvatarFallback>
+                          </Avatar>
+                          <span className="text-slate-700 dark:text-slate-300">Alex</span>
+                        </div>
+                        <span className="font-medium text-red-600 dark:text-red-400">-$8.75</span>
+                      </div>
+                    </>
+                  ) : (
+                    // Regular users see a prompt to add household members
+                    <div className="text-center py-4 animate-fade-in">
+                      <div className="flex items-center justify-center w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-full mx-auto mb-2">
+                        <Users className="h-6 w-6 text-slate-400" />
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                        No household members yet
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        Add roommates to start tracking shared expenses
+                      </p>
                     </div>
-                    <span className="font-medium text-green-600 dark:text-green-400">+$12.45</span>
-                  </div>
-                  <div className="flex justify-between items-center animate-fade-in" style={{animationDelay: '200ms'}}>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">AL</AvatarFallback>
-                      </Avatar>
-                      <span className="text-slate-700 dark:text-slate-300">Alex</span>
-                    </div>
-                    <span className="font-medium text-red-600 dark:text-red-400">-$8.75</span>
-                  </div>
+                  )}
                 </div>
               </CardContent>
               <CardFooter>
                 <Button 
                   variant="outline" 
                   className="w-full border-slate-200 dark:border-slate-700 dark:text-slate-300 hover:scale-105 transition-transform duration-200" 
-                  onClick={() => navigate('/ledger')}
+                  onClick={() => navigate(isAdmin ? '/ledger' : '/invite-household')}
                 >
                   <Split className="h-4 w-4 mr-2" />
-                  Manage Expenses
+                  {isAdmin ? "Manage Expenses" : "Add Household Members"}
                 </Button>
               </CardFooter>
             </Card>
           </div>
 
-          <Tabs defaultValue="all" className="w-full animate-fade-in" value={activeTab} onValueChange={setActiveTab}>
+          <Tabs className="w-full animate-fade-in" value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center mb-4">
               <TabsList className="grid w-full md:w-auto grid-cols-4 md:inline-flex dark:bg-slate-800">
                 <TabsTrigger value="all">All Tasks</TabsTrigger>
@@ -786,6 +843,13 @@ export default function HomePage() {
               )}
             </DialogContent>
           </Dialog>
+        )}
+        {!isAdmin && (
+          <SubscriptionManager
+            isOpen={showSubscriptionManager}
+            onClose={() => setShowSubscriptionManager(false)}
+            showUpgradeOnly={currentTier !== 'free'}
+          />
         )}
       </div>
     </AppLayout>

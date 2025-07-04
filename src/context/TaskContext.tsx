@@ -64,150 +64,6 @@ export interface Trip {
   shopper: { name: string; avatar: string };
 }
 
-// Initial mock data for tasks
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    title: 'Pick up dry cleaning',
-    dueDate: '2025-05-05',
-    location: 'Downtown Cleaners',
-    coordinates: { lat: 39.9622, lng: -83.0007 },
-    priority: 'high',
-    completed: false,
-    isRotating: false,
-    assignees: [
-      { id: '1', name: 'You', avatar: "" },
-      { id: '2', name: 'Rachel', avatar: "" }
-    ],
-    notes: "Don't forget the receipt"
-  },
-  {
-    id: '2',
-    title: 'Return library books',
-    dueDate: '2025-05-08',
-    location: 'Columbus Public Library',
-    coordinates: { lat: 39.9611, lng: -83.0101 },
-    priority: 'medium',
-    completed: false,
-    isRotating: true,
-    assignees: [
-      { id: '1', name: 'You', avatar: "" }
-    ],
-    notes: "Books due by 8pm"
-  },
-  {
-    id: '3',
-    title: 'Get groceries from Trader Joe\'s',
-    dueDate: '2025-05-02',
-    location: 'Trader Joe\'s',
-    coordinates: { lat: 39.9702, lng: -83.0150 },
-    priority: 'high',
-    completed: true,
-    isRotating: false,
-    assignees: [
-      { id: '3', name: 'Brian', avatar: "" },
-      { id: '4', name: 'Ella', avatar: "" }
-    ],
-    notes: "See shopping list in app"
-  }
-];
-
-// Initial mock data for trips
-const mockTrips: Trip[] = [
-  {
-    id: '1',
-    store: "Trader Joe's",
-    date: new Date().toISOString(),
-    time: "10:00",
-    status: 'pending',
-    coordinates: { lat: 39.9702, lng: -83.0150 },
-    items: [
-      {
-        id: '1-1',
-        name: "Milk",
-        quantity: 1,
-        price: 3.99,
-        unit: 'gal',
-        addedBy: {
-          name: "You",
-          avatar: "https://example.com/you.jpg"
-        },
-        checked: false
-      },
-      {
-        id: '1-2',
-        name: "Eggs",
-        quantity: 1,
-        price: 4.49,
-        unit: 'dozen',
-        addedBy: {
-          name: "You",
-          avatar: "https://example.com/you.jpg"
-        },
-        checked: false
-      }
-    ],
-    participants: [
-      { id: '1', name: 'You', avatar: "https://example.com/you.jpg" },
-      { id: '2', name: 'Rachel', avatar: "https://example.com/rachel.jpg" }
-    ],
-    shopper: { name: 'You', avatar: 'https://example.com/you.jpg' }
-  },
-  {
-    id: '2',
-    store: "Costco",
-    date: new Date(Date.now() + 86400000).toISOString(),
-    time: "14:00",
-    status: 'shopping',
-    coordinates: { lat: 39.9650, lng: -83.0200 },
-    items: [
-      {
-        id: '2-1',
-        name: "Paper Towels",
-        quantity: 2,
-        price: 19.99,
-        unit: 'pack',
-        addedBy: {
-          name: "You",
-          avatar: "https://example.com/you.jpg"
-        },
-        checked: true
-      }
-    ],
-    participants: [
-      { id: '1', name: 'You', avatar: "https://example.com/you.jpg" }
-    ],
-    shopper: { name: 'You', avatar: 'https://example.com/you.jpg' }
-  },
-  {
-    id: '3',
-    store: "Whole Foods",
-    date: new Date(Date.now() - 86400000).toISOString(),
-    time: "15:00",
-    status: 'completed',
-    coordinates: { lat: 39.9600, lng: -83.0180 },
-    items: [
-      {
-        id: '3-1',
-        name: "Organic Bananas",
-        quantity: 1,
-        price: 3.99,
-        unit: 'bunch',
-        addedBy: {
-          name: "Alex",
-          avatar: "https://example.com/alex.jpg"
-        },
-        checked: true
-      }
-    ],
-    participants: [
-      { id: '1', name: 'You', avatar: "https://example.com/you.jpg" },
-      { id: '3', name: 'Alex', avatar: "https://example.com/alex.jpg" }
-    ],
-    shopper: { name: 'Alex', avatar: 'https://example.com/alex.jpg' }
-  }
-];
-
 export interface TaskContextType {
   tasks: Task[];
   trips: Trip[];
@@ -217,7 +73,7 @@ export interface TaskContextType {
   addTrip: (tripData: Omit<Trip, 'id' | 'status'> & { items?: Item[] }) => void;
   updateTrip: (tripId: string, updates: Partial<Trip>) => void;
   deleteTrip: (tripId: string) => void;
-  syncTasksWithTrips: () => void;
+  syncTasksWithTrips: () => { tasksProcessed: number; tripsCreated: number; tripsUpdated: number; };
   budget: number;
   updateBudget: (newBudget: number) => void;
   // Recurring items functionality
@@ -237,7 +93,7 @@ export interface TaskContextType {
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [budget, setBudget] = useState(500);
@@ -250,12 +106,16 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadData = () => {
       try {
+        // Set current user for recurring items service
+        recurringItemsService.setCurrentUser(user?.id || null);
+        
         // Load tasks
         const storedTasks = localStorage.getItem(getStorageKey('tasks'));
         if (storedTasks) {
           setTasks(JSON.parse(storedTasks));
         } else {
-          setTasks(mockTasks);
+          // All users start with empty tasks - no sample data
+          setTasks([]);
         }
 
         // Load trips
@@ -263,22 +123,27 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         if (storedTrips) {
           setTrips(JSON.parse(storedTrips));
         } else {
-          setTrips(mockTrips);
+          // All users start with empty trips - no sample data
+          setTrips([]);
         }
 
         // Load budget
         const storedBudget = localStorage.getItem(getStorageKey('budget'));
         if (storedBudget) {
-          setBudget(JSON.parse(storedBudget));
+          setBudget(parseFloat(storedBudget));
+        } else {
+          setBudget(500);
         }
 
-        // Load recurring templates
-        const templates = recurringItemsService.loadTemplates();
+        // Load recurring templates from service (now user-specific)
+        const templates = recurringItemsService.loadTemplates();   
         setRecurringTemplates(templates);
+
       } catch (error) {
         console.error('Error loading data from localStorage:', error);
-        setTasks(mockTasks);
-        setTrips(mockTrips);
+        // On error, ensure clean slate for all users
+        setTasks([]);
+        setTrips([]);
         setBudget(500);
         setRecurringTemplates([]);
       }
@@ -302,11 +167,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       (tripData: Omit<Trip, 'id' | 'status'> & { status: 'open' }) => {
         // Create new trip
         addTrip(tripData);
-      }
+      },
+      user ? { id: user.id, name: user.name, avatar: user.avatar } : undefined,
+      isAdmin
     );
 
     return cleanup;
-  }, [trips.length]); // Only re-run when trips are initially loaded
+  }, [trips.length, user, isAdmin]); // Add user and isAdmin as dependencies
 
   // Save data to localStorage whenever state changes
   const replacer = (key: string, value: any) => {
@@ -414,7 +281,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       },
       (tripData: Omit<Trip, 'id' | 'status'> & { status: 'open' }) => {
         addTrip(tripData);
-      }
+      },
+      user ? { id: user.id, name: user.name, avatar: user.avatar } : undefined,
+      isAdmin
     );
 
     // Refresh templates after processing
@@ -433,10 +302,123 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     setRecurringTemplates(prev => [...prev, template]);
   };
 
-  // Sync tasks with trips (existing function)
+  // Sync tasks with trips (enhanced function)
   const syncTasksWithTrips = () => {
-    // Implementation remains the same
     console.log('Syncing tasks with trips...');
+    
+    // Find tasks with locations that could become trips - only include tasks with BOTH location AND coordinates
+    const locationTasks = tasks.filter(task => 
+      task.location && 
+      task.coordinates &&
+      task.coordinates.lat !== 0 && // Exclude default coordinates that would put task in Atlantic Ocean
+      task.coordinates.lng !== 0 &&
+      !task.completed &&
+      // Check if location looks like a store/shopping location
+      (task.location.toLowerCase().includes('store') || 
+       task.location.toLowerCase().includes('market') ||
+       task.location.toLowerCase().includes('shop') ||
+       task.location.toLowerCase().includes('mall') ||
+       task.location.toLowerCase().includes('walmart') ||
+       task.location.toLowerCase().includes('target') ||
+       task.location.toLowerCase().includes('kroger') ||
+       task.location.toLowerCase().includes('costco') ||
+       task.location.toLowerCase().includes('trader') ||
+       task.location.toLowerCase().includes('whole foods'))
+    );
+
+    // Group tasks by similar locations
+    const locationGroups: { [key: string]: Task[] } = {};
+    locationTasks.forEach(task => {
+      const locationKey = task.location.toLowerCase().trim();
+      if (!locationGroups[locationKey]) {
+        locationGroups[locationKey] = [];
+      }
+      locationGroups[locationKey].push(task);
+    });
+
+    let syncStats = {
+      tasksProcessed: 0,
+      tripsCreated: 0,
+      tripsUpdated: 0
+    };
+
+    // For each location group, either create a new trip or update existing one
+    Object.entries(locationGroups).forEach(([location, groupTasks]) => {
+      // Check if there's already an open trip for this location
+      const existingTrip = trips.find(trip => 
+        trip.status === 'open' && 
+        trip.store.toLowerCase().includes(location.split(' ')[0]) // Match first word of location
+      );
+
+      if (existingTrip && groupTasks.length > 0) {
+        // Add tasks as items to existing trip
+        const newItems: Item[] = groupTasks.map(task => ({
+          id: `task_${task.id}`,
+          name: task.title,
+          quantity: 1,
+          checked: task.completed || false,
+          category: 'Task',
+          notes: `From task: ${task.notes || ''}`,
+          addedBy: {
+            name: user?.name || 'User',
+            avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+          }
+        }));
+
+        // Update existing trip with new items
+        updateTrip(existingTrip.id, {
+          items: [...existingTrip.items, ...newItems]
+        });
+
+        syncStats.tripsUpdated++;
+        syncStats.tasksProcessed += groupTasks.length;
+
+      } else if (groupTasks.length > 0) {
+        // Create new trip for this location - only if we have valid coordinates
+        const firstTask = groupTasks[0];
+        if (firstTask.coordinates && firstTask.coordinates.lat !== 0 && firstTask.coordinates.lng !== 0) {
+          const tripItems: Item[] = groupTasks.map(task => ({
+            id: `task_${task.id}`,
+            name: task.title,
+            quantity: 1,
+            checked: task.completed || false,
+            category: 'Task',
+            notes: `From task: ${task.notes || ''}`,
+            addedBy: {
+              name: user?.name || 'User',
+              avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+            }
+          }));
+
+          const newTrip = {
+            store: firstTask.location,
+            date: new Date().toISOString(),
+            time: '12:00',
+            items: tripItems,
+            notes: `Auto-created from ${groupTasks.length} task(s)`,
+            eta: '30 minutes',
+            coordinates: firstTask.coordinates, // Only use coordinates if they're valid
+            participants: [
+              { 
+                id: user?.id || '1', 
+                name: user?.name || 'User', 
+                avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+              }
+            ],
+            shopper: {
+              name: user?.name || 'User',
+              avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+            }
+          };
+
+          addTrip(newTrip);
+          syncStats.tripsCreated++;
+          syncStats.tasksProcessed += groupTasks.length;
+        }
+      }
+    });
+
+    return syncStats;
   };
 
   const updateBudget = (newBudget: number) => {

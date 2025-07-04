@@ -11,8 +11,11 @@ import {
   cancelPayment,
   TransactionCategory,
   getTransactionCategories,
-  updateTransactionCategory
+  updateTransactionCategory,
+  setCurrentUser
 } from "../services/LedgerService";
+import { useAuth } from "../context/AuthContext";
+import { useHousehold } from "../context/HouseholdContext";
 import { Button } from "../components/ui/button";
 import { useToast } from "../hooks/use-toast";
 import { 
@@ -156,12 +159,13 @@ const CategoryBadge = ({ category }: { category?: TransactionCategory }) => {
 };
 
 const LedgerPage = () => {
+  const { user } = useAuth();
+  const { members } = useHousehold();
   const [activeTab, setActiveTab] = useState("balances");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [balances, setBalances] = useState<UserBalance[]>([]);
   const [recommendations, setRecommendations] = useState<{from: UserBalance, to: UserBalance, amount: number}[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<{from: UserBalance, to: UserBalance, amount: number} | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDescription, setPaymentDescription] = useState("");
   const [selectedRecipientId, setSelectedRecipientId] = useState<string>("");
@@ -174,6 +178,11 @@ const LedgerPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<TransactionCategory | undefined>(undefined);
   const [showCategoryMenu, setShowCategoryMenu] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // Set current user for ledger service
+  useEffect(() => {
+    setCurrentUser(user?.id || null);
+  }, [user]);
   
   // Close category menu when clicking outside
   useEffect(() => {
@@ -211,7 +220,12 @@ const LedgerPage = () => {
   
   // Handle initiating a payment
   const handleInitiatePayment = (recommendation: {from: UserBalance, to: UserBalance, amount: number}) => {
-    setSelectedPayment(recommendation);
+    // Find the recipient in household members
+    const recipient = members.find(member => member.name === recommendation.to.userName);
+    if (recipient) {
+      setSelectedRecipientId(recipient.id);
+    }
+    
     setPaymentAmount(recommendation.amount.toFixed(2));
     setPaymentDescription(`Payment from ${recommendation.from.userName} to ${recommendation.to.userName}`);
     setShowPaymentDialog(true);
@@ -255,8 +269,6 @@ const LedgerPage = () => {
   
   // Submit a new payment
   const handleSubmitPayment = () => {
-    if (!selectedPayment) return;
-    
     // Validation
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -277,7 +289,7 @@ const LedgerPage = () => {
       return;
     }
     
-    if (!selectedRecipientId && !selectedPayment.to.userId) {
+    if (!selectedRecipientId) {
       toast({
         title: "Recipient required",
         description: "Please select a recipient for this payment.",
@@ -286,22 +298,34 @@ const LedgerPage = () => {
       return;
     }
     
+    // Find the recipient from household members
+    const recipient = members.find(member => member.id === selectedRecipientId);
+    if (!recipient) {
+      toast({
+        title: "Recipient not found",
+        description: "The selected recipient could not be found.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       // Create the payment transaction
       createPaymentTransaction(
-        selectedPayment.from.userId,
-        selectedPayment.from.userName,
-        selectedRecipientId || selectedPayment.to.userId,
-        selectedRecipientId ? balances.find(b => b.userId === selectedRecipientId)?.userName || "" : selectedPayment.to.userName,
+        user?.id || 'current-user',
+        user?.name || 'You',
+        selectedRecipientId,
+        recipient.name,
         amount,
-        paymentDescription
+        paymentDescription,
+        selectedCategory
       );
       
       // Reset form and close dialog
       setPaymentAmount("");
       setPaymentDescription("");
       setSelectedRecipientId("");
-      setSelectedPayment(null);
+      setSelectedCategory(undefined);
       setShowPaymentDialog(false);
       
       // Reload data to reflect changes
@@ -322,21 +346,19 @@ const LedgerPage = () => {
   
   // Handle new payment dialog open
   const handleOpenNewPayment = () => {
-    if (balances.length === 0) {
+    const availableRecipients = members.filter(member => member.id !== user?.id);
+    
+    if (availableRecipients.length === 0) {
       toast({
-        title: "No users available",
-        description: "You need at least one other user to make a payment.",
+        title: "No household members",
+        description: "Invite someone to your household to send them payments.",
         variant: "destructive"
       });
       return;
     }
     
-    // Pre-select the first user as payer
-    setSelectedPayment({
-      from: balances[0],
-      to: balances.length > 1 ? balances[1] : balances[0],
-      amount: 0
-    });
+    // Pre-select the first available recipient
+    setSelectedRecipientId(availableRecipients[0].id);
     
     setPaymentAmount("");
     setPaymentDescription("");
@@ -1415,13 +1437,30 @@ const LedgerPage = () => {
                   <SelectValue placeholder="Select recipient" />
                 </SelectTrigger>
                 <SelectContent>
-                  {balances
-                    .filter(b => b.userName !== "You")
-                    .map(user => (
-                      <SelectItem key={user.userId} value={user.userId}>
-                        {user.userName}
-                      </SelectItem>
-                    ))}
+                  {members.filter(member => member.id !== user?.id).length > 0 ? (
+                    members
+                      .filter(member => member.id !== user?.id)
+                      .map(member => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name}
+                        </SelectItem>
+                      ))
+                  ) : (
+                    <div className="p-2 text-center text-sm text-muted-foreground">
+                      No household members found.
+                      <Button 
+                        variant="link" 
+                        className="p-0 h-auto font-normal text-blue-600 dark:text-blue-400"
+                        onClick={() => {
+                          setShowPaymentDialog(false);
+                          // Navigate to profile page where they can invite members
+                          window.location.href = '#/profile';
+                        }}
+                      >
+                        Invite someone to your household
+                      </Button>
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>

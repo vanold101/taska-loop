@@ -29,7 +29,9 @@ import {
   Download, 
   AlertCircle,
   SplitSquareVertical,
-  PlusCircle
+  PlusCircle,
+  Mail,
+  Send
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -50,7 +52,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { createSettlementTransaction } from "@/services/LedgerService";
+import { useHousehold } from "@/context/HouseholdContext";
+import { useAuth } from "@/context/AuthContext";
+import { inviteService } from "@/services/InviteService";
 
 interface CostSplitSummaryProps {
   tripId?: string;
@@ -82,10 +88,16 @@ const CostSplitSummary = ({
   const [totalCost, setTotalCost] = useState(0);
   const [hasCustomSplits, setHasCustomSplits] = useState(false);
   const [bulkSplitDialogOpen, setBulkSplitDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [bulkSplitType, setBulkSplitType] = useState<SplitType>('equal');
   const [bulkSplitDetails, setBulkSplitDetails] = useState<SplitDetail[]>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [selectedExpenseItems, setSelectedExpenseItems] = useState<string[]>([]);
   const { toast } = useToast();
+  const { inviteForExpense } = useHousehold();
+  const { user } = useAuth();
 
   // Calculate the split amounts when component mounts or dependencies change
   useEffect(() => {
@@ -127,6 +139,39 @@ const CostSplitSummary = ({
     }
   }, [bulkSplitDialogOpen, participants]);
 
+  // Initialize invite dialog
+  useEffect(() => {
+    if (inviteDialogOpen) {
+      // Default to all items with prices
+      const itemsWithPrices = items.filter(item => item.price !== undefined && item.price > 0).map(item => item.id);
+      setSelectedExpenseItems(itemsWithPrices);
+      
+      // Set default message
+      const selectedTotal = items
+        .filter(item => itemsWithPrices.includes(item.id))
+        .reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+      
+      if (selectedTotal > 0) {
+        const defaultMessage = `I'd like to split some expenses from our ${tripName || 'shopping trip'} with you!
+
+Total amount: $${selectedTotal.toFixed(2)}
+Your share: $${(selectedTotal / 2).toFixed(2)} (split equally)
+
+Download TaskaLoop to easily split expenses and track payments!`;
+        
+        setInviteMessage(defaultMessage);
+      } else {
+        const defaultMessage = `I'd like to invite you to join our ${tripName || 'shopping trip'} on TaskaLoop!
+
+TaskaLoop helps us coordinate shopping trips, split expenses, and manage household tasks together.
+
+Download TaskaLoop to get started!`;
+        
+        setInviteMessage(defaultMessage);
+      }
+    }
+  }, [inviteDialogOpen, items, tripName]);
+
   // Get the current user's summary
   const currentUserSummary = splitSummary.find(s => s.userName === "You");
   
@@ -152,6 +197,78 @@ const CostSplitSummary = ({
       title: "Export to CSV",
       description: "This feature is coming soon!"
     });
+  };
+
+  // Handle sending expense invite
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please enter an email address to send the invitation",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Calculate total amount for selected items
+      const selectedTotal = items
+        .filter(item => selectedExpenseItems.includes(item.id))
+        .reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+
+      if (selectedTotal > 0) {
+        // Send expense split invitation
+        const selectedItemNames = items
+          .filter(item => selectedExpenseItems.includes(item.id))
+          .map(item => item.name)
+          .join(", ");
+
+        const expenseDescription = selectedItemNames.length > 50 
+          ? `${selectedItemNames.substring(0, 50)}...` 
+          : selectedItemNames;
+
+        await inviteForExpense(
+          inviteEmail,
+          selectedTotal,
+          expenseDescription,
+          tripId,
+          tripName
+        );
+
+        toast({
+          title: "Expense split invitation sent!",
+          description: `Invitation to split $${selectedTotal.toFixed(2)} sent to ${inviteEmail}`,
+        });
+      } else {
+        // Send general app invitation since there are no expenses to split
+        await inviteService.sendAppDownloadInvite({
+          email: inviteEmail,
+          message: inviteMessage || undefined,
+          fromUser: {
+            id: user?.id || 'current-user',
+            name: user?.name || 'Someone',
+            email: user?.email || ''
+          }
+        });
+
+        toast({
+          title: "Invitation sent!",
+          description: `App invitation sent to ${inviteEmail}`,
+        });
+      }
+
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteMessage("");
+      setSelectedExpenseItems([]);
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      toast({
+        title: "Failed to send invitation",
+        description: "Please try again later",
+        variant: "destructive",
+      });
+    }
   };
   
   // Handle settle up button click
@@ -519,14 +636,14 @@ const CostSplitSummary = ({
                       <SelectContent>
                         <SelectItem value="equal">Equal Split</SelectItem>
                         <SelectItem value="percentage">Percentage</SelectItem>
-                        <SelectItem value="custom">Custom Amount</SelectItem>
+                        <SelectItem value="person">Custom Amount</SelectItem>
                       </SelectContent>
                     </Select>
                     
                     <p className="text-xs text-muted-foreground">
                       {bulkSplitType === 'equal' && "Split the cost equally among selected participants"}
                       {bulkSplitType === 'percentage' && "Assign a percentage of the total to each participant"}
-                      {bulkSplitType === 'custom' && "Specify exact amounts for each participant"}
+                      {bulkSplitType === 'person' && "Specify exact amounts for each participant"}
                     </p>
                   </div>
                   
@@ -556,12 +673,12 @@ const CostSplitSummary = ({
                           {selectedParticipants.includes(participant.id) && (
                             <div className="ml-auto flex items-center space-x-2">
                               <Input
-                                type={bulkSplitType === 'custom' ? 'number' : 'text'}
-                                step={bulkSplitType === 'custom' ? '0.01' : undefined}
+                                type={bulkSplitType === 'person' ? 'number' : 'text'}
+                                step={bulkSplitType === 'person' ? '0.01' : undefined}
                                 min="0"
                                 placeholder={
                                   bulkSplitType === 'percentage' ? '%'
-                                  : bulkSplitType === 'custom' ? '$'
+                                  : bulkSplitType === 'person' ? '$'
                                   : 'Equal'
                                 }
                                 className="w-20 h-8 text-sm"
@@ -584,10 +701,7 @@ const CostSplitSummary = ({
                 </div>
                 
                 <DialogFooter>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setBulkSplitDialogOpen(false)}
-                  >
+                  <Button variant="outline" onClick={() => setBulkSplitDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button onClick={handleApplyBulkSplit}>
@@ -596,24 +710,123 @@ const CostSplitSummary = ({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Invite someone to split expenses */}
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <Mail className="h-4 w-4 mr-2" />
+                  {items.filter(item => item.price !== undefined && item.price > 0).length > 0 
+                    ? "Invite Someone to Split" 
+                    : "Invite Someone to TaskaLoop"}
+                </Button>
+              </DialogTrigger>
+              
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {items.filter(item => item.price !== undefined && item.price > 0).length > 0 
+                      ? "Invite Someone to Split Expenses" 
+                      : "Invite Someone to TaskaLoop"}
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4 py-2">
+                  {/* Email input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-email">Email Address</Label>
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      placeholder="Enter their email address"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Select items to split */}
+                  <div className="space-y-2">
+                    <Label>Select items to split</Label>
+                    {items.filter(item => item.price !== undefined && item.price > 0).length > 0 ? (
+                      <>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {items.filter(item => item.price !== undefined && item.price > 0).map((item) => (
+                            <div key={item.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`expense-item-${item.id}`}
+                                checked={selectedExpenseItems.includes(item.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedExpenseItems(prev => [...prev, item.id]);
+                                  } else {
+                                    setSelectedExpenseItems(prev => prev.filter(id => id !== item.id));
+                                  }
+                                }}
+                              />
+                              <Label 
+                                htmlFor={`expense-item-${item.id}`}
+                                className="flex-1 cursor-pointer"
+                              >
+                                {item.name} - ${((item.price || 0) * item.quantity).toFixed(2)}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Selected total: ${items
+                            .filter(item => selectedExpenseItems.includes(item.id))
+                            .reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0)
+                            .toFixed(2)}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-4 border border-dashed rounded-lg text-center">
+                        <AlertCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          No items with prices found in this trip.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          You can still invite someone to join TaskaLoop and coordinate future trips together!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Custom message */}
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-message">Custom Message (optional)</Label>
+                    <Textarea
+                      id="invite-message"
+                      placeholder="Add a personal message..."
+                      value={inviteMessage}
+                      onChange={(e) => setInviteMessage(e.target.value)}
+                      rows={4}
+                    />
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSendInvite}>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Invitation
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             
-            <Button 
-              variant="outline" 
-              className="w-full" 
-              onClick={handleShare}
-            >
-              <Share2 className="h-4 w-4 mr-2" />
-              Share Split Summary
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="w-full" 
-              onClick={handleExport}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export as CSV
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleShare} className="flex-1">
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button variant="outline" onClick={handleExport} className="flex-1">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

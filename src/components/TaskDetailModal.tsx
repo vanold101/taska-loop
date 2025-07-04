@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Flag, MapPin, RotateCw, Users, AlertCircle, InfoIcon, Save, UserPlus } from "lucide-react";
+import { CalendarIcon, Flag, MapPin, RotateCw, Users, AlertCircle, InfoIcon, Save, UserPlus } from "lucide-react";
 import { format, isBefore, startOfToday } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -13,14 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
-
-// Mock users for assignee selection
-const mockUsers = [
-  { id: '1', name: 'You', avatar: '' },
-  { id: '2', name: 'Rachel', avatar: '' },
-  { id: '3', name: 'Brian', avatar: '' },
-  { id: '4', name: 'Ella', avatar: '' },
-];
+import { useHousehold, HouseholdMember } from "../context/HouseholdContext";
 
 export type TaskData = {
   id: string;
@@ -30,7 +23,7 @@ export type TaskData = {
   isRotating: boolean;
   location: string | null;
   notes: string;
-  assignees: typeof mockUsers;
+  assignees: HouseholdMember[];
   completed?: boolean;
 };
 
@@ -43,6 +36,7 @@ type TaskDetailModalProps = {
 
 const TaskDetailModal = ({ isOpen, onClose, onSave, task }: TaskDetailModalProps) => {
   const { toast } = useToast();
+  const { members, inviteMember } = useHousehold();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isRotating, setIsRotating] = useState(false);
@@ -50,10 +44,11 @@ const TaskDetailModal = ({ isOpen, onClose, onSave, task }: TaskDetailModalProps
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
-  const [selectedAssignees, setSelectedAssignees] = useState([mockUsers[0]]);
+  const [selectedAssignees, setSelectedAssignees] = useState<HouseholdMember[]>([]);
   const [errors, setErrors] = useState<{title?: string, date?: string}>({});
   const [isFormValid, setIsFormValid] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
 
   // Reset form when dialog is opened and populate with task data if editing
   useEffect(() => {
@@ -67,8 +62,12 @@ const TaskDetailModal = ({ isOpen, onClose, onSave, task }: TaskDetailModalProps
       setNotes(task.notes);
       setSelectedAssignees(task.assignees);
       setErrors({});
+    } else if (isOpen && members.length > 0) {
+      // For new tasks, default to the current user (owner)
+      const currentUser = members.find(m => m.role === 'owner');
+      setSelectedAssignees(currentUser ? [currentUser] : []);
     }
-  }, [isOpen, task]);
+  }, [isOpen, task, members]);
 
   // Validate form on every change
   useEffect(() => {
@@ -131,34 +130,47 @@ const TaskDetailModal = ({ isOpen, onClose, onSave, task }: TaskDetailModalProps
     onClose();
   };
   
-  const toggleAssignee = (user: typeof mockUsers[0]) => {
+  const toggleAssignee = (member: HouseholdMember) => {
     setSelectedAssignees(prev => {
       // Always keep at least one assignee
-      if (prev.length === 1 && prev[0].id === user.id) {
+      if (prev.length === 1 && prev[0].id === member.id) {
         return prev;
       }
       
-      const isSelected = prev.some(u => u.id === user.id);
+      const isSelected = prev.some(u => u.id === member.id);
       if (isSelected) {
-        return prev.filter(u => u.id !== user.id);
+        return prev.filter(u => u.id !== member.id);
       } else {
-        return [...prev, user];
+        return [...prev, member];
       }
     });
   };
 
-  const handleInviteUser = () => {
-    // In a real app, this would open a user selection modal or send invites
-    setIsInviteModalOpen(true);
-    
-    // Simulate adding a new user after a delay
-    setTimeout(() => {
+  const handleInviteUser = async () => {
+    if (!inviteEmail.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please enter an email address to send the invitation",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await inviteMember(inviteEmail, `You've been invited to help with tasks in our household!`);
       toast({
         title: "Invitation sent",
-        description: "User will be notified about this task",
+        description: `Invitation sent to ${inviteEmail}`,
       });
       setIsInviteModalOpen(false);
-    }, 1500);
+      setInviteEmail("");
+    } catch (error) {
+      toast({
+        title: "Failed to send invitation",
+        description: "Please try again later",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!task) return null;
@@ -222,32 +234,32 @@ const TaskDetailModal = ({ isOpen, onClose, onSave, task }: TaskDetailModalProps
           <div className="space-y-2">
             <Label>Assignees</Label>
             <div className="flex flex-wrap gap-2 premium-card p-3 rounded-lg">
-              {mockUsers.map(user => (
+              {members.map(member => (
                 <Button
-                  key={user.id}
+                  key={member.id}
                   type="button"
                   variant="outline"
                   className={cn(
                     "flex items-center gap-1 premium-card",
-                    selectedAssignees.some(u => u.id === user.id) 
+                    selectedAssignees.some(u => u.id === member.id) 
                       ? "bg-gloop-primary text-white hover:bg-gloop-primary-hover border-0" 
                       : ""
                   )}
-                  onClick={() => toggleAssignee(user)}
+                  onClick={() => toggleAssignee(member)}
                 >
                   <Avatar className="h-5 w-5 mr-1">
-                    <AvatarFallback className={selectedAssignees.some(u => u.id === user.id) ? "bg-white text-gloop-primary" : ""}>
-                      {user.name.charAt(0)}
+                    <AvatarFallback className={selectedAssignees.some(u => u.id === member.id) ? "bg-white text-gloop-primary" : ""}>
+                      {member.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  {user.name}
+                  {member.name}
                 </Button>
               ))}
               <Button
                 type="button"
                 variant="outline"
                 className="flex items-center gap-1 premium-card border-dashed"
-                onClick={handleInviteUser}
+                onClick={() => setIsInviteModalOpen(true)}
               >
                 <UserPlus className="h-4 w-4" />
                 Invite
