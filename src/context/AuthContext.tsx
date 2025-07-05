@@ -65,6 +65,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Listen for Firebase auth state changes
   useEffect(() => {
     setIsLoading(true);
+    
+    // Check if Firebase auth is available
+    if (!auth) {
+      console.warn('Firebase auth is not initialized. Please check your Firebase configuration.');
+      setIsLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         // Set user info from Firebase
@@ -90,6 +98,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Real Google sign-in
   const loginWithGoogle = async () => {
+    if (!auth) {
+      setError('Authentication is not available. Please check your internet connection and try again.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -123,6 +136,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Email/password login for emulator testing
   const loginWithEmail = async (email: string, password: string) => {
+    if (!auth) {
+      setError('Authentication is not available. Please check your internet connection and try again.');
+      throw new Error('Firebase auth not initialized');
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -148,6 +166,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Real logout
   const logout = async () => {
+    if (!auth) {
+      // If auth is not available, just clear local state
+      setUser(null);
+      localStorage.removeItem(AUTH_USER_KEY);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -188,6 +213,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Register with email
   const registerWithEmail = async (email: string, password: string, name: string) => {
+    if (!auth) {
+      setError('Authentication is not available. Please check your internet connection and try again.');
+      throw new Error('Firebase auth not initialized');
+    }
+
     setIsLoading(true);
     setError(null);
     try {

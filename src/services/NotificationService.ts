@@ -1,8 +1,15 @@
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import { app, db, auth, collection, addDoc, updateDoc, doc, getDoc, arrayUnion, arrayRemove } from '@/lib/firebase';
 
-// Initialize Firebase Cloud Messaging
-const messaging = getMessaging(app);
+// Initialize Firebase Cloud Messaging - only if app is available
+let messaging: any = null;
+if (app) {
+  try {
+    messaging = getMessaging(app);
+  } catch (error) {
+    console.warn('Firebase Messaging initialization failed:', error);
+  }
+}
 
 // Your VAPID key from environment variables
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
@@ -20,12 +27,13 @@ export interface PushNotification {
   data?: Record<string, string>;
 }
 
-// Check if notifications are supported
+// Check if notifications are supported in this environment
 export const isNotificationSupported = async (): Promise<boolean> => {
   try {
+    if (!messaging) return false;
     return await isSupported();
   } catch (error) {
-    console.error('Error checking notification support:', error);
+    console.log('Notification support check failed:', error);
     return false;
   }
 };
@@ -33,6 +41,11 @@ export const isNotificationSupported = async (): Promise<boolean> => {
 // Request notification permission and get FCM token
 export const requestNotificationPermission = async (): Promise<string | null> => {
   try {
+    if (!messaging || !auth) {
+      console.warn('Firebase services not available for notifications');
+      return null;
+    }
+
     const supported = await isNotificationSupported();
     if (!supported) {
       console.log('Notifications are not supported');
@@ -63,6 +76,11 @@ export const requestNotificationPermission = async (): Promise<string | null> =>
 // Save user's FCM token to Firestore
 const saveUserFCMToken = async (token: string) => {
   try {
+    if (!auth || !db) {
+      console.warn('Firebase services not available for saving FCM token');
+      return;
+    }
+
     const currentUser = auth.currentUser;
     if (!currentUser) {
       console.error('No user is currently signed in');
@@ -100,6 +118,11 @@ const saveUserFCMToken = async (token: string) => {
 // Remove FCM token when user logs out
 export const removeUserFCMToken = async (token: string) => {
   try {
+    if (!auth || !db) {
+      console.warn('Firebase services not available for removing FCM token');
+      return;
+    }
+
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
@@ -112,33 +135,19 @@ export const removeUserFCMToken = async (token: string) => {
   }
 };
 
-// Handle incoming messages when app is in foreground
-export const setupForegroundNotificationListener = (
-  callback: (notification: PushNotification) => void
-) => {
-  onMessage(messaging, (payload) => {
-    console.log('Received foreground message:', payload);
-    
-    const notification: PushNotification = {
-      title: payload.notification?.title || 'New Notification',
-      body: payload.notification?.body || '',
-      icon: payload.notification?.icon,
-      data: payload.data
-    };
+// Listen for foreground messages
+export const onForegroundMessage = (callback: (payload: any) => void) => {
+  if (!messaging) {
+    console.warn('Firebase Messaging not available');
+    return () => {}; // Return empty unsubscribe function
+  }
 
-    // Call the provided callback with the notification
-    callback(notification);
-
-    // Show a native notification if the app is not focused
-    if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
-      new Notification(notification.title, {
-        body: notification.body,
-        icon: notification.icon,
-        tag: payload.data?.tag || 'default',
-        requireInteraction: true
-      });
-    }
-  });
+  try {
+    return onMessage(messaging, callback);
+  } catch (error) {
+    console.error('Error setting up foreground message listener:', error);
+    return () => {}; // Return empty unsubscribe function
+  }
 };
 
 // Send a notification to specific users
@@ -147,6 +156,11 @@ export const sendNotification = async (
   notification: PushNotification
 ) => {
   try {
+    if (!db) {
+      console.warn('Firebase Firestore not available for sending notifications');
+      return;
+    }
+
     // Add notification to Firestore
     await addDoc(collection(db, 'notifications'), {
       ...notification,
@@ -163,6 +177,11 @@ export const sendNotification = async (
 // Get user's notification preferences
 export const getNotificationPreferences = async (userId: string) => {
   try {
+    if (!db) {
+      console.warn('Firebase Firestore not available for getting notification preferences');
+      return null;
+    }
+
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
@@ -188,6 +207,11 @@ export const updateNotificationPreferences = async (
   preferences: Record<string, boolean>
 ) => {
   try {
+    if (!db) {
+      console.warn('Firebase Firestore not available for updating notification preferences');
+      return false;
+    }
+
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, {
       notificationPreferences: preferences
