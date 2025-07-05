@@ -1,5 +1,5 @@
 // Google Maps API configuration
-export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8';
+export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 // Validate API key is present
 if (!GOOGLE_MAPS_API_KEY) {

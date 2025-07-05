@@ -1,7 +1,12 @@
 import { loadScript } from '../utils/scriptLoader';
 
-// Use the API key from the environment, with a fallback for development
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCC9n6z-koJp5qiyOOPRRag3qudrcfOeK8';
+// Google Places API Service
+// This service handles Google Places API calls for location suggestions
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+if (!GOOGLE_MAPS_API_KEY) {
+  console.warn('Google Maps API key is not set. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
+}
 
 const loadedLibraries: Set<string> = new Set();
 let isGoogleMapsLoaded = false;
