@@ -1,5 +1,5 @@
 // Firebase configuration for TaskaLoop
-import { initializeApp } from 'firebase/app';
+import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   collection, 
@@ -13,7 +13,8 @@ import {
   arrayRemove,
   addDoc,
   serverTimestamp,
-  connectFirestoreEmulator
+  connectFirestoreEmulator,
+  Firestore
 } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -24,11 +25,12 @@ import {
   updateProfile,
   connectAuthEmulator,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  Auth
 } from 'firebase/auth';
-import { getAnalytics } from "firebase/analytics";
-import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
-import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getAnalytics, Analytics } from "firebase/analytics";
+import { getMessaging, getToken, onMessage, isSupported, Messaging } from "firebase/messaging";
+import { getStorage, connectStorageEmulator, FirebaseStorage } from 'firebase/storage';
 
 // Check if we're running in development mode
 const isDevelopment = () => {
@@ -38,17 +40,6 @@ const isDevelopment = () => {
     return hostname === 'localhost' || hostname === '127.0.0.1';
   }
   return import.meta.env.DEV;
-};
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Validate required environment variables
@@ -63,68 +54,102 @@ const requiredEnvVars = [
 
 const missingEnvVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
 
-if (missingEnvVars.length > 0) {
+// Check if we have all required environment variables
+const hasValidFirebaseConfig = missingEnvVars.length === 0;
+
+// Only show error messages in development or if explicitly needed
+if (!hasValidFirebaseConfig && isDevelopment()) {
   console.error('Missing required environment variables:', missingEnvVars);
   console.error('Please create a .env file with the required Firebase configuration.');
   console.error('See env.example for the required variables.');
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const storage = getStorage(app);
+// Your web app's Firebase configuration - only if we have valid env vars
+const firebaseConfig = hasValidFirebaseConfig ? {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+} : null;
 
-// Check if we're in development mode
-const isDev = isDevelopment();
+// Initialize Firebase only if we have valid config
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let auth: Auth | null = null;
+let storage: FirebaseStorage | null = null;
+let analytics: Analytics | null = null;
+let messagingInstance: Messaging | null = null;
 
-// Flags to control whether to use emulators (set to false for real Firebase services)
-const USE_AUTH_EMULATOR = false; // Disabled to use real Firebase auth
-const USE_FIRESTORE_EMULATOR = false; // Disabled to use real Firebase Firestore
-const USE_STORAGE_EMULATOR = false; // Disabled to use real Firebase Storage
-
-// Connect to emulators in development mode
-if (isDev) {
+if (hasValidFirebaseConfig && firebaseConfig) {
   try {
-    // Only connect auth emulator if flag is enabled
-    if (USE_AUTH_EMULATOR) {
-      connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-    }
-    
-    // Only connect Firestore emulator if flag is enabled
-    if (USE_FIRESTORE_EMULATOR) {
-      connectFirestoreEmulator(db, 'localhost', 8081);
-    }
-    
-    // Only connect Storage emulator if flag is enabled
-    if (USE_STORAGE_EMULATOR) {
-      connectStorageEmulator(storage, 'localhost', 9199);
-    }
-  } catch (error) {
-    // Silent fail - emulators might not be running
-    console.log('Emulator connection failed, using production services');
-  }
-}
+    // Initialize Firebase
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    storage = getStorage(app);
 
-// Initialize other services - but skip analytics in development
-let analytics = null;
-let messagingInstance = null;
+    // Check if we're in development mode
+    const isDev = isDevelopment();
 
-if (typeof window !== 'undefined') {
-  try {
-    // Only initialize analytics in production
-    if (!isDev && firebaseConfig.measurementId) {
-      analytics = getAnalytics(app);
-    }
-    
-    // Initialize messaging if supported
-    isSupported().then((supported) => {
-      if (supported) {
-        messagingInstance = getMessaging(app);
+    // Flags to control whether to use emulators (set to false for real Firebase services)
+    const USE_AUTH_EMULATOR = false; // Disabled to use real Firebase auth
+    const USE_FIRESTORE_EMULATOR = false; // Disabled to use real Firebase Firestore
+    const USE_STORAGE_EMULATOR = false; // Disabled to use real Firebase Storage
+
+    // Connect to emulators in development mode
+    if (isDev) {
+      try {
+        // Only connect auth emulator if flag is enabled
+        if (USE_AUTH_EMULATOR && auth) {
+          connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+        }
+        
+        // Only connect Firestore emulator if flag is enabled
+        if (USE_FIRESTORE_EMULATOR && db) {
+          connectFirestoreEmulator(db, 'localhost', 8081);
+        }
+        
+        // Only connect Storage emulator if flag is enabled
+        if (USE_STORAGE_EMULATOR && storage) {
+          connectStorageEmulator(storage, 'localhost', 9199);
+        }
+      } catch (error) {
+        // Silent fail - emulators might not be running
+        console.log('Emulator connection failed, using production services');
       }
-    });
+    }
+
+    // Initialize other services - but skip analytics in development
+    if (typeof window !== 'undefined') {
+      try {
+        // Only initialize analytics in production
+        if (!isDev && firebaseConfig.measurementId && app) {
+          analytics = getAnalytics(app);
+        }
+        
+        // Initialize messaging if supported
+        isSupported().then((supported) => {
+          if (supported && app) {
+            messagingInstance = getMessaging(app);
+          }
+        });
+      } catch (error) {
+        console.log('Analytics/Messaging initialization failed:', error);
+      }
+    }
   } catch (error) {
-    console.log('Analytics/Messaging initialization failed:', error);
+    console.error('Firebase initialization failed:', error);
+    if (isDevelopment()) {
+      console.error('Please check your Firebase configuration in .env file');
+    }
+  }
+} else {
+  // In production without valid config, show a user-friendly message
+  if (!isDevelopment() && typeof window !== 'undefined') {
+    console.warn('TaskaLoop: Firebase configuration is being loaded. Please refresh if you continue to see authentication issues.');
   }
 }
 
