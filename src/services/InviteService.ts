@@ -4,7 +4,7 @@ export interface Invitation {
   fromUserName: string;
   fromUserEmail: string;
   toEmail: string;
-  type: 'household' | 'expense_split' | 'app_download';
+  type: 'household' | 'expense_split' | 'app_download' | 'trip_invite';
   status: 'pending' | 'accepted' | 'rejected' | 'expired';
   message: string;
   data?: {
@@ -23,7 +23,7 @@ export interface Invitation {
 export interface InviteOptions {
   email: string;
   message?: string;
-  type: 'household' | 'expense_split' | 'app_download';
+  type: 'household' | 'expense_split' | 'app_download' | 'trip_invite';
   expenseAmount?: number;
   expenseDescription?: string;
   tripId?: string;
@@ -155,6 +155,49 @@ Download the app to get started:`;
       message: options.message || defaultMessage,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() // 90 days
+    };
+
+    return this.saveInvitation(invitation);
+  }
+
+  /**
+   * Send an invitation to join a shopping trip
+   */
+  async sendTripInvite(options: {
+    email: string;
+    message?: string;
+    tripId: string;
+    tripName: string;
+    fromUser: { id: string; name: string; email?: string };
+  }): Promise<Invitation> {
+    const defaultMessage = `${options.fromUser.name} invited you to join their shopping trip to ${options.tripName}!
+
+Join us on TaskaLoop to:
+• See the shared shopping list
+• Add items you need
+• Split costs fairly when we're done
+• Coordinate timing and logistics
+
+TaskaLoop makes group shopping trips easy and organized. Download the app to join the trip!
+
+Trip Details:
+• Store: ${options.tripName}
+• Organizer: ${options.fromUser.name}`;
+
+    const invitation: Omit<Invitation, 'id'> = {
+      fromUserId: options.fromUser.id,
+      fromUserName: options.fromUser.name,
+      fromUserEmail: options.fromUser.email || '',
+      toEmail: options.email,
+      type: 'trip_invite',
+      status: 'pending',
+      message: options.message || defaultMessage,
+      data: {
+        tripId: options.tripId,
+        tripName: options.tripName
+      },
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
     };
 
     return this.saveInvitation(invitation);

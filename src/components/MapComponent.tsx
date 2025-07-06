@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Map as MapIcon, Navigation, MapPin, Clock, Route, Plus, Trash2 } from "lucide-react";
+import { Map as MapIcon, Navigation, MapPin, Clock, Route, Plus, Trash2, Settings, ExternalLink } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import { motion } from "framer-motion";
 import { format } from 'date-fns';
@@ -151,40 +151,42 @@ export default function MapComponent() {
   const addAllMarkers = () => {
     if (!googleMapRef.current || !window.google) return;
     
-    // Clear existing markers first
+    // Clear existing markers
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
-    
-    // Add user location marker (Always A)
+
+    let letterIndex = 1; // Start at 1 since A is for user location
+
+    // Add user location marker (A)
     const userMarker = new google.maps.Marker({
-      position: location,
+      position: { lat: location.lat, lng: location.lng },
       map: googleMapRef.current,
-      title: 'Your Location',
+      title: "Your Location",
       label: {
-        text: 'A',
+        text: "A",
         color: 'white',
         fontSize: '14px',
         fontWeight: 'bold'
       },
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
-        fillColor: '#2563EB', // Blue for user location
+        scale: 12,
+        fillColor: '#2563EB',
         fillOpacity: 1,
-        strokeWeight: 3,
-        strokeColor: '#FFFFFF',
-        scale: 14,
-        labelOrigin: new google.maps.Point(0, 0)
+        strokeColor: 'white',
+        strokeWeight: 2
       }
     });
     markersRef.current.push(userMarker);
-    
-    let letterIndex = 1; // Start at 1 since A is user location
-    
-    // Add task markers - only for tasks with coordinates
-    tasks.filter(task => task.coordinates).forEach((task) => {
+
+    // Add task markers - only for tasks with coordinates that are different from user location
+    tasks.filter(task => 
+      task.coordinates && 
+      !(Math.abs(task.coordinates.lat - location.lat) < 0.0001 && Math.abs(task.coordinates.lng - location.lng) < 0.0001)
+    ).forEach((task) => {
       const letter = String.fromCharCode(65 + letterIndex); // B, C, D, etc.
       const marker = new google.maps.Marker({
-        position: { lat: task.coordinates.lat, lng: task.coordinates.lng },
+        position: { lat: task.coordinates!.lat, lng: task.coordinates!.lng },
         map: googleMapRef.current,
         title: task.title,
         label: {
@@ -195,40 +197,27 @@ export default function MapComponent() {
         },
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#EF4444', // Red for tasks
-          fillOpacity: 1,
-          strokeWeight: 2,
-          strokeColor: '#FFFFFF',
           scale: 12,
-          labelOrigin: new google.maps.Point(0, 0)
+          fillColor: '#DC2626',
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 2
         }
       });
-      
-      marker.addListener('click', () => {
-        setSelectedTask(task);
-        if (infoWindowRef.current) {
-          infoWindowRef.current.setContent(`
-            <div>
-              <h4>${task.title}</h4>
-              <p>${task.location}</p>
-              <p>Priority: ${task.priority}</p>
-              <p>Due: ${format(new Date(task.dueDate), 'PPP')}</p>
-            </div>
-          `);
-          infoWindowRef.current.open(googleMapRef.current, marker);
-        }
-      });
-      
       markersRef.current.push(marker);
       letterIndex++;
     });
-    
-    // Add trip markers - only for trips with coordinates
-    trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').forEach((trip) => {
-      const coordinates = trip.coordinates!; // Safe to assert since we filtered for coordinates
-      const letter = String.fromCharCode(65 + letterIndex); // Continue lettering sequence
+
+    // Add trip markers - only for active trips with coordinates that are different from user location
+    trips.filter(trip => 
+      trip.coordinates && 
+      trip.status !== 'completed' && 
+      trip.status !== 'cancelled' &&
+      !(Math.abs(trip.coordinates.lat - location.lat) < 0.0001 && Math.abs(trip.coordinates.lng - location.lng) < 0.0001)
+    ).forEach((trip) => {
+      const letter = String.fromCharCode(65 + letterIndex); // Continue sequence
       const marker = new google.maps.Marker({
-        position: { lat: coordinates.lat, lng: coordinates.lng },
+        position: { lat: trip.coordinates!.lat, lng: trip.coordinates!.lng },
         map: googleMapRef.current,
         title: trip.store,
         label: {
@@ -239,41 +228,24 @@ export default function MapComponent() {
         },
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#3B82F6', // Blue for trips
-          fillOpacity: 1,
-          strokeWeight: 2,
-          strokeColor: '#FFFFFF',
           scale: 12,
-          labelOrigin: new google.maps.Point(0, 0)
+          fillColor: '#2563EB',
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 2
         }
       });
-      
-      marker.addListener('click', () => {
-        if (infoWindowRef.current) {
-          infoWindowRef.current.setContent(`
-            <div>
-              <h4>Trip to ${trip.store}</h4>
-              <p>ETA: ${trip.eta}</p>
-              <p>Status: ${trip.status}</p>
-              <p>Items: ${trip.items.length}</p>
-            </div>
-          `);
-          infoWindowRef.current.open(googleMapRef.current, marker);
-        }
-      });
-      
       markersRef.current.push(marker);
       letterIndex++;
     });
-    
-    console.log(`Created ${markersRef.current.length} markers on map`);
   };
 
-  // Update markers when tasks, trips, or location changes
+  // Effect to add all markers
   useEffect(() => {
-    if (googleMapRef.current) {
-      addAllMarkers();
-    }
+    // Don't recreate markers if we're showing an optimized route
+    if (optimizedRoute) return;
+    
+    addAllMarkers();
   }, [tasks, trips, location]);
 
   // Route optimization and preferences
@@ -284,8 +256,11 @@ export default function MapComponent() {
   const showOptimizedRoute = async () => {
     if (!googleMapRef.current || !window.google) return;
     
-    // Get all locations with coordinates
-    const taskLocations = tasks.filter(task => task.coordinates).map(task => ({
+    // Get all locations with coordinates (excluding user location duplicates)
+    const taskLocations = tasks.filter(task => 
+      task.coordinates && 
+      !(Math.abs(task.coordinates.lat - location.lat) < 0.0001 && Math.abs(task.coordinates.lng - location.lng) < 0.0001)
+    ).map(task => ({
       location: {
         lat: task.coordinates!.lat,
         lng: task.coordinates!.lng
@@ -294,7 +269,12 @@ export default function MapComponent() {
       dueDate: new Date(task.dueDate)
     } as StopTimeWindow));
     
-    const tripLocations = trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').map(trip => ({
+    const tripLocations = trips.filter(trip => 
+      trip.coordinates && 
+      trip.status !== 'completed' && 
+      trip.status !== 'cancelled' &&
+      !(Math.abs(trip.coordinates.lat - location.lat) < 0.0001 && Math.abs(trip.coordinates.lng - location.lng) < 0.0001)
+    ).map(trip => ({
       location: {
         lat: trip.coordinates!.lat,
         lng: trip.coordinates!.lng
@@ -319,35 +299,44 @@ export default function MapComponent() {
       const route = await calculateOptimalRoute(origin, allLocations, routePreferences);
       setOptimizedRoute(route);
       
-      // Display route on map
+      // Clear existing directions renderer
       if (directionsRendererRef.current) {
         directionsRendererRef.current.setMap(null);
       }
       
+      // Create new directions renderer with proper styling
       directionsRendererRef.current = new google.maps.DirectionsRenderer({
-        draggable: true,
-        panel: document.createElement('div') // We'll handle this ourselves
+        draggable: false,
+        suppressMarkers: true, // Don't show default markers, use our custom ones
+        polylineOptions: {
+          strokeColor: '#2563EB',
+          strokeWeight: 4,
+          strokeOpacity: 0.8
+        }
       });
       
       directionsRendererRef.current.setMap(googleMapRef.current);
       
-      // Create directions request using the waypoints from the optimized route
-      const waypoints = route.waypoints.slice(0, -1).map(wp => ({
+      // Create waypoints for directions service
+      const waypoints = route.waypoints.map(wp => ({
         location: new google.maps.LatLng(wp.location.lat, wp.location.lng),
         stopover: true
       }));
       
       const directionsService = new google.maps.DirectionsService();
       const destination = routePreferences.returnToStart ? 
-        new google.maps.LatLng(location.lat, location.lng) : 
-        new google.maps.LatLng(route.waypoints[route.waypoints.length - 1].location.lat, route.waypoints[route.waypoints.length - 1].location.lng);
+        origin : 
+        waypoints.length > 0 ? waypoints[waypoints.length - 1].location : origin;
+      
+      // Remove the last waypoint from waypoints array if we're using it as destination
+      const finalWaypoints = routePreferences.returnToStart ? waypoints : waypoints.slice(0, -1);
       
       const directionsRequest: google.maps.DirectionsRequest = {
         origin: origin,
         destination: destination,
-        waypoints: waypoints,
+        waypoints: finalWaypoints,
         travelMode: google.maps.TravelMode.DRIVING,
-        optimizeWaypoints: true,
+        optimizeWaypoints: false, // We already optimized, don't let Google re-optimize
         avoidHighways: routePreferences.avoidHighways,
         avoidTolls: routePreferences.avoidTolls
       };
@@ -356,11 +345,14 @@ export default function MapComponent() {
         if (status === google.maps.DirectionsStatus.OK && result) {
           directionsRendererRef.current?.setDirections(result);
           
+          // Don't zoom or change view - keep current map bounds
+          
           toast({
             title: "Route optimized",
-            description: `Optimized route with ${route.waypoints.length} stops. Total distance: ${(route.totalDistance / 1000).toFixed(1)} km, time: ${Math.round(route.totalDuration / 60)} minutes.`
+            description: `Optimized route with ${allLocations.length} stops. Total distance: ${(route.totalDistance / 1609.34).toFixed(1)} miles, time: ${Math.round(route.totalDuration / 60)} minutes.`
           });
         } else {
+          console.error('Directions request failed:', status);
           toast({
             title: "Route optimization failed",
             description: "Unable to calculate the optimal route. Please try again.",
@@ -402,43 +394,76 @@ export default function MapComponent() {
               {/* Route Options */}
               <Card className="shadow-md flex-shrink-0">
                 <CardHeader className="py-3">
-                  <CardTitle>Route Options</CardTitle>
+                  <CardTitle className="text-sm">Route Options</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={() => setShowRoutePreferences(true)}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                      >
-                        <Route className="mr-2 h-4 w-4" />
-                        Preferences
-                      </Button>
-                      
-                      <Button 
-                        onClick={showOptimizedRoute}
-                        variant={optimizedRoute ? "default" : "outline"}
-                        size="sm"
-                        className="flex-1"
-                        disabled={
-                          tasks.filter(t => t.coordinates).length === 0 && 
-                          trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length === 0
-                        }
-                      >
-                        <Navigation className="mr-2 h-4 w-4" />
-                        {optimizedRoute ? "Update" : "Optimize"}
-                      </Button>
-                    </div>
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={showOptimizedRoute}
+                      disabled={tasks.filter(task => task.coordinates).length === 0 && trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length === 0}
+                      className="bg-primary text-white hover:bg-primary/90 flex-1 min-w-[120px]"
+                    >
+                      <Navigation className="h-4 w-4 mr-2" />
+                      Optimize Route
+                    </Button>
                     
-                    {optimizedRoute && (
-                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                        <span className="text-sm font-medium text-green-900">
-                          {optimizedRoute.waypoints.length + 1} stops • {(optimizedRoute.totalDistance / 1609.34).toFixed(1)} miles • {Math.round(optimizedRoute.totalDuration / 60)} min
-                        </span>
-                      </div>
-                    )}
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowRoutePreferences(true)}
+                      className="flex-1 min-w-[120px]"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Preferences
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Get all valid locations
+                        const validTasks = tasks.filter(task => 
+                          task.coordinates && 
+                          !(Math.abs(task.coordinates.lat - location.lat) < 0.0001 && Math.abs(task.coordinates.lng - location.lng) < 0.0001)
+                        );
+                        const validTrips = trips.filter(trip => 
+                          trip.coordinates && 
+                          trip.status !== 'completed' && 
+                          trip.status !== 'cancelled' &&
+                          !(Math.abs(trip.coordinates.lat - location.lat) < 0.0001 && Math.abs(trip.coordinates.lng - location.lng) < 0.0001)
+                        );
+                        const allLocations = [...validTasks, ...validTrips];
+                        
+                        if (allLocations.length === 0) {
+                          toast({
+                            title: "No locations to view",
+                            description: "Add some tasks or trips with locations first.",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+                        
+                        // Create simple Google Maps URL with user location as starting point
+                        let url = `https://www.google.com/maps/dir/${location.lat},${location.lng}`;
+                        
+                        // Add all destinations
+                        allLocations.forEach(loc => {
+                          if (loc.coordinates) {
+                            url += `/${loc.coordinates.lat},${loc.coordinates.lng}`;
+                          }
+                        });
+                        
+                        window.open(url, '_blank');
+                        
+                        toast({
+                          title: "Opening Google Maps",
+                          description: `Showing route from your location to ${allLocations.length} destinations`,
+                        });
+                      }}
+                      disabled={tasks.filter(task => task.coordinates).length === 0 && trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length === 0}
+                      className="flex-1 min-w-[120px]"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View on Google Maps
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -476,26 +501,7 @@ export default function MapComponent() {
                           return (
                             <div
                               key={`task-${task.id}`}
-                              className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                if (task.coordinates && googleMapRef.current) {
-                                  googleMapRef.current.panTo({ lat: task.coordinates.lat, lng: task.coordinates.lng });
-                                  googleMapRef.current.setZoom(15);
-                                  
-                                  // Find and click the corresponding marker
-                                  const marker = markersRef.current.find(
-                                    m => m.getPosition()?.lat() === task.coordinates?.lat && 
-                                         m.getPosition()?.lng() === task.coordinates?.lng
-                                  );
-                                  
-                                  if (marker && google.maps) {
-                                    google.maps.event.trigger(marker, 'click');
-                                  }
-                                  
-                                  // Set the selected task to show task details
-                                  setSelectedTask(task);
-                                }
-                              }}
+                              className="p-3 border rounded-md bg-gray-50 transition-colors"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
@@ -530,13 +536,7 @@ export default function MapComponent() {
                           return (
                             <div
                               key={`trip-${trip.id}`}
-                              className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                if (trip.coordinates && googleMapRef.current) {
-                                  googleMapRef.current.panTo({ lat: trip.coordinates.lat, lng: trip.coordinates.lng });
-                                  googleMapRef.current.setZoom(15);
-                                }
-                              }}
+                              className="p-3 border rounded-md bg-gray-50 transition-colors"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
@@ -580,20 +580,30 @@ export default function MapComponent() {
                     <CardTitle className="text-sm">Route Details</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="space-y-3 max-h-48 overflow-y-auto">
-                      {optimizedRoute.segments.map((segment, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs font-medium text-gray-600">
-                              {index === 0 ? 'A' : String.fromCharCode(65 + index)} → {String.fromCharCode(66 + index)}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {segment.distance}
-                            </span>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {optimizedRoute.segments.map((segment, index) => {
+                        // Calculate correct from and to letters based on actual waypoints
+                        const fromLetter = index === 0 ? 'A' : String.fromCharCode(65 + index);
+                        const toLetter = String.fromCharCode(65 + index + 1);
+                        
+                        // Don't show segment if it would exceed the number of actual locations
+                        const totalLocations = 1 + optimizedRoute.waypoints.length; // 1 for start + waypoints
+                        if (index + 1 >= totalLocations) return null;
+                        
+                        return (
+                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-medium text-gray-600">
+                                {fromLetter} → {toLetter}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {segment.distance}
+                              </span>
+                            </div>
+                            <span className="text-xs text-gray-500">{segment.duration}</span>
                           </div>
-                          <span className="text-xs text-gray-500">{segment.duration}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between text-sm font-medium">
                           <span>Total:</span>

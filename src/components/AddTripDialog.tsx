@@ -186,41 +186,16 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
       let participants;
       let shopper;
 
-      if (isAdmin) {
-        // Admin accounts get example participants for testing
-        participants = [
-          { 
-            id: user?.id || '1', 
-            name: user?.name || 'You', 
-            avatar: user?.avatar || 'https://i.pravatar.cc/150?u=a042581f4e29026024d' 
-          },
-          { 
-            id: '2', 
-            name: 'Rachel', 
-            avatar: 'https://i.pravatar.cc/150?u=rachel' 
-          },
-          { 
-            id: '3', 
-            name: 'Dev', 
-            avatar: 'https://i.pravatar.cc/150?u=dev' 
-          }
-        ];
-        shopper = { 
-          name: user?.name || 'You', 
-          avatar: user?.avatar || 'https://i.pravatar.cc/150?u=a042581f4e29026024d' 
-        };
-      } else {
-        // Regular users only get themselves
-        participants = [{ 
-          id: user?.id || '1', 
-          name: user?.name || 'User', 
-          avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
-        }];
-        shopper = { 
-          name: user?.name || 'User', 
-          avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
-        };
-      }
+      // Both admin and regular users only get themselves as participants
+      participants = [{ 
+        id: user?.id || '1', 
+        name: user?.name || 'User', 
+        avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+      }];
+      shopper = { 
+        name: user?.name || 'User', 
+        avatar: user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`
+      };
 
       const tripData = {
         store,

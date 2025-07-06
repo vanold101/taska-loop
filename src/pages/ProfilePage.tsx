@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useTutorial } from '../context/TutorialContext';
@@ -11,6 +11,7 @@ import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import SubscriptionManager from '../components/SubscriptionManager';
 import { stripeService } from '../services/stripeService';
+import { getCurrentTheme, toggleTheme } from '../utils/theme';
 import {
   Bell,
   Calculator,
@@ -56,6 +57,21 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showSubscriptionManager, setShowSubscriptionManager] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Initialize dark mode state
+  useEffect(() => {
+    setIsDarkMode(getCurrentTheme() === 'dark');
+  }, []);
+
+  const handleDarkModeToggle = () => {
+    const newTheme = toggleTheme();
+    setIsDarkMode(newTheme === 'dark');
+    toast({
+      title: newTheme === 'dark' ? "Dark mode enabled" : "Light mode enabled",
+      description: `Switched to ${newTheme} mode`,
+    });
+  };
 
   const handleSignOut = async () => {
     try {
@@ -238,7 +254,7 @@ export default function ProfilePage() {
                       <Label htmlFor="darkMode">Dark Mode</Label>
                       <p className="text-sm text-slate-500">Enable dark mode for the application</p>
                     </div>
-                    <Switch id="darkMode" />
+                    <Switch id="darkMode" checked={isDarkMode} onCheckedChange={handleDarkModeToggle} />
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
