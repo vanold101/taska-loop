@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useHousehold } from '../context/HouseholdContext';
-import { useToast } from '../hooks/use-toast';
 import { AppLayout } from '../components/AppLayout';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -34,7 +33,6 @@ export default function InviteHouseholdPage() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
   const { members, currentHousehold, inviteMember, removeMember, updateMember } = useHousehold();
-  const { toast } = useToast();
   
   const [emailInvite, setEmailInvite] = useState('');
   const [phoneInvite, setPhoneInvite] = useState('');
@@ -63,22 +61,14 @@ export default function InviteHouseholdPage() {
     e.preventDefault();
     
     if (!emailInvite.trim()) {
-      toast({
-        title: "Email required",
-        description: "Please enter an email address to send the invitation.",
-        variant: "destructive",
-      });
+      console.log("Email required");
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailInvite)) {
-      toast({
-        title: "Invalid email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
+      console.log("Invalid email");
       return;
     }
 
@@ -86,10 +76,7 @@ export default function InviteHouseholdPage() {
       setIsLoading(true);
       await inviteMember(emailInvite, customMessage || undefined);
       
-      toast({
-        title: "Invitation sent!",
-        description: `Invitation sent to ${emailInvite}. Check the browser console to see the invitation details (demo mode).`,
-      });
+      console.log(`Invitation sent to ${emailInvite}. Check the browser console to see the invitation details (demo mode).`);
       
       // Reset form
       setEmailInvite('');
@@ -100,11 +87,7 @@ export default function InviteHouseholdPage() {
       setSentInvitations(invitations);
       
     } catch (error) {
-      toast({
-        title: "Failed to send invitation",
-        description: "Please try again later.",
-        variant: "destructive",
-      });
+      console.error("Failed to send invitation");
     } finally {
       setIsLoading(false);
     }
@@ -114,45 +97,27 @@ export default function InviteHouseholdPage() {
     e.preventDefault();
     
     if (!phoneInvite.trim()) {
-      toast({
-        title: "Phone number required",
-        description: "Please enter a phone number to send the invitation.",
-        variant: "destructive",
-      });
+      console.log("Phone number required");
       return;
     }
 
     // For now, we'll convert phone invites to email-style invites
     // In a real app, you'd integrate with SMS services like Twilio
-    toast({
-      title: "Phone invites coming soon!",
-      description: "SMS invitations are not yet available. Please use email invitations for now.",
-      variant: "default",
-    });
+    console.log("Phone invites coming soon!");
+    console.log("SMS invitations are not yet available. Please use email invitations for now.");
   };
 
   const handleRemoveMember = async (memberId: string, memberName: string) => {
     if (memberId === user?.id) {
-      toast({
-        title: "Cannot remove yourself",
-        description: "You cannot remove yourself from the household.",
-        variant: "destructive",
-      });
+      console.log("Cannot remove yourself");
       return;
     }
 
     try {
       removeMember(memberId);
-      toast({
-        title: "Member removed",
-        description: `${memberName} has been removed from your household.`,
-      });
+      console.log(`${memberName} has been removed from your household.`);
     } catch (error) {
-      toast({
-        title: "Failed to remove member",
-        description: "Please try again later.",
-        variant: "destructive",
-      });
+      console.error("Failed to remove member");
     }
   };
 

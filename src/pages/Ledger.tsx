@@ -17,7 +17,6 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useHousehold } from "../context/HouseholdContext";
 import { Button } from "../components/ui/button";
-import { useToast } from "../hooks/use-toast";
 import { 
   Card, 
   CardContent, 
@@ -177,7 +176,6 @@ const LedgerPage = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<TransactionCategory | undefined>(undefined);
   const [showCategoryMenu, setShowCategoryMenu] = useState<string | null>(null);
-  const { toast } = useToast();
   
   // Set current user for ledger service
   useEffect(() => {
@@ -236,16 +234,9 @@ const LedgerPage = () => {
     try {
       confirmPayment(transactionId);
       loadData(); // Reload data to reflect changes
-      toast({
-        title: "Payment confirmed",
-        description: "The payment has been successfully confirmed.",
-      });
+      console.log("Payment confirmed");
     } catch (error) {
-      toast({
-        title: "Error confirming payment",
-        description: "There was a problem confirming this payment.",
-        variant: "destructive"
-      });
+      console.error("Error confirming payment:", error);
     }
   };
   
@@ -254,16 +245,9 @@ const LedgerPage = () => {
     try {
       cancelPayment(transactionId);
       loadData(); // Reload data to reflect changes
-      toast({
-        title: "Payment cancelled",
-        description: "The payment has been cancelled.",
-      });
+      console.log("Payment cancelled");
     } catch (error) {
-      toast({
-        title: "Error cancelling payment",
-        description: "There was a problem cancelling this payment.",
-        variant: "destructive"
-      });
+      console.error("Error cancelling payment:", error);
     }
   };
   
@@ -272,40 +256,24 @@ const LedgerPage = () => {
     // Validation
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount greater than 0.",
-        variant: "destructive"
-      });
+      console.error("Invalid amount");
       return;
     }
     
     if (!paymentDescription.trim()) {
-      toast({
-        title: "Description required",
-        description: "Please enter a description for this payment.",
-        variant: "destructive"
-      });
+      console.error("Description required");
       return;
     }
     
     if (!selectedRecipientId) {
-      toast({
-        title: "Recipient required",
-        description: "Please select a recipient for this payment.",
-        variant: "destructive"
-      });
+      console.error("Recipient required");
       return;
     }
     
     // Find the recipient from household members
     const recipient = members.find(member => member.id === selectedRecipientId);
     if (!recipient) {
-      toast({
-        title: "Recipient not found",
-        description: "The selected recipient could not be found.",
-        variant: "destructive"
-      });
+      console.error("Recipient not found");
       return;
     }
     
@@ -331,16 +299,9 @@ const LedgerPage = () => {
       // Reload data to reflect changes
       loadData();
       
-      toast({
-        title: "Payment recorded",
-        description: "Your payment has been recorded successfully.",
-      });
+      console.log("Payment recorded");
     } catch (error) {
-      toast({
-        title: "Error recording payment",
-        description: "There was a problem recording this payment.",
-        variant: "destructive"
-      });
+      console.error("Error recording payment:", error);
     }
   };
   
@@ -349,11 +310,7 @@ const LedgerPage = () => {
     const availableRecipients = members.filter(member => member.id !== user?.id);
     
     if (availableRecipients.length === 0) {
-      toast({
-        title: "No household members",
-        description: "Invite someone to your household to send them payments.",
-        variant: "destructive"
-      });
+      console.error("No household members - Invite someone to your household to send them payments.");
       return;
     }
     
@@ -494,10 +451,7 @@ const LedgerPage = () => {
   // Export transactions to CSV
   const exportTransactions = () => {
     if (transactions.length === 0) {
-      toast({
-        title: "No transactions to export",
-        description: "There are no transactions to export."
-      });
+      console.log("No transactions to export");
       return;
     }
     
@@ -531,16 +485,9 @@ const LedgerPage = () => {
       link.click();
       document.body.removeChild(link);
       
-      toast({
-        title: "Export successful",
-        description: "Your transactions have been exported to CSV."
-      });
+      console.log("Export successful - Your transactions have been exported to CSV.");
     } catch (error) {
-      toast({
-        title: "Export failed",
-        description: "There was a problem exporting your transactions.",
-        variant: "destructive"
-      });
+      console.error("Export failed - There was a problem exporting your transactions.", error);
     }
   };
   
@@ -554,16 +501,9 @@ const LedgerPage = () => {
       setShowCategoryMenu(null);
       loadData(); // Reload data to reflect changes
       
-      toast({
-        title: "Category updated",
-        description: "Transaction category has been updated.",
-      });
+      console.log("Category updated");
     } catch (error) {
-      toast({
-        title: "Error updating category",
-        description: "There was a problem updating the category.",
-        variant: "destructive"
-      });
+      console.error("Error updating category", error);
     }
   };
   
@@ -732,10 +672,7 @@ const LedgerPage = () => {
                           size="sm"
                           className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                           onClick={() => {
-                            toast({
-                              title: "Reminder added",
-                              description: `You'll be reminded about this payment later.`
-                            });
+                            console.log("Reminder added");
                           }}
                         >
                           <Clock className="h-4 w-4 mr-1" />
@@ -756,10 +693,7 @@ const LedgerPage = () => {
                         size="sm"
                         className="border-green-500 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20"
                         onClick={() => {
-                          toast({
-                            title: "Payment request sent",
-                            description: `A payment reminder was sent to ${rec.from.userName}.`
-                          });
+                          console.log("Payment request sent");
                         }}
                       >
                         <Send className="h-4 w-4 mr-1" />

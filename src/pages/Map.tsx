@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Plus, MapPin, ShoppingCart, Route } from 'lucide-react';
-import { useToast } from '../hooks/use-toast';
 import { useTaskContext } from '../context/TaskContext';
 import { AppLayout } from '../components/AppLayout';
 import MapComponent from '../components/MapComponent';
@@ -10,7 +9,6 @@ import { CreateTaskModal } from '../components/CreateTaskModal';
 import CreateTripModal from '../components/CreateTripModal';
 
 export default function MapPage() {
-  const { toast } = useToast();
   const { tasks, trips, addTask, addTrip } = useTaskContext();
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
@@ -22,10 +20,7 @@ export default function MapPage() {
 
   const handleCreateTask = (taskData: any) => {
     addTask(taskData);
-    toast({
-      title: "Task created",
-      description: "Your task has been successfully created.",
-    });
+    console.log("Task created:", taskData);
     setIsCreateTaskModalOpen(false);
   };
 
@@ -40,10 +35,7 @@ export default function MapPage() {
       shopper: { name: "You", avatar: "https://example.com/avatar.jpg" },
       items: []
     });
-    toast({
-      title: "Trip created",
-      description: "Your shopping trip has been successfully created.",
-    });
+    console.log("Trip created:", tripData);
     setIsCreateTripModalOpen(false);
   };
 

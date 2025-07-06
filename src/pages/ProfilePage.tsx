@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useTutorial } from '../context/TutorialContext';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '../hooks/use-toast';
 import { AppLayout } from '../components/AppLayout';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
@@ -11,7 +10,7 @@ import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import SubscriptionManager from '../components/SubscriptionManager';
 import { stripeService } from '../services/stripeService';
-import { getCurrentTheme, toggleTheme } from '../utils/theme';
+import { toggleTheme, getCurrentTheme } from '../utils/theme';
 import {
   Bell,
   Calculator,
@@ -54,7 +53,6 @@ export default function ProfilePage() {
   const { currentTier, limits } = useSubscription();
   const { startTutorial } = useTutorial();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showSubscriptionManager, setShowSubscriptionManager] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -67,28 +65,18 @@ export default function ProfilePage() {
   const handleDarkModeToggle = () => {
     const newTheme = toggleTheme();
     setIsDarkMode(newTheme === 'dark');
-    toast({
-      title: newTheme === 'dark' ? "Dark mode enabled" : "Light mode enabled",
-      description: `Switched to ${newTheme} mode`,
-    });
+    console.log(newTheme === 'dark' ? "Dark mode enabled" : "Light mode enabled");
   };
 
   const handleSignOut = async () => {
     try {
       setIsLoggingOut(true);
       await logout();
-      toast({
-        title: "Successfully signed out",
-        description: "You have been signed out of your account.",
-      });
+      console.log("Successfully signed out");
       navigate('/');
     } catch (error) {
       console.error("Sign out failed:", error);
-      toast({
-        title: "Sign out failed",
-        description: "There was a problem signing you out. Please try again.",
-        variant: "destructive",
-      });
+      console.error("There was a problem signing you out. Please try again.");
     } finally {
       setIsLoggingOut(false);
     }
@@ -568,11 +556,7 @@ export default function ProfilePage() {
                                   // In production, you'd pass the actual Stripe customer ID
                                   await stripeService.openCustomerPortal('cus_demo_customer_id');
                                 } catch (error) {
-                                  toast({
-                                    title: "Error",
-                                    description: "Failed to open customer portal. Please try again.",
-                                    variant: "destructive"
-                                  });
+                                  console.error("Failed to open customer portal. Please try again.");
                                 }
                               }}
                             >
@@ -633,10 +617,7 @@ export default function ProfilePage() {
                         if (user) {
                           localStorage.removeItem(`tutorial_completed_${user.id}`);
                           startTutorial();
-                          toast({
-                            title: "Tutorial Started",
-                            description: "The welcome tutorial has been restarted.",
-                          });
+                          console.log("The welcome tutorial has been restarted.");
                         }
                       }}
                     >

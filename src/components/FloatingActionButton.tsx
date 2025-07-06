@@ -3,7 +3,6 @@ import { Megaphone, Plus, ShoppingCart, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptics } from "@/lib/utils";
 import { useLocation } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { ReactNode } from "react";
 
@@ -43,7 +42,6 @@ const FloatingActionButton = ({
   enableLongPress = true
 }: FloatingActionButtonProps) => {
   const location = useLocation();
-  const { toast } = useToast();
   const [isPressed, setIsPressed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);

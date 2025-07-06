@@ -51,7 +51,6 @@ import {
   DialogTrigger,
 } from "../components/ui/dialog"
 import { Label } from "../components/ui/label"
-import { toast } from "../components/ui/use-toast"
 import PantryBarcodeScanner from "../components/PantryBarcodeScanner"
 import { motion, AnimatePresence } from "framer-motion"
 import FloatingActionButton from "../components/FloatingActionButton"
@@ -182,10 +181,7 @@ export default function PantryPage() {
     if (item) {
       // In a real app, this would add to a shopping list context
       // For now, we'll show a toast and navigate to trips page
-      toast({
-        title: "Added to Shopping List",
-        description: `${item.name} has been added to your shopping list`,
-      });
+      console.log(`${item.name} has been added to your shopping list`);
       
       // Navigate to trips page where user can create a new trip with this item
       navigate("/trips?action=add-item&item=" + encodeURIComponent(item.name));
@@ -195,6 +191,7 @@ export default function PantryPage() {
   // Handler for "Remove" menu item
   const handleRemoveItem = (itemId: string) => {
     removePantryItem(itemId);
+    console.log("Item removed from pantry");
   };
 
   // Handler for closing Add Item dialog
@@ -212,11 +209,7 @@ export default function PantryPage() {
     e.preventDefault();
     
     if (!newItem.name || !newItem.quantity) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide at least an item name and quantity.",
-        variant: "destructive",
-      });
+      console.error("Please provide at least an item name and quantity.");
       return;
     }
 
@@ -286,28 +279,19 @@ export default function PantryPage() {
 
   const handleClearPantry = () => {
     pantryItems.forEach(item => removePantryItem(item.id));
-    toast({
-      title: "Pantry Cleared",
-      description: "All items have been removed from your pantry.",
-    });
+    console.log("All items have been removed from your pantry.");
   };
 
   const handleAddLowStockToCart = () => {
     const lowStockItemNames = lowStockItems.map(item => item.name);
     
     if (lowStockItemNames.length === 0) {
-      toast({
-        title: "No Low Stock Items",
-        description: "All items are adequately stocked.",
-      });
+      console.log("All items are adequately stocked.");
       return;
     }
     
     // In a real app, this would integrate with shopping list context
-    toast({
-      title: "Items Added to Cart",
-      description: `${lowStockItemNames.length} low stock items have been added to your shopping list: ${lowStockItemNames.join(", ")}`,
-    });
+    console.log(`${lowStockItemNames.length} low stock items have been added to your shopping list: ${lowStockItemNames.join(", ")}`);
     
     // Navigate to trips page to create a shopping trip
     navigate("/trips?action=low-stock-refill");
@@ -361,18 +345,11 @@ export default function PantryPage() {
     }).filter(Boolean);
     
     if (selectedItemNames.length === 0) {
-      toast({
-        title: "No Items Selected",
-        description: "Please select items to add to your shopping list.",
-        variant: "destructive"
-      });
+      console.error("Please select items to add to your shopping list.");
       return;
     }
     
-    toast({
-      title: 'Items Added',
-      description: `${selectedItems.size} items have been added to your shopping list: ${selectedItemNames.join(", ")}`,
-    });
+    console.log(`${selectedItems.size} items have been added to your shopping list: ${selectedItemNames.join(", ")}`);
     
     // Navigate to trips page to create a shopping trip
     navigate("/trips?action=bulk-add&items=" + encodeURIComponent(selectedItemNames.join(",")));
@@ -959,11 +936,7 @@ export default function PantryPage() {
             <Button onClick={() => {
               // Implement add to cart with all selected options
               setShowShoppingListDialog(false);
-              toast({
-                title: "Added to shopping list",
-                description: `${addToCartQuantity} items added to ${selectedShoppingList} list`,
-                variant: "default"
-              });
+              console.log(`${addToCartQuantity} items added to ${selectedShoppingList} list`);
             }}>
               Add to List
             </Button>

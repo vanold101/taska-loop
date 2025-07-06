@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLoginForm from '@/components/ui/AdminLoginForm';
 import { isUserAdmin } from '@/services/AdminService';
-import { toast } from 'sonner';
 
 const AdminLoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,7 +19,7 @@ const AdminLoginPage: React.FC = () => {
           
           if (isAdmin) {
             // If already logged in as admin, redirect to dashboard
-            toast.success('Welcome back, admin!');
+            console.log('Welcome back, admin!');
             navigate('/admin/dashboard');
           } else {
             // Remove invalid admin data
@@ -38,7 +37,7 @@ const AdminLoginPage: React.FC = () => {
 
   // Handle successful login
   const handleLoginSuccess = (adminData: any) => {
-    toast.success('Successfully logged in as admin!');
+    console.log('Successfully logged in as admin!');
   };
 
   return (

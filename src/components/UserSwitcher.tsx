@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, LogOut, Settings, ChevronDown, Users, Crown, Shield, AlertTriangle, ExternalLink, Minimize2, Maximize2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { LogOut, User, Shield, Users, AlertTriangle, ExternalLink, Minimize2, Maximize2 } from 'lucide-react';
-import { useToast } from '../hooks/use-toast';
 
 const UserSwitcher: React.FC = () => {
   const { user, logout, loginWithEmail, loginWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const { toast } = useToast();
 
   // Test accounts for easy switching
   const testAccounts = [
@@ -48,35 +48,20 @@ const UserSwitcher: React.FC = () => {
       // Login with test account
       await loginWithEmail(account.email, account.password);
       
-      toast({
-        title: "Account switched successfully",
-        description: `Logged in as ${account.name}`,
-      });
+      console.log("Account switched successfully", `Logged in as ${account.name}`);
       
     } catch (error: any) {
       console.error('Account switch failed:', error);
       
       if (error.code === 'auth/operation-not-allowed') {
         setAuthError('Firebase Authentication not enabled');
-        toast({
-          title: "Authentication not enabled",
-          description: "Please enable Firebase Authentication first",
-          variant: "destructive",
-        });
+        console.error("Authentication not enabled", "Please enable Firebase Authentication first");
       } else if (error.code === 'auth/user-not-found') {
         setAuthError('Test accounts not created');
-        toast({
-          title: "Test accounts not found",
-          description: "Please run the admin setup script first",
-          variant: "destructive",
-        });
+        console.error("Test accounts not found", "Please run the admin setup script first");
       } else {
         setAuthError(error.message);
-        toast({
-          title: "Login failed",
-          description: error.message,
-          variant: "destructive",
-        });
+        console.error("Login failed", error.message);
       }
     } finally {
       setIsLoading(false);
@@ -95,19 +80,12 @@ const UserSwitcher: React.FC = () => {
       
       await loginWithGoogle();
       
-      toast({
-        title: "Google login successful",
-        description: "Logged in with your Google account",
-      });
+      console.log("Google login successful", "Logged in with your Google account");
       
     } catch (error: any) {
       console.error('Google login failed:', error);
       setAuthError(error.message);
-      toast({
-        title: "Google login failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      console.error("Google login failed", error.message);
     } finally {
       setIsLoading(false);
     }
@@ -118,17 +96,10 @@ const UserSwitcher: React.FC = () => {
       setIsLoading(true);
       await logout();
       setAuthError(null);
-      toast({
-        title: "Logged out successfully",
-        description: "You have been signed out",
-      });
+      console.log("Logged out successfully", "You have been signed out");
     } catch (error: any) {
       console.error('Logout failed:', error);
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      console.error("Logout failed", error.message);
     } finally {
       setIsLoading(false);
     }
