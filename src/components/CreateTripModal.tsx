@@ -86,11 +86,7 @@ const CreateTripModal = ({ isOpen, onClose, onSubmit }: CreateTripModalProps) =>
     e.preventDefault();
     
     if (!isFormValid) {
-      toast({
-        title: "Cannot broadcast trip",
-        description: "Please fix the errors in the form",
-        variant: "destructive",
-      });
+      console.log("Cannot broadcast trip: Form is invalid.");
       return;
     }
     

@@ -298,11 +298,7 @@ export function CreateTaskModal({ isOpen, onClose, onSubmit, taskToEdit, isEditi
           // Get a new session token for the next search
           placesSessionToken.current = new google.maps.places.AutocompleteSessionToken();
         } else {
-          toast({
-            title: "Error",
-            description: "Couldn't get place details",
-            variant: "destructive"
-          });
+          console.error("Couldn't get place details");
         }
       }
     );
