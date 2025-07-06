@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTaskContext } from "@/context/TaskContext";
-import { toast } from "@/components/ui/use-toast";
 import { initGoogleMapsPlaces } from "@/services/googlePlaces";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon, MapPin, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
 
 interface AddTripDialogProps {
   open: boolean;
@@ -40,7 +38,6 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
 
   // Context
   const { addTrip } = useTaskContext();
-  const { toast } = useToast();
   const { user, isAdmin } = useAuth();
 
   // Initialize Google Places services
@@ -48,11 +45,6 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
     if (open) {
       initGoogleMapsPlaces().catch(error => {
         console.error("Failed to initialize Google Maps:", error);
-        toast({
-          title: "Location Search Unavailable",
-          description: "Please try refreshing the page",
-          variant: "destructive"
-        });
       });
     }
 
@@ -127,11 +119,7 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
       }
     } catch (error) {
       console.error('Error fetching place details:', error);
-      toast({
-        title: "Error",
-        description: "Could not fetch place details.",
-        variant: "destructive",
-      });
+      console.error("Could not fetch place details.");
     } finally {
       setSessionToken(undefined); // End of session
     }
@@ -171,11 +159,7 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
     if (!time) missingFields.push("Time");
 
     if (missingFields.length > 0) {
-      toast({
-        title: "Missing Required Fields",
-        description: `Please fill in: ${missingFields.join(", ")}`,
-        variant: "destructive",
-      });
+      console.error(`Missing required fields: ${missingFields.join(", ")}`);
       return;
     }
 
@@ -214,20 +198,13 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
       // Add trip
       addTrip(tripData);
 
-      toast({
-        title: "Success",
-        description: "Trip created successfully"
-      });
+      console.log("Trip created successfully");
 
       // Close dialog and reset form
       handleOpenChange(false);
     } catch (error) {
       console.error("Failed to create trip:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create trip. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Failed to create trip. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

@@ -5,7 +5,6 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Map as MapIcon, Navigation, MapPin, Clock, Route, Plus, Trash2, Settings, ExternalLink } from "lucide-react";
-import { useToast } from "../hooks/use-toast";
 import { motion } from "framer-motion";
 import { format } from 'date-fns';
 import { useTaskContext, Task } from "../context/TaskContext";
@@ -15,10 +14,11 @@ import { RoutePreferences, OptimizedRoute, StopTimeWindow } from '../types/routi
 import RoutePreferencesComponent from '../components/RoutePreferences';
 import { initGoogleMapsCore } from "@/services/googlePlaces";
 import { CreateTaskModal } from "../components/CreateTaskModal";
+import { useDeviceDetection } from "../hooks/useDeviceDetection";
 
 export default function MapComponent() {
-  const { toast } = useToast();
   const { tasks, trips, addTask } = useTaskContext();
+  const { isMobile, isTablet, screenWidth } = useDeviceDetection();
   const [location, setLocation] = useState<{ lat: number, lng: number }>({ lat: 39.9789, lng: -82.8677 }); // Default to Columbus, OH
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -33,6 +33,7 @@ export default function MapComponent() {
   });
   const [optimizedRoute, setOptimizedRoute] = useState<OptimizedRoute | null>(null);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [showLocationsList, setShowLocationsList] = useState(!isMobile); // Hide by default on mobile
   
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
@@ -129,18 +130,11 @@ export default function MapComponent() {
         console.log("Adding markers...");
         addAllMarkers();
         
-        toast({
-          title: "Map loaded",
-          description: "Google Maps has been loaded successfully."
-        });
+        console.log("Map loaded successfully.");
         
       } catch (error) {
         console.error("Failed to initialize map:", error);
-        toast({
-          title: "Map loading failed",
-          description: "There was an error loading the map. Please try again.",
-          variant: "destructive"
-        });
+        console.error("Map loading failed. Please try again.");
       }
     };
 
@@ -286,11 +280,7 @@ export default function MapComponent() {
     const allLocations = [...taskLocations, ...tripLocations];
     
     if (allLocations.length === 0) {
-      toast({
-        title: "No locations to optimize",
-        description: "Add some tasks or trips with locations to optimize your route.",
-        variant: "destructive"
-      });
+      console.log("No locations to optimize. Add some tasks or trips with locations.");
       return;
     }
     
@@ -347,35 +337,21 @@ export default function MapComponent() {
           
           // Don't zoom or change view - keep current map bounds
           
-          toast({
-            title: "Route optimized",
-            description: `Optimized route with ${allLocations.length} stops. Total distance: ${(route.totalDistance / 1609.34).toFixed(1)} miles, time: ${Math.round(route.totalDuration / 60)} minutes.`
-          });
+          console.log(`Optimized route with ${allLocations.length} stops. Total distance: ${(route.totalDistance / 1609.34).toFixed(1)} miles, time: ${Math.round(route.totalDuration / 60)} minutes.`);
         } else {
           console.error('Directions request failed:', status);
-          toast({
-            title: "Route optimization failed",
-            description: "Unable to calculate the optimal route. Please try again.",
-            variant: "destructive"
-          });
+          console.error("Route optimization failed. Unable to calculate the optimal route.");
         }
       });
     } catch (error) {
       console.error('Route optimization error:', error);
-      toast({
-        title: "Route optimization failed",
-        description: "There was an error calculating the route. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Route optimization failed. There was an error calculating the route.");
     }
   };
 
   const handleCreateTask = (taskData: any) => {
     addTask(taskData);
-    toast({
-      title: "Task created",
-      description: "Your task has been successfully created.",
-    });
+    console.log("Task created successfully.");
     setIsCreateTaskModalOpen(false);
   };
 
@@ -388,32 +364,32 @@ export default function MapComponent() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="flex flex-1 gap-4 p-4">
+          <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} flex-1 gap-2 ${isMobile ? 'p-2' : 'p-4'}`}>
             {/* Left Sidebar - Route Options and Locations */}
-            <div className="w-80 flex-shrink-0 flex flex-col gap-4">
+            <div className={`${isMobile ? 'w-full' : 'w-80'} flex-shrink-0 flex flex-col gap-2`}>
               {/* Route Options */}
               <Card className="shadow-md flex-shrink-0">
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm">Route Options</CardTitle>
+                <CardHeader className={`${isMobile ? 'py-2' : 'py-3'}`}>
+                  <CardTitle className={`${isMobile ? 'text-xs' : 'text-sm'}`}>Route Options</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4">
-                  <div className="flex flex-wrap gap-2">
+                <CardContent className={`${isMobile ? 'p-2' : 'p-4'}`}>
+                  <div className={`flex ${isMobile ? 'flex-col gap-1' : 'flex-wrap gap-2'}`}>
                     <Button
                       onClick={showOptimizedRoute}
                       disabled={tasks.filter(task => task.coordinates).length === 0 && trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length === 0}
-                      className="bg-primary text-white hover:bg-primary/90 flex-1 min-w-[120px]"
+                      className={`bg-primary text-white hover:bg-primary/90 ${isMobile ? 'text-xs py-2 h-8' : 'flex-1 min-w-[120px]'}`}
                     >
-                      <Navigation className="h-4 w-4 mr-2" />
-                      Optimize Route
+                      <Navigation className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-4 w-4 mr-2'}`} />
+                      {isMobile ? 'Optimize' : 'Optimize Route'}
                     </Button>
                     
                     <Button
                       variant="outline"
                       onClick={() => setShowRoutePreferences(true)}
-                      className="flex-1 min-w-[120px]"
+                      className={`${isMobile ? 'text-xs py-2 h-8' : 'flex-1 min-w-[120px]'}`}
                     >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Preferences
+                      <Settings className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-4 w-4 mr-2'}`} />
+                      {isMobile ? 'Settings' : 'Preferences'}
                     </Button>
 
                     <Button
@@ -433,11 +409,7 @@ export default function MapComponent() {
                         const allLocations = [...validTasks, ...validTrips];
                         
                         if (allLocations.length === 0) {
-                          toast({
-                            title: "No locations to view",
-                            description: "Add some tasks or trips with locations first.",
-                            variant: "destructive"
-                          });
+                          console.log("No locations to view. Add some tasks or trips with locations first.");
                           return;
                         }
                         
@@ -453,134 +425,157 @@ export default function MapComponent() {
                         
                         window.open(url, '_blank');
                         
-                        toast({
-                          title: "Opening Google Maps",
-                          description: `Showing route from your location to ${allLocations.length} destinations`,
-                        });
+                        console.log(`Opening Google Maps to show route from your location to ${allLocations.length} destinations.`);
                       }}
                       disabled={tasks.filter(task => task.coordinates).length === 0 && trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length === 0}
-                      className="flex-1 min-w-[120px]"
+                      className={`${isMobile ? 'text-xs py-2 h-8' : 'flex-1 min-w-[120px]'}`}
                     >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View on Google Maps
+                      <ExternalLink className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-4 w-4 mr-2'}`} />
+                      {isMobile ? 'Maps' : 'View on Google Maps'}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Locations */}
-              <Card className="shadow-md flex-1 min-h-0">
-                <CardHeader className="py-3 flex-shrink-0">
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Locations</span>
-                    <span className="text-sm text-gray-500">
-                      {tasks.filter(t => t.coordinates).length + trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length + 1} total
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-hidden p-0">
-                  <div className="h-full overflow-y-auto px-6 pb-6">
-                    {(tasks.filter(t => t.coordinates).length > 0 || trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length > 0) ? (
-                      <div className="space-y-2">
-                        {/* User Location - Always A */}
-                        <div className="p-3 border rounded-md bg-blue-50 border-blue-200">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">A</span>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-medium text-sm">Your Location</h4>
-                              <p className="text-xs text-gray-600">Starting point</p>
+              {/* Locations - Collapsible on mobile */}
+              {(!isMobile || showLocationsList) && (
+                <Card className={`shadow-md ${isMobile ? 'max-h-64' : 'flex-1 min-h-0'}`}>
+                  <CardHeader className={`${isMobile ? 'py-2' : 'py-3'} flex-shrink-0`}>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className={`${isMobile ? 'text-xs' : 'text-sm'}`}>Locations</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>
+                          {tasks.filter(t => t.coordinates).length + trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length + 1} total
+                        </span>
+                        {isMobile && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowLocationsList(false)}
+                            className="h-6 w-6 p-0"
+                          >
+                            ×
+                          </Button>
+                        )}
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1 overflow-hidden p-0">
+                    <div className={`h-full overflow-y-auto ${isMobile ? 'px-2 pb-2' : 'px-6 pb-6'}`}>
+                      {(tasks.filter(t => t.coordinates).length > 0 || trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length > 0) ? (
+                        <div className={`space-y-${isMobile ? '1' : '2'}`}>
+                          {/* User Location - Always A */}
+                          <div className={`${isMobile ? 'p-2' : 'p-3'} border rounded-md bg-blue-50 border-blue-200`}>
+                            <div className="flex items-center space-x-2">
+                              <div className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'} bg-blue-600 rounded-full flex items-center justify-center`}>
+                                <span className={`text-white ${isMobile ? 'text-xs' : 'text-xs'} font-bold`}>A</span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>Your Location</h4>
+                                <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-600`}>Starting point</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Tasks */}
-                        {tasks.filter(task => task.coordinates).map((task, index) => {
-                          const letter = String.fromCharCode(66 + index); // B, C, D, etc.
-                          return (
-                            <div
-                              key={`task-${task.id}`}
-                              className="p-3 border rounded-md bg-gray-50 transition-colors"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-xs font-bold">{letter}</span>
+                          {/* Tasks */}
+                          {tasks.filter(task => task.coordinates).map((task, index) => {
+                            const letter = String.fromCharCode(66 + index); // B, C, D, etc.
+                            return (
+                              <div
+                                key={`task-${task.id}`}
+                                className={`${isMobile ? 'p-2' : 'p-3'} border rounded-md bg-gray-50 transition-colors`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'} bg-red-500 rounded-full flex items-center justify-center`}>
+                                      <span className={`text-white ${isMobile ? 'text-xs' : 'text-xs'} font-bold`}>{letter}</span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{task.title}</h4>
+                                      <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 truncate`}>{task.location}</p>
+                                    </div>
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className="font-medium text-sm truncate">{task.title}</h4>
-                                    <p className="text-xs text-gray-500 truncate">{task.location}</p>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500`}>
+                                      {format(new Date(task.dueDate), 'MMM d')}
+                                    </p>
+                                    <span className={`${isMobile ? 'text-xs px-1 py-0.5' : 'text-xs px-2 py-1'} rounded ${
+                                      task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-green-100 text-green-800'
+                                    }`}>
+                                      {task.priority}
+                                    </span>
                                   </div>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                  <p className="text-xs text-gray-500">
-                                    {format(new Date(task.dueDate), 'MMM d')}
-                                  </p>
-                                  <span className={`text-xs px-2 py-1 rounded ${
-                                    task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                    task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                    'bg-green-100 text-green-800'
-                                  }`}>
-                                    {task.priority}
-                                  </span>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                        
-                        {/* Trips */}
-                        {trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').map((trip, index) => {
-                          const letter = String.fromCharCode(66 + tasks.filter(task => task.coordinates).length + index); // Continue from where tasks left off
-                          return (
-                            <div
-                              key={`trip-${trip.id}`}
-                              className="p-3 border rounded-md bg-gray-50 transition-colors"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-xs font-bold">{letter}</span>
+                            );
+                          })}
+                          
+                          {/* Trips */}
+                          {trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').map((trip, index) => {
+                            const letter = String.fromCharCode(66 + tasks.filter(task => task.coordinates).length + index); // Continue from where tasks left off
+                            return (
+                              <div
+                                key={`trip-${trip.id}`}
+                                className={`${isMobile ? 'p-2' : 'p-3'} border rounded-md bg-gray-50 transition-colors`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'} bg-blue-500 rounded-full flex items-center justify-center`}>
+                                      <span className={`text-white ${isMobile ? 'text-xs' : 'text-xs'} font-bold`}>{letter}</span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{trip.store}</h4>
+                                      <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500`}>{trip.items.length} items</p>
+                                    </div>
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className="font-medium text-sm truncate">{trip.store}</h4>
-                                    <p className="text-xs text-gray-500">{trip.items.length} items</p>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500`}>ETA: {trip.eta}</p>
+                                    <span className={`${isMobile ? 'text-xs px-1 py-0.5' : 'text-xs px-2 py-1'} rounded ${
+                                      trip.status === 'shopping' ? 'bg-blue-100 text-blue-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {trip.status}
+                                    </span>
                                   </div>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                  <p className="text-xs text-gray-500">ETA: {trip.eta}</p>
-                                  <span className={`text-xs px-2 py-1 rounded ${
-                                    trip.status === 'shopping' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}>
-                                    {trip.status}
-                                  </span>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                        <MapPin className="h-12 w-12 text-gray-300 mb-3" />
-                        <p className="text-sm text-gray-500 font-medium">No locations to display</p>
-                        <p className="text-xs text-gray-400 mt-1">Add tasks or trips with locations to see them here</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                          <MapPin className={`${isMobile ? 'h-8 w-8' : 'h-12 w-12'} text-gray-300 mb-3`} />
+                          <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500 font-medium`}>No locations to display</p>
+                          <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-400 mt-1`}>Add tasks or trips with locations to see them here</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Show Locations Button for Mobile */}
+              {isMobile && !showLocationsList && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLocationsList(true)}
+                  className="text-xs py-2 h-8"
+                >
+                  <MapPin className="h-3 w-3 mr-1" />
+                  Show Locations ({tasks.filter(t => t.coordinates).length + trips.filter(trip => trip.coordinates && trip.status !== 'completed' && trip.status !== 'cancelled').length + 1})
+                </Button>
+              )}
 
               {/* Route Optimization Details */}
               {optimizedRoute && (
                 <Card className="shadow-md flex-shrink-0">
-                  <CardHeader className="py-3">
-                    <CardTitle className="text-sm">Route Details</CardTitle>
+                  <CardHeader className={`${isMobile ? 'py-2' : 'py-3'}`}>
+                    <CardTitle className={`${isMobile ? 'text-xs' : 'text-sm'}`}>Route Details</CardTitle>
                   </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                  <CardContent className={`${isMobile ? 'p-2' : 'p-4'}`}>
+                    <div className={`space-y-2 ${isMobile ? 'max-h-32' : 'max-h-64'} overflow-y-auto`}>
                       {optimizedRoute.segments.map((segment, index) => {
                         // Calculate correct from and to letters based on actual waypoints
                         const fromLetter = index === 0 ? 'A' : String.fromCharCode(65 + index);
@@ -591,21 +586,21 @@ export default function MapComponent() {
                         if (index + 1 >= totalLocations) return null;
                         
                         return (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div key={index} className={`flex items-center justify-between ${isMobile ? 'p-1' : 'p-2'} bg-gray-50 rounded`}>
                             <div className="flex items-center space-x-2">
-                              <span className="text-xs font-medium text-gray-600">
+                              <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-medium text-gray-600`}>
                                 {fromLetter} → {toLetter}
                               </span>
-                              <span className="text-xs text-gray-500">
+                              <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500`}>
                                 {segment.distance}
                               </span>
                             </div>
-                            <span className="text-xs text-gray-500">{segment.duration}</span>
+                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500`}>{segment.duration}</span>
                           </div>
                         );
                       })}
-                      <div className="border-t pt-2 mt-2">
-                        <div className="flex justify-between text-sm font-medium">
+                      <div className={`border-t ${isMobile ? 'pt-1 mt-1' : 'pt-2 mt-2'}`}>
+                        <div className={`flex justify-between ${isMobile ? 'text-xs' : 'text-sm'} font-medium`}>
                           <span>Total:</span>
                           <span>{(optimizedRoute.totalDistance / 1609.34).toFixed(1)} mi • {Math.round(optimizedRoute.totalDuration / 60)} min</span>
                         </div>
@@ -617,7 +612,7 @@ export default function MapComponent() {
             </div>
             
             {/* Map - Now takes up more space */}
-            <div className="flex-1 min-w-0">
+            <div className={`flex-1 min-w-0 ${isMobile ? 'h-64' : ''}`}>
               <div 
                 ref={mapRef}
                 className="w-full h-full rounded-lg border shadow-sm"

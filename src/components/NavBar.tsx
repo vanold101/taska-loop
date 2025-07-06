@@ -5,9 +5,9 @@ import { cn, haptics } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import DarkModeToggle from './DarkModeToggle';
 import NotificationCenter, { Notification } from './NotificationCenter';
-import { useToast } from "@/hooks/use-toast";
 import FileSystemNavigation from './FileSystemNavigation';
 import { useAuth } from '@/context/AuthContext';
+import { useDeviceDetection } from '../hooks/useDeviceDetection';
 
 interface NavBarProps {
   activeItem?: string;
@@ -16,9 +16,9 @@ interface NavBarProps {
 const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isMobile, screenWidth } = useDeviceDetection();
   const [activeItem, setActiveItem] = useState(propActiveItem || location.pathname);
   const [showMenu, setShowMenu] = useState(false);
-  const { toast } = useToast();
   const { user, isAdmin } = useAuth();
   const isHomePage = location.pathname === '/home' || location.pathname === '/';
 
@@ -91,13 +91,13 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
   }, [location.pathname]);
 
   const navItems = [
-    { name: 'Home', path: '/home', icon: <Home className="w-4 h-4 sm:w-5 sm:h-5" /> },
-    { name: 'Map', path: '/map', icon: <Map className="w-4 h-4 sm:w-5 sm:h-5" /> },
-    { name: 'Trips', path: '/trips', icon: <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" /> },
-    { name: 'Pantry', path: '/pantry', icon: <Package className="w-4 h-4 sm:w-5 sm:h-5" /> },
-    { name: 'Ledger', path: '/ledger', icon: <Wallet className="w-4 h-4 sm:w-5 sm:h-5" /> },
-    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" /> },
-    { name: 'Profile', path: '/profile', icon: <User className="w-4 h-4 sm:w-5 sm:h-5" /> }
+    { name: 'Home', path: '/home', icon: <Home className={isMobile ? "w-4 h-4" : "w-4 h-4 sm:w-5 sm:h-5"} /> },
+    { name: 'Map', path: '/map', icon: <Map className={isMobile ? "w-4 h-4" : "w-4 h-4 sm:w-5 sm:h-5"} /> },
+    { name: 'Trips', path: '/trips', icon: <ShoppingCart className={isMobile ? "w-4 h-4" : "w-4 h-4 sm:w-5 sm:h-5"} /> },
+    { name: 'Pantry', path: '/pantry', icon: <Package className={isMobile ? "w-4 h-4" : "w-4 h-4 sm:w-5 sm:h-5"} /> },
+    { name: 'Ledger', path: '/ledger', icon: <Wallet className={isMobile ? "w-4 h-4" : "w-4 h-4 sm:w-5 sm:h-5"} /> },
+    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className={isMobile ? "w-4 h-4" : "w-4 h-4 sm:w-5 sm:h-5"} /> },
+    { name: 'Profile', path: '/profile', icon: <User className={isMobile ? "w-4 h-4" : "w-4 h-4 sm:w-5 sm:h-5"} /> }
   ];
 
   // Handle notification actions
@@ -109,31 +109,19 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
 
   const handleMarkAllAsRead = () => {
     setNotifications(notifications.map(note => ({ ...note, read: true })));
-    toast({
-      title: "All notifications marked as read"
-    });
   };
 
   const handleClearAll = () => {
     setNotifications([]);
-    toast({
-      title: "All notifications cleared"
-    });
   };
 
   const handleNotificationAction = (notification: Notification) => {
     if (notification.actionUrl && notification.actionText) {
       if (notification.actionUrl.startsWith('/')) {
         navigate(notification.actionUrl);
-        toast({
-          title: `Navigating to ${notification.actionText}`,
-          description: `Action: ${notification.actionText}`
-        });
       } else {
-        toast({
-          title: `Action: ${notification.actionText}`,
-          description: `Would navigate to: ${notification.actionUrl}`
-        });
+        // For external links, open in a new tab
+        window.open(notification.actionUrl, '_blank');
       }
       
       // Mark the notification as read
@@ -150,12 +138,12 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-gloop-dark-surface border-t border-gloop-outline dark:border-gloop-dark-outline shadow-lg">
-      <div className="absolute top-0 right-0 -mt-16 pr-4 flex gap-2">
+    <div className={`fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-gloop-dark-surface border-t border-gloop-outline dark:border-gloop-dark-outline shadow-lg ${isMobile ? 'pb-safe' : ''}`}>
+      <div className={`absolute top-0 right-0 ${isMobile ? '-mt-12 pr-2' : '-mt-16 pr-4'} flex gap-2`}>
         {/* NotificationCenter is now integrated with the FAB */}
         <DarkModeToggle />
       </div>
-      <nav className="flex justify-between items-center w-full max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl mx-auto px-1 sm:px-2">
+      <nav className={`flex justify-between items-center w-full ${isMobile ? 'max-w-full px-1' : 'max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl px-1 sm:px-2'} mx-auto`}>
         {navItems.map((item) => {
           const isActive = activeItem === item.path || 
                           activeItem === item.name.toLowerCase() ||
@@ -164,7 +152,7 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
             <motion.div
               key={item.path}
               className="flex flex-col items-center"
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: isMobile ? 1.02 : 1.05 }}
               whileTap={{ scale: 0.95 }}
               transition={{ duration: 0.2 }}
             >
@@ -172,7 +160,8 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
                 to={item.path} 
                 onClick={() => handleNavItemClick(item.path)}
                 className={cn(
-                  "flex flex-col items-center py-1.5 sm:py-2 px-1.5 sm:px-2.5 transition-all duration-300 relative",
+                  `flex flex-col items-center transition-all duration-300 relative`,
+                  isMobile ? "py-1 px-1" : "py-1.5 sm:py-2 px-1.5 sm:px-2.5",
                   isActive 
                     ? "text-gloop-primary dark:text-gloop-primary"
                     : "text-gloop-text-muted hover:text-gloop-text-main dark:text-gloop-dark-text-muted dark:hover:text-gloop-dark-text-main"
@@ -181,7 +170,7 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
                 {isActive && (
                   <motion.div 
                     layoutId="activeTab"
-                    className="absolute -top-1 w-6 sm:w-8 h-1 rounded-full bg-gloop-primary"
+                    className={`absolute -top-1 ${isMobile ? 'w-4 h-0.5' : 'w-6 sm:w-8 h-1'} rounded-full bg-gloop-primary`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ 
@@ -195,32 +184,30 @@ const NavBar = ({ activeItem: propActiveItem }: NavBarProps) => {
                 
                 <motion.div 
                   className={cn(
-                    "p-1.5 sm:p-2 rounded-full mb-0.5 sm:mb-1 transition-all duration-300",
+                    "rounded-full transition-all duration-300",
+                    isMobile ? "p-1 mb-0.5" : "p-1.5 sm:p-2 mb-0.5 sm:mb-1",
                     isActive 
                       ? "bg-gloop-accent/80 dark:bg-gloop-dark-accent/80 scale-110" 
-                      : "bg-transparent hover:bg-gloop-accent/20 dark:hover:bg-gloop-dark-accent/20"
+                      : "hover:bg-gloop-outline/50 dark:hover:bg-gloop-dark-outline/50"
                   )}
-                  animate={{ 
-                    scale: isActive ? 1.1 : 1,
+                  whileHover={{ 
                     backgroundColor: isActive 
-                      ? "var(--gloop-accent-translucent)" 
-                      : "transparent"
+                      ? "rgba(var(--gloop-accent), 0.9)" 
+                      : "rgba(var(--gloop-outline), 0.7)" 
                   }}
-                  transition={{ duration: 0.3 }}
                 >
                   {item.icon}
                 </motion.div>
                 
-                <motion.span 
-                  className="text-[10px] sm:text-xs font-medium transition-all duration-300"
-                  animate={{ 
-                    scale: isActive ? 1.05 : 1,
-                    fontWeight: isActive ? "600" : "500"
-                  }}
-                  transition={{ duration: 0.2 }}
-                >
+                <span className={cn(
+                  "transition-all duration-300 text-center font-medium",
+                  isMobile ? "text-xs leading-tight" : "text-xs sm:text-sm leading-tight sm:leading-normal",
+                  isActive 
+                    ? "text-gloop-primary dark:text-gloop-primary font-semibold" 
+                    : "text-gloop-text-muted dark:text-gloop-dark-text-muted"
+                )}>
                   {item.name}
-                </motion.span>
+                </span>
               </Link>
             </motion.div>
           );

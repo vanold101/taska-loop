@@ -1,5 +1,3 @@
-import { Toaster } from "./components/ui/toaster";
-import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -151,8 +149,6 @@ const App = () => {
                           {/* Tutorial overlay */}
                           <WelcomeTutorial />
                         </div>
-                        <Toaster />
-                        <Sonner />
                       </HashRouter>
                     </PantryProvider>
                   </NotificationProvider>

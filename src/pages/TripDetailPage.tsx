@@ -11,11 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Users, ShoppingCart, Clock, UserPlus, CheckCircle, ArrowLeft, Mail } from 'lucide-react';
+import { Plus, Trash2, Users, ShoppingCart, Clock, UserPlus, CheckCircle, ArrowLeft, Send, Mail } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import AutocompleteInput from '@/components/AutocompleteInput';
 import { fruits } from '@/data/fruits';
@@ -77,7 +76,7 @@ Download TaskaLoop to join the trip!`;
     const updatedTrip = { ...trip, items: [...trip.items, { ...newItem, id: Date.now().toString() }] };
     updateTrip(trip.id, updatedTrip);
     setNewItemName('');
-    toast({ title: 'Item Added', description: `${newItemName} has been added to the trip.` });
+    console.log(`Item Added: ${newItemName}`);
   };
   
   const handleToggleItem = (itemId: string) => {
@@ -110,16 +109,12 @@ Download TaskaLoop to join the trip!`;
 
     const updatedTrip = { ...trip, items: [...trip.items, { ...newItem, id: Date.now().toString() }] };
     updateTrip(trip.id, updatedTrip);
-    toast({ title: 'Item Added', description: `${pantryItemName} has been added from pantry.` });
+    console.log(`Item Added from Pantry: ${pantryItemName}`);
   };
 
   const handleSendInvite = async () => {
     if (!trip || !user || !inviteEmail.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an email address",
-        variant: "destructive"
-      });
+      console.error("Error sending invite: Email or trip not found.");
       return;
     }
 
@@ -136,10 +131,7 @@ Download TaskaLoop to join the trip!`;
         }
       });
 
-      toast({
-        title: "Invite Sent!",
-        description: `Trip invitation sent to ${inviteEmail}`,
-      });
+      console.log(`Invite Sent to: ${inviteEmail}`);
 
       // Reset form and close dialog
       setInviteEmail('');
@@ -147,11 +139,7 @@ Download TaskaLoop to join the trip!`;
       setInviteDialogOpen(false);
     } catch (error) {
       console.error('Error sending invite:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send invite. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Failed to send invite. Please try again.");
     }
   };
 

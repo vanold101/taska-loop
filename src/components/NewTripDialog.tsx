@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTaskContext } from "@/context/TaskContext";
 import { usePantry } from "@/context/PantryContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { useToast } from "@/hooks/use-toast";
 import { initGoogleMapsPlaces } from "../services/googlePlaces";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +28,6 @@ interface NewTripDialogProps {
 export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
   const { addTrip, trips } = useTaskContext();
   const { pantryItems } = usePantry();
-  const { toast } = useToast();
   const { user, isAdmin } = useAuth();
   const { currentTier, limits, checkLimit } = useSubscription();
   const [location, setLocation] = useState("");
@@ -80,16 +78,9 @@ export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
       const trimmedItem = newCustomItem.trim();
       setCustomItems(prev => [...prev, trimmedItem]);
       setNewCustomItem("");
-      toast({
-        title: "Item Added",
-        description: `"${trimmedItem}" has been added to your shopping list`,
-      });
+      console.log(`"${trimmedItem}" has been added to your shopping list`);
     } else if (customItems.includes(newCustomItem.trim())) {
-      toast({
-        title: "Item Already Added",
-        description: `"${newCustomItem.trim()}" is already in your shopping list`,
-        variant: "destructive"
-      });
+      console.log(`"${newCustomItem.trim()}" is already in your shopping list`);
     }
   };
 
@@ -177,11 +168,7 @@ export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
         autocomplete.addListener('place_changed', () => {
           const place = autocomplete.getPlace();
           if (!place.geometry?.location) {
-            toast({
-              title: "No location found",
-              description: "Please select a location from the dropdown",
-              variant: "destructive"
-            });
+            console.error("No location found for autocomplete selection.");
             return;
           }
 
@@ -200,11 +187,7 @@ export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
           retryCount++;
           timeoutId = setTimeout(initializeAutocomplete, 1000);
         } else {
-          toast({
-            title: "Error",
-            description: "Failed to initialize location search. Please try refreshing the page.",
-            variant: "destructive"
-          });
+          console.error("Failed to initialize location search after multiple retries.");
         }
       }
     };
@@ -225,21 +208,13 @@ export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
     
     // Check trip limit before proceeding
     if (!canCreateTrip) {
-      toast({
-        title: "Upgrade Required",
-        description: `You've reached the limit of ${limits.maxActiveTrips} active trips on your ${currentTier} plan.`,
-        variant: "destructive"
-      });
+      console.warn(`You've reached the limit of ${limits.maxActiveTrips} active trips on your ${currentTier} plan. Upgrade required.`);
       setShowUpgradeDialog(true);
       return;
     }
     
     if (!date || !time || !location) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields (store, date, and time).",
-        variant: "destructive"
-      });
+      console.error("Missing required fields for trip creation.");
       return;
     }
 
@@ -307,10 +282,7 @@ export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
       // Add the trip
       const newTrip = addTrip(tripData);
       
-      toast({
-        title: "Success",
-        description: `Trip created successfully! ${selectedPantryItems.size + customItems.length > 0 ? `Added ${selectedPantryItems.size + customItems.length} items to your shopping list.` : ''}`,
-      });
+      console.log(`Trip created successfully! ${selectedPantryItems.size + customItems.length > 0 ? `Added ${selectedPantryItems.size + customItems.length} items to your shopping list.` : ''}`);
       
       // Reset form
       setLocation("");
@@ -328,11 +300,7 @@ export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
       onClose();
     } catch (error) {
       console.error("Error creating trip:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create trip. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Failed to create trip. Please try again.");
     } finally {
       setIsLoading(false);
     }
