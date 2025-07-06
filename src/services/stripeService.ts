@@ -39,7 +39,7 @@ class StripeService {
    * Create a Stripe Checkout Session for subscription
    */
   async createCheckoutSession(
-    tier: 'plus' | 'family',
+    tier: 'plus' | 'premium',
     userEmail: string,
     userId: string
   ): Promise<CheckoutSessionResponse> {
@@ -113,7 +113,7 @@ class StripeService {
    * Create subscription checkout flow
    */
   async subscribeTo(
-    tier: 'plus' | 'family',
+    tier: 'plus' | 'premium',
     userEmail: string,
     userId: string
   ): Promise<void> {

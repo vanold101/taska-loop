@@ -59,6 +59,9 @@ import { ScannedItem } from "../components/BarcodeScannerButton"
 import { usePantry, PantryItem } from "../context/PantryContext"
 import PantryBarcodeAdder from "../components/PantryBarcodeAdder"
 import RecurringItemsManager from '../components/RecurringItemsManager'
+import { useSubscription } from "../context/SubscriptionContext"
+import { useTaskContext } from "../context/TaskContext"
+import { useAuth } from "../context/AuthContext"
 
 // Define interfaces for new item form
 interface NewItem {
@@ -98,6 +101,9 @@ const categoryIcons: Record<string, React.ReactNode> = {
 export default function PantryPage() {
   const navigate = useNavigate();
   const { pantryItems, addPantryItem, updatePantryItem, removePantryItem } = usePantry();
+  const { trips, addTrip } = useTaskContext();
+  const { user, isAdmin } = useAuth();
+  const { currentTier, limits, checkLimit } = useSubscription();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name");
@@ -208,19 +214,32 @@ export default function PantryPage() {
   const handleAddItemSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newItem.name || !newItem.quantity) {
-      console.error("Please provide at least an item name and quantity.");
+    // Check pantry item limit
+    if (!checkLimit('maxPantryItems', pantryItems.length)) {
+      console.warn(`You've reached the limit of ${limits.maxPantryItems} pantry items on your ${currentTier} plan. Upgrade required.`);
       return;
     }
 
     const itemToAdd: Omit<PantryItem, 'id'> = {
-      ...newItem,
+      name: newItem.name,
+      quantity: newItem.quantity,
+      category: newItem.category,
+      expiry: newItem.expiry || undefined,
       lowStock: newItem.quantity <= 1
     };
 
     addPantryItem(itemToAdd);
+    console.log("Item added to pantry");
     
-    handleCloseAddItemDialog();
+    // Reset form
+    setNewItem({
+      name: '',
+      quantity: 1,
+      category: '',
+      expiry: ''
+    });
+    
+    setShowAddItemDialog(false);
   };
 
   const handleBarcodeScan = (scannedItem: ScannedItem) => {
@@ -376,9 +395,24 @@ export default function PantryPage() {
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Pantry</h2>
+            <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              Pantry
+              {!isAdmin && (
+                <Badge 
+                  variant={currentTier === 'free' ? 'destructive' : currentTier === 'plus' ? 'secondary' : 'default'}
+                  className="text-xs"
+                >
+                  {currentTier === 'free' ? '🔒 FREE PLAN' : 
+                   currentTier === 'plus' ? '⭐ PLUS PLAN' : 
+                   '👑 PREMIUM PLAN'}
+                </Badge>
+              )}
+            </h2>
             <p className="text-muted-foreground">
               Track and manage your household inventory
+              {!isAdmin && currentTier === 'free' && (
+                <span className="text-red-600 font-medium"> • Limited to {limits.maxPantryItems} items • No barcode scanning</span>
+              )}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -392,34 +426,82 @@ export default function PantryPage() {
         </div>
 
         {/* Barcode Scanner Section */}
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-800">
-              <ScanLine className="h-5 w-5" />
-              Quick Add with Barcode Scanner
-            </CardTitle>
-            <CardDescription className="text-blue-600">
-              Scan any product barcode to instantly add it to your pantry with product details
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4 items-center">
-              <div className="flex-1">
-                <PantryBarcodeScanner onAddPantryItem={(item) => {
-                  addPantryItem(item);
-                }} />
+        {checkLimit('hasBarcodeScanning') ? (
+          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-800">
+                <ScanLine className="h-5 w-5" />
+                Quick Add with Barcode Scanner
+              </CardTitle>
+              <CardDescription className="text-blue-600">
+                Scan any product barcode to instantly add it to your pantry with product details
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="flex-1">
+                  <PantryBarcodeScanner onAddPantryItem={(item) => {
+                    addPantryItem(item);
+                  }} />
+                </div>
+                <div className="text-sm text-blue-600 max-w-xs">
+                  <p className="font-medium mb-1">How it works:</p>
+                  <ul className="text-xs space-y-1">
+                    <li>• Click scan and point camera at barcode</li>
+                    <li>• Product info is automatically fetched</li>
+                    <li>• Item is added to your pantry instantly</li>
+                  </ul>
+                </div>
               </div>
-              <div className="text-sm text-blue-600 max-w-xs">
-                <p className="font-medium mb-1">How it works:</p>
-                <ul className="text-xs space-y-1">
-                  <li>• Click scan and point camera at barcode</li>
-                  <li>• Product info is automatically fetched</li>
-                  <li>• Item is added to your pantry instantly</li>
-                </ul>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-700">
+                <ScanLine className="h-5 w-5" />
+                🔒 Barcode Scanner - LOCKED
+                <Badge variant="destructive" className="text-xs">Plus & Premium Only</Badge>
+              </CardTitle>
+              <CardDescription className="text-red-600">
+                ⚠️ This feature requires a Plus ($3.99/month) or Premium ($8.99/month) subscription
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-4">
+                <div className="flex-1 text-center py-8 bg-white/50 rounded-lg border-2 border-dashed border-red-300">
+                  <ScanLine className="h-16 w-16 mx-auto text-red-400 mb-4" />
+                  <h3 className="font-semibold text-red-800 mb-2">Barcode Scanning Disabled</h3>
+                  <p className="text-sm text-red-700 mb-4 max-w-md mx-auto">
+                    You're currently on the <strong>Free plan</strong>. Upgrade to scan product barcodes 
+                    and automatically add items with product details, nutrition info, and more.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-red-600 mb-4">
+                    <div className="p-2 bg-red-100 rounded">
+                      <strong>Plus ($3.99/month)</strong><br/>
+                      ✓ Barcode scanning<br/>
+                      ✓ Household sharing<br/>
+                      ✓ Unlimited items
+                    </div>
+                    <div className="p-2 bg-red-100 rounded">
+                      <strong>Premium ($8.99/month)</strong><br/>
+                      ✓ Everything in Plus<br/>
+                      ✓ Receipt scanning<br/>
+                      ✓ Advanced analytics
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => console.log("Upgrade to access barcode scanning")}
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold"
+                    size="lg"
+                  >
+                    🚀 Upgrade Now to Unlock Barcode Scanning
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Top Summary Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -695,11 +777,28 @@ export default function PantryPage() {
           </DialogHeader>
           
           {/* Add barcode scanner */}
-          <div className="mb-4">
-            <PantryBarcodeScanner onAddPantryItem={(item) => {
-              addPantryItem(item);
-            }} />
-          </div>
+          {checkLimit('hasBarcodeScanning') ? (
+            <div className="mb-4">
+              <PantryBarcodeScanner onAddPantryItem={(item) => {
+                addPantryItem(item);
+              }} />
+            </div>
+          ) : (
+            <div className="mb-4 text-center py-6 bg-red-50 rounded-lg border-2 border-dashed border-red-300">
+              <ScanLine className="h-12 w-12 mx-auto text-red-400 mb-3" />
+              <h4 className="font-semibold text-red-800 mb-2">🔒 Barcode Scanning Locked</h4>
+              <p className="text-sm text-red-700 mb-3">
+                <strong>Free Plan:</strong> Barcode scanning requires Plus ($3.99/month) or Premium ($8.99/month)
+              </p>
+              <Button 
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => console.log("Upgrade to unlock barcode scanning")}
+              >
+                Upgrade to Unlock
+              </Button>
+            </div>
+          )}
           
           <div className="text-center text-sm text-muted-foreground mb-4">
             - or update quantities manually -

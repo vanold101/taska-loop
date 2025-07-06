@@ -212,7 +212,7 @@ export default function HomePage() {
     switch (currentTier) {
       case 'free':
         return {
-          name: 'Basic',
+          name: 'Free',
           icon: <Users className="h-4 w-4" />,
           color: 'bg-gray-100 text-gray-800',
           upgradeColor: 'bg-blue-600 hover:bg-blue-700'
@@ -224,12 +224,19 @@ export default function HomePage() {
           color: 'bg-blue-100 text-blue-800',
           upgradeColor: 'bg-purple-600 hover:bg-purple-700'
         };
-      case 'family':
+      case 'premium':
         return {
-          name: 'Family',
+          name: 'Premium',
           icon: <Crown className="h-4 w-4" />,
           color: 'bg-purple-100 text-purple-800',
           upgradeColor: ''
+        };
+      default:
+        return {
+          name: 'Free',
+          icon: <Users className="h-4 w-4" />,
+          color: 'bg-gray-100 text-gray-800',
+          upgradeColor: 'bg-blue-600 hover:bg-blue-700'
         };
     }
   };
@@ -242,8 +249,25 @@ export default function HomePage() {
         <div className="p-4 md:p-8 animate-fade-in">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-slide-down">
             <div>
-              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200">Home</h1>
-              <p className="text-slate-500 dark:text-slate-400">Welcome back, {user?.name?.split(' ')[0] || "User"}! Here's what's happening today.</p>
+              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                Home
+                {!isAdmin && (
+                  <Badge 
+                    variant={currentTier === 'free' ? 'destructive' : currentTier === 'plus' ? 'secondary' : 'default'}
+                    className="text-xs"
+                  >
+                    {currentTier === 'free' ? '🔒 FREE PLAN' : 
+                     currentTier === 'plus' ? '⭐ PLUS PLAN' : 
+                     '👑 PREMIUM PLAN'}
+                  </Badge>
+                )}
+              </h1>
+              <p className="text-slate-500 dark:text-slate-400">
+                Welcome back, {user?.name?.split(' ')[0] || "User"}! Here's what's happening today.
+                {!isAdmin && currentTier === 'free' && (
+                  <span className="text-red-600 font-medium"> • Free plan limits apply</span>
+                )}
+              </p>
             </div>
             <div className="flex gap-2">
               <Button 

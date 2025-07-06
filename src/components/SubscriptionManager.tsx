@@ -37,75 +37,85 @@ interface TierDetails {
 
 const TIER_DETAILS: Record<SubscriptionTier, TierDetails> = {
   free: {
-    name: 'TaskaLoop Basic',
+    name: 'TaskaLoop Free',
     price: 'Free',
-    description: 'Perfect for individuals and small households getting started',
+    description: 'Perfect for individuals getting started with basic task management',
     icon: <Users className="h-6 w-6" />,
     color: 'bg-gray-500',
     features: [
-      'Up to 3 active shopping trips',
-      'Up to 25 active tasks',
-      'Basic pantry (50 items)',
-      'Manual expense tracking (10/month)',
-      'Up to 2 household members',
-      'Basic maps integration',
-      'Dark mode',
-      'Mobile app (PWA)'
+      'Up to 50 active tasks',
+      'Up to 10 trips per month', 
+      'Basic pantry (100 items max)',
+      'Single user account only',
+      'Basic map view with standard markers',
+      '5 saved locations maximum',
+      'Manual item entry only',
+      'Community support',
+      'Mobile web app access'
     ],
     limitations: [
-      'No receipt scanning',
-      'No AI-powered features',
-      'No recurring item automation',
-      'No advanced analytics',
-      'No export capabilities',
-      'Equal split only for expenses'
+      'NO barcode scanning',
+      'NO receipt scanning', 
+      'NO AI-powered features',
+      'NO household sharing',
+      'NO recurring item automation',
+      'NO advanced analytics',
+      'NO export capabilities',
+      'NO route optimization',
+      'NO expense tracking'
     ]
   },
   plus: {
     name: 'TaskaLoop Plus',
-    price: '$4.99',
+    price: '$3.99',
     billing: '/month',
-    description: 'For active households who want convenience and automation',
+    description: 'For active households who want convenience and smart features',
     icon: <Star className="h-6 w-6" />,
     color: 'bg-blue-500',
     features: [
-      'Unlimited shopping lists & tasks',
-      'Advanced pantry with alerts',
-      'Receipt scanning (20/month)',
-      'AI-powered grocery list generation',
-      'Basic recurring items',
-      'Advanced expense splitting',
-      'Expense analytics & reports',
-      'Calendar integration',
-      'Up to 6 household members',
-      'Export data (CSV, PDF)',
-      'Priority support',
-      'Bulk operations'
+      'Unlimited tasks and trips',
+      'Unlimited pantry items',
+      'BARCODE SCANNING enabled',
+      'Advanced grocery lists with categories',
+      'Household sharing (up to 5 members)',
+      'Route optimization with Google Maps',
+      'Unlimited saved locations',
+      'Basic expense tracking and splitting',
+      'Trip history for 6 months',
+      'Priority email support',
+      'Export data to CSV',
+      'Smart notifications'
+    ],
+    limitations: [
+      'No receipt scanning',
+      'No advanced analytics dashboard',
+      'Limited household members (5 max)',
+      'No API access'
     ],
     popular: true
   },
-  family: {
-    name: 'TaskaLoop Family',
+  premium: {
+    name: 'TaskaLoop Premium',
     price: '$8.99',
     billing: '/month',
     description: 'For large households and power users who want everything',
     icon: <Crown className="h-6 w-6" />,
     color: 'bg-purple-500',
     features: [
-      'Everything in Plus',
-      'Unlimited household members',
-      'Unlimited receipt scanning',
-      'Advanced AI features',
+      'Everything in Plus plan',
+      'UNLIMITED household members',
+      'RECEIPT SCANNING with OCR',
+      'Advanced analytics dashboard',
+      'Spending insights and reports',
       'Smart meal planning suggestions',
       'Predictive shopping lists',
-      'Price tracking & deal alerts',
-      'Complex recurring patterns',
-      'Premium analytics dashboard',
-      'Smart home integration',
-      'Multiple calendar platforms',
-      'Premium support (chat & phone)',
+      'Advanced AI features',
+      'Unlimited trip history',
+      'Priority phone and chat support',
       'Early access to new features',
-      'Data backup & sync'
+      'Advanced data export (PDF, Excel)',
+      'API access for integrations',
+      'Custom branding for households'
     ]
   }
 };
@@ -171,7 +181,7 @@ export default function SubscriptionManager({ isOpen, onClose, showUpgradeOnly =
       
       try {
         await stripeService.subscribeTo(
-          selectedTier as 'plus' | 'family',
+          selectedTier as 'plus' | 'premium',
           user.email,
           user.id || 'anonymous'
         );
@@ -198,8 +208,8 @@ export default function SubscriptionManager({ isOpen, onClose, showUpgradeOnly =
   };
 
   const tiersToShow = showUpgradeOnly 
-    ? (['plus', 'family'] as SubscriptionTier[])
-    : (['free', 'plus', 'family'] as SubscriptionTier[]);
+    ? (['plus', 'premium'] as SubscriptionTier[])
+    : (['free', 'plus', 'premium'] as SubscriptionTier[]);
 
   const isStripeConfigured = stripeService.isConfigured();
 

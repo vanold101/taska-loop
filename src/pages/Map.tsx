@@ -3,15 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Plus, MapPin, ShoppingCart, Route } from 'lucide-react';
 import { useTaskContext } from '../context/TaskContext';
+import { useTrips } from '../context/TripsContext';
+import { useSubscription } from '../context/SubscriptionContext';
+import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../components/AppLayout';
 import MapComponent from '../components/MapComponent';
 import { CreateTaskModal } from '../components/CreateTaskModal';
 import CreateTripModal from '../components/CreateTripModal';
+import { Badge } from '../components/ui/badge';
 
 export default function MapPage() {
   const { tasks, trips, addTask, addTrip } = useTaskContext();
+  const { isAdmin } = useAuth();
+  const { currentTier, limits, checkLimit } = useSubscription();
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  
+  // Check task limit
+  const activeTasksCount = tasks.filter(task => !task.completed).length;
+  const canCreateTask = isAdmin || checkLimit('maxActiveTasks', activeTasksCount);
 
   // Count items with coordinates
   const tasksWithCoordinates = tasks.filter(task => task.coordinates).length;
@@ -19,8 +30,14 @@ export default function MapPage() {
   const totalLocations = tasksWithCoordinates + tripsWithCoordinates + 1; // +1 for user location
 
   const handleCreateTask = (taskData: any) => {
+    // Check task limit before creating
+    if (!canCreateTask) {
+      console.warn(`You've reached the limit of ${limits.maxActiveTasks} active tasks on your ${currentTier} plan. Upgrade required.`);
+      return;
+    }
+    
     addTask(taskData);
-    console.log("Task created:", taskData);
+    console.log("Task created successfully!");
     setIsCreateTaskModalOpen(false);
   };
 
@@ -47,9 +64,22 @@ export default function MapPage() {
             <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
               <MapPin className="w-6 h-6" />
               Map & Routes
+              {!isAdmin && (
+                <Badge 
+                  variant={currentTier === 'free' ? 'destructive' : currentTier === 'plus' ? 'secondary' : 'default'}
+                  className="text-xs"
+                >
+                  {currentTier === 'free' ? '🔒 FREE PLAN' : 
+                   currentTier === 'plus' ? '⭐ PLUS PLAN' : 
+                   '👑 PREMIUM PLAN'}
+                </Badge>
+              )}
             </h1>
             <p className="text-slate-500">
               View your tasks and trips on the map, and optimize your routes
+              {!isAdmin && currentTier === 'free' && (
+                <span className="text-red-600 font-medium"> • Limited to {limits.maxActiveTasks} tasks</span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -57,9 +87,20 @@ export default function MapPage() {
               <ShoppingCart className="w-4 h-4 mr-2" />
               New Trip
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsCreateTaskModalOpen(true)}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => canCreateTask ? setIsCreateTaskModalOpen(true) : console.warn("Task limit reached")}
+              disabled={!canCreateTask}
+              className={!canCreateTask ? "border-red-500 text-red-600 bg-red-50" : ""}
+            >
               <Plus className="w-4 h-4 mr-2" />
-              Add Task
+              {!canCreateTask ? "🔒 Task Limit Reached" : "Add Task"}
+              {!isAdmin && (
+                <span className={`ml-2 text-xs px-2 py-1 rounded ${!canCreateTask ? 'bg-red-200 text-red-800' : 'bg-gray-100'}`}>
+                  {activeTasksCount}/{limits.maxActiveTasks === Infinity ? '∞' : limits.maxActiveTasks}
+                </span>
+              )}
             </Button>
           </div>
         </div>
@@ -122,9 +163,19 @@ export default function MapPage() {
                   Add tasks with locations or create shopping trips to see them on the map
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button variant="outline" onClick={() => setIsCreateTaskModalOpen(true)}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => canCreateTask ? setIsCreateTaskModalOpen(true) : console.warn("Task limit reached")}
+                    disabled={!canCreateTask}
+                    className={!canCreateTask ? "border-red-500 text-red-600 bg-red-50" : ""}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Task
+                    {!canCreateTask ? "🔒 Task Limit Reached" : "Add Task"}
+                    {!isAdmin && (
+                      <span className={`ml-2 text-xs px-2 py-1 rounded ${!canCreateTask ? 'bg-red-200 text-red-800' : 'bg-gray-100'}`}>
+                        {activeTasksCount}/{limits.maxActiveTasks === Infinity ? '∞' : limits.maxActiveTasks}
+                      </span>
+                    )}
                   </Button>
                   <Button onClick={() => setIsCreateTripModalOpen(true)}>
                     <ShoppingCart className="w-4 h-4 mr-2" />

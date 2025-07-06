@@ -100,13 +100,21 @@ export default function ProfilePage() {
           color: 'bg-blue-500',
           badgeColor: 'bg-blue-100 text-blue-800'
         };
-      case 'family':
+      case 'premium':
         return {
-          name: 'TaskaLoop Family',
+          name: 'TaskaLoop Premium',
           price: '$8.99/month',
           icon: <Crown className="h-5 w-5" />,
           color: 'bg-purple-500',
           badgeColor: 'bg-purple-100 text-purple-800'
+        };
+      default:
+        return {
+          name: 'TaskaLoop Free',
+          price: '$0/month',
+          icon: <User className="h-5 w-5" />,
+          color: 'bg-gray-500',
+          badgeColor: 'bg-gray-100 text-gray-800'
         };
     }
   };
@@ -516,7 +524,7 @@ export default function ProfilePage() {
                         </div>
                       </div>
                       
-                      {currentTier !== 'family' && (
+                      {currentTier !== 'premium' && (
                         <Button 
                           onClick={() => setShowSubscriptionManager(true)}
                           className="w-full bg-blue-600 hover:bg-blue-700"

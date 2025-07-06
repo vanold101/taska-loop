@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 
-export type SubscriptionTier = 'free' | 'plus' | 'family';
+export type SubscriptionTier = 'free' | 'plus' | 'premium';
 
 export interface SubscriptionLimits {
   maxActiveTrips: number;
@@ -10,7 +10,9 @@ export interface SubscriptionLimits {
   maxExpensesPerMonth: number;
   maxHouseholdMembers: number;
   maxReceiptScansPerMonth: number;
+  maxSavedLocations: number;
   hasReceiptScanning: boolean;
+  hasBarcodeScanning: boolean;
   hasAIFeatures: boolean;
   hasRecurringItems: boolean;
   hasAdvancedExpenseSplitting: boolean;
@@ -33,13 +35,15 @@ export interface SubscriptionContextType {
 
 const TIER_LIMITS: Record<SubscriptionTier, SubscriptionLimits> = {
   free: {
-    maxActiveTrips: 3,
-    maxActiveTasks: 25,
-    maxPantryItems: 50,
-    maxExpensesPerMonth: 10,
-    maxHouseholdMembers: 2,
+    maxActiveTrips: 10,
+    maxActiveTasks: 50,
+    maxPantryItems: 100,
+    maxExpensesPerMonth: 0,
+    maxHouseholdMembers: 1,
     maxReceiptScansPerMonth: 0,
+    maxSavedLocations: 5,
     hasReceiptScanning: false,
+    hasBarcodeScanning: false,
     hasAIFeatures: false,
     hasRecurringItems: false,
     hasAdvancedExpenseSplitting: false,
@@ -55,9 +59,11 @@ const TIER_LIMITS: Record<SubscriptionTier, SubscriptionLimits> = {
     maxActiveTasks: Infinity,
     maxPantryItems: Infinity,
     maxExpensesPerMonth: Infinity,
-    maxHouseholdMembers: 6,
-    maxReceiptScansPerMonth: 20,
-    hasReceiptScanning: true,
+    maxHouseholdMembers: 5,
+    maxReceiptScansPerMonth: 0,
+    maxSavedLocations: Infinity,
+    hasReceiptScanning: false,
+    hasBarcodeScanning: true,
     hasAIFeatures: true,
     hasRecurringItems: true,
     hasAdvancedExpenseSplitting: true,
@@ -68,14 +74,16 @@ const TIER_LIMITS: Record<SubscriptionTier, SubscriptionLimits> = {
     hasSmartHomeIntegration: false,
     hasPrioritySupport: true,
   },
-  family: {
+  premium: {
     maxActiveTrips: Infinity,
     maxActiveTasks: Infinity,
     maxPantryItems: Infinity,
     maxExpensesPerMonth: Infinity,
     maxHouseholdMembers: Infinity,
     maxReceiptScansPerMonth: Infinity,
+    maxSavedLocations: Infinity,
     hasReceiptScanning: true,
+    hasBarcodeScanning: true,
     hasAIFeatures: true,
     hasRecurringItems: true,
     hasAdvancedExpenseSplitting: true,
@@ -100,13 +108,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   // Load tier from localStorage on mount
   useEffect(() => {
     if (user && !isAdmin) {
-      const storedTier = localStorage.getItem(getStorageKey('subscription_tier'));
-      if (storedTier && ['free', 'plus', 'family'].includes(storedTier)) {
-        setCurrentTier(storedTier as SubscriptionTier);
-      }
+      // Non-admin users always start as free tier
+      // Reset any existing premium subscriptions for demo purposes
+      setCurrentTier('free');
+      localStorage.setItem(getStorageKey('subscription_tier'), 'free');
     } else if (isAdmin) {
-      // Admin accounts get family tier by default
-      setCurrentTier('family');
+      // Admin accounts get premium tier by default
+      setCurrentTier('premium');
     }
   }, [user, isAdmin]);
 
@@ -145,7 +153,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   };
 
   const value: SubscriptionContextType = {
-    currentTier: isAdmin ? 'family' : currentTier,
+    currentTier: isAdmin ? 'premium' : currentTier,
     limits,
     isAdmin,
     upgradeTier,

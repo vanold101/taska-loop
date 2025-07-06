@@ -313,7 +313,7 @@ export default function NewTripDialog({ isOpen, onClose }: NewTripDialogProps) {
           <DialogHeader className="pb-3">
             <DialogTitle className="flex items-center justify-between">
               <span>Create New Trip</span>
-              {!isAdmin && currentTier !== 'family' && (
+              {!isAdmin && currentTier !== 'premium' && (
                 <Badge variant="outline" className="text-xs">
                   {activeTripsCount}/{limits.maxActiveTrips === Infinity ? '∞' : limits.maxActiveTrips} trips
                 </Badge>

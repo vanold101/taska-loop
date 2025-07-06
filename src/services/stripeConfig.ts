@@ -19,17 +19,17 @@ export const STRIPE_PRODUCTS = {
     price: 4.99,
     interval: 'month'
   },
-  family: {
-    priceId: 'price_1Otest_family_monthly', // Replace with actual Stripe Price ID
-    productId: 'prod_test_family', // Replace with actual Stripe Product ID
-    name: 'TaskaLoop Family',
+  premium: {
+    priceId: 'price_1Otest_premium_monthly', // Replace with actual Stripe Price ID
+    productId: 'prod_test_premium', // Replace with actual Stripe Product ID
+    name: 'TaskaLoop Premium',
     price: 8.99,
     interval: 'month'
   }
 } as const;
 
 // Helper function to get price ID for a tier
-export const getStripePriceId = (tier: 'plus' | 'family'): string | null => {
+export const getStripePriceId = (tier: 'plus' | 'premium'): string | null => {
   return STRIPE_PRODUCTS[tier]?.priceId || null;
 };
 
