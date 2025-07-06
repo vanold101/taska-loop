@@ -164,14 +164,22 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!store || !date || !time) {
+    // Check each required field and provide specific error messages
+    const missingFields = [];
+    if (!store.trim()) missingFields.push("Store Location");
+    if (!date) missingFields.push("Date");
+    if (!time) missingFields.push("Time");
+
+    if (missingFields.length > 0) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields",
+        title: "Missing Required Fields",
+        description: `Please fill in: ${missingFields.join(", ")}`,
         variant: "destructive",
       });
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       // Create participants array based on admin status
@@ -216,13 +224,13 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
 
       const tripData = {
         store,
-        date: date.toISOString(),
+        date: date!.toISOString(),
         time,
         notes,
         budget: budget ? parseFloat(budget) : undefined,
         eta: duration,
         location: "",
-        coordinates: { lat: 0, lng: 0 },
+        coordinates: coordinates || { lat: 0, lng: 0 },
         participants,
         shopper,
         items: [] as any[]
@@ -272,7 +280,7 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 placeholder="Search for a store"
-                className="pr-8"
+                className={`pr-8 ${!store.trim() ? "border-red-300 dark:border-red-600" : ""}`}
                 autoComplete="off"
               />
               {store && (
@@ -332,7 +340,7 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
+                    !date && "text-muted-foreground border-red-300 dark:border-red-600"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -354,9 +362,9 @@ export function AddTripDialog({ open, onOpenChange }: AddTripDialogProps) {
 
           {/* Time Select */}
           <div className="space-y-2">
-            <Label>Time</Label>
+            <Label>Time*</Label>
             <Select value={time} onValueChange={setTime}>
-              <SelectTrigger>
+              <SelectTrigger className={!time ? "border-red-300 dark:border-red-600" : ""}>
                 <SelectValue placeholder="Select a time" />
               </SelectTrigger>
               <SelectContent>

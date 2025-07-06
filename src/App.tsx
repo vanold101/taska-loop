@@ -13,6 +13,7 @@ import NotificationProvider from "./context/NotificationContext";
 import { PantryProvider } from "./context/PantryContext";
 import UserSwitcher from "./components/UserSwitcher";
 import WelcomeTutorial from "./components/WelcomeTutorial";
+import { initializeTheme } from "./utils/theme";
 
 // Import pages
 import Landing from "./pages/Landing";
@@ -36,22 +37,9 @@ import AdminRoute from "./components/AdminRoute";
 import TripDetailPage from "./pages/TripDetailPage";
 
 const App = () => {
-  // Apply theme preferences with light mode as default
+  // Initialize theme on app start
   useEffect(() => {
-    // Only check for theme in localStorage, default to light mode
-    const storedTheme = localStorage.getItem('theme');
-    
-    // If theme is explicitly set to dark, use dark mode
-    // Otherwise, always default to light mode
-    if (storedTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      // Set default theme to light in localStorage if not already set
-      if (!storedTheme) {
-        localStorage.setItem('theme', 'light');
-      }
-      document.documentElement.classList.remove('dark');
-    }
+    initializeTheme();
   }, []);
   
   return (
