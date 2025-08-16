@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { ScanLine, Package, CheckCircle } from "lucide-react";
-import BarcodeScannerButton from "./BarcodeScannerButton";
-import { ScannedItem } from "./BarcodeScannerButton";
+import BarcodeScanner from "./BarcodeScanner";
 import { toast } from "./ui/use-toast";
 import { PantryItem } from "../context/PantryContext";
 
@@ -12,14 +11,15 @@ interface PantryBarcodeScannerProps {
 
 const PantryBarcodeScanner = ({ onAddPantryItem }: PantryBarcodeScannerProps) => {
   const [lastScannedItem, setLastScannedItem] = useState<string | null>(null);
+  const [isScannerVisible, setIsScannerVisible] = useState(false);
 
-  const handleBarcodeScan = (scannedItem: ScannedItem) => {
-    // Convert scanned item to pantry item
+  const handleBarcodeScan = (barcode: string) => {
+    // Convert scanned barcode to pantry item
     const pantryItem: Omit<PantryItem, 'id'> = {
-      name: scannedItem.name || `Product (${scannedItem.upc})`,
+      name: `Product (${barcode})`,
       quantity: 1,
       expiry: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
-      category: scannedItem.category || 'Pantry',
+      category: 'Pantry',
       lowStock: false
     };
 
@@ -37,13 +37,13 @@ const PantryBarcodeScanner = ({ onAddPantryItem }: PantryBarcodeScannerProps) =>
 
   return (
     <div className="space-y-3">
-      <BarcodeScannerButton
-        onItemScanned={handleBarcodeScan}
-        buttonText="📱 Scan Barcode"
-        buttonVariant="default"
-        buttonSize="lg"
+      <Button
+        onClick={() => setIsScannerVisible(true)}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg shadow-md transition-all duration-200 hover:shadow-lg"
-      />
+      >
+        <ScanLine className="h-4 w-4 mr-2" />
+        📱 Scan Barcode
+      </Button>
       
       {lastScannedItem && (
         <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -53,6 +53,12 @@ const PantryBarcodeScanner = ({ onAddPantryItem }: PantryBarcodeScannerProps) =>
           </span>
         </div>
       )}
+
+      <BarcodeScanner
+        isVisible={isScannerVisible}
+        onClose={() => setIsScannerVisible(false)}
+        onBarcodeScanned={handleBarcodeScan}
+      />
     </div>
   );
 };

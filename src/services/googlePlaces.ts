@@ -1,205 +1,223 @@
-import { loadScript } from '../utils/scriptLoader';
+import { GOOGLE_MAPS_API_KEY } from '../config/maps';
 
-// Google Places API Service
-// This service handles Google Places API calls for location suggestions
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-if (!GOOGLE_MAPS_API_KEY) {
-  console.warn('Google Maps API key is not set. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
+export interface PlaceResult {
+  place_id: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
 }
 
-const loadedLibraries: Set<string> = new Set();
-let isGoogleMapsLoaded = false;
-
-async function loadGoogleMapsLibrary(library: string): Promise<void> {
-  // Check if Google Maps is already loaded
-  if (window.google && window.google.maps && isGoogleMapsLoaded) {
-    const isLoaded = (lib: string) => {
-      switch(lib) {
-        case 'places': return !!window.google.maps.places;
-        case 'geometry': return !!window.google.maps.geometry;
-        case 'core': return !!window.google.maps.DirectionsService; // DirectionsService is part of core
-        default: return false;
-      }
+export interface PlaceDetails {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
     };
-    
-    if (isLoaded(library)) {
-      loadedLibraries.add(library);
+  };
+  types: string[];
+}
+
+class GooglePlacesService {
+  private autocompleteService: google.maps.places.AutocompleteService | null = null;
+  private placesService: google.maps.places.PlacesService | null = null;
+  private geocoder: google.maps.Geocoder | null = null;
+  private directionsService: google.maps.DirectionsService | null = null;
+
+  async initialize(): Promise<void> {
+    if (typeof window !== 'undefined' && window.google && window.google.maps) {
+      this.autocompleteService = new window.google.maps.places.AutocompleteService();
+      this.placesService = new window.google.maps.places.PlacesService(document.createElement('div'));
+      this.geocoder = new window.google.maps.Geocoder();
+      this.directionsService = new window.google.maps.DirectionsService();
       return;
     }
+
+    // Load Google Maps API if not already loaded
+    await this.loadGoogleMapsAPI();
   }
 
-  // If not loaded, load the script with all required libraries
-  const libraries = new Set([...loadedLibraries, library]);
-  // Remove 'core' from libraries string since it's not a real library
-  const validLibraries = Array.from(libraries).filter(lib => lib !== 'core');
-  const libraryString = validLibraries.length > 0 ? validLibraries.join(',') : '';
+  private async loadGoogleMapsAPI(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (typeof window === 'undefined') {
+        reject(new Error('Window is not defined'));
+        return;
+      }
 
-  if (!GOOGLE_MAPS_API_KEY) {
-    throw new Error('Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
+      // Check if already loaded
+      if (window.google && window.google.maps) {
+        this.autocompleteService = new window.google.maps.places.AutocompleteService();
+        this.placesService = new window.google.maps.places.PlacesService(document.createElement('div'));
+        this.geocoder = new window.google.maps.Geocoder();
+        this.directionsService = new window.google.maps.DirectionsService();
+        resolve();
+        return;
+      }
+
+      // Load the script
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,geometry`;
+      script.async = true;
+      script.defer = true;
+
+      script.onload = () => {
+        this.autocompleteService = new window.google.maps.places.AutocompleteService();
+        this.placesService = new window.google.maps.places.PlacesService(document.createElement('div'));
+        this.geocoder = new window.google.maps.Geocoder();
+        this.directionsService = new window.google.maps.DirectionsService();
+        resolve();
+      };
+
+      script.onerror = () => {
+        reject(new Error('Failed to load Google Maps API'));
+      };
+
+      document.head.appendChild(script);
+    });
   }
 
-  try {
-    const scriptUrl = libraryString 
-      ? `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=${libraryString}`
-      : `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
-    
-    await loadScript(scriptUrl);
-    
-    // Wait for Google Maps to be fully loaded
-    await new Promise<void>((resolve, reject) => {
-      let attempts = 0;
-      const maxAttempts = 100; // 10 seconds with 100ms intervals
-      
-      const checkLoaded = () => {
-        attempts++;
-        
-        if (window.google && window.google.maps) {
-          // Check if the specific library is loaded
-          const isLoaded = (lib: string) => {
-            switch(lib) {
-              case 'places': return !!window.google.maps.places;
-              case 'geometry': return !!window.google.maps.geometry;
-              case 'core': return !!window.google.maps.DirectionsService;
-              default: return true;
-            }
+  async getPlacePredictions(input: string): Promise<PlaceResult[]> {
+    if (!this.autocompleteService) {
+      await this.initialize();
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!this.autocompleteService) {
+        reject(new Error('Autocomplete service not initialized'));
+        return;
+      }
+
+      const request: google.maps.places.AutocompletionRequest = {
+        input,
+        types: ['establishment', 'geocode'],
+        componentRestrictions: { country: 'us' }
+      };
+
+      this.autocompleteService.getPlacePredictions(request, (results, status) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+          resolve(results as PlaceResult[]);
+        } else {
+          resolve([]);
+        }
+      });
+    });
+  }
+
+  async getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
+    if (!this.placesService) {
+      await this.initialize();
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!this.placesService) {
+        reject(new Error('Places service not initialized'));
+        return;
+      }
+
+      const request: google.maps.places.PlaceDetailsRequest = {
+        placeId,
+        fields: ['place_id', 'name', 'formatted_address', 'geometry', 'types']
+      };
+
+      this.placesService.getDetails(request, (place, status) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+          const details: PlaceDetails = {
+            place_id: place.place_id || '',
+            name: place.name || '',
+            formatted_address: place.formatted_address || '',
+            geometry: {
+              location: {
+                lat: place.geometry?.location?.lat() || 0,
+                lng: place.geometry?.location?.lng() || 0
+              }
+            },
+            types: place.types || []
           };
-          
-          if (isLoaded(library)) {
-            isGoogleMapsLoaded = true;
-            libraries.forEach(lib => loadedLibraries.add(lib));
-            console.log(`Google Maps API loaded successfully with ${library} library`);
-            resolve();
-            return;
-          }
+          resolve(details);
+        } else {
+          resolve(null);
         }
-        
-        if (attempts >= maxAttempts) {
-          reject(new Error('Google Maps API failed to load within 10 seconds'));
-          return;
-        }
-        
-        setTimeout(checkLoaded, 100);
-      };
-      
-      // Start checking immediately
-      checkLoaded();
+      });
     });
-  } catch (error) {
-    console.error('Failed to load Google Maps API:', error);
-    throw error;
-  }
-}
-
-export const initGoogleMapsPlaces = () => loadGoogleMapsLibrary('places');
-export const initGoogleMapsDirections = () => loadGoogleMapsLibrary('core'); // Use 'core' instead of 'directions'
-export const initGoogleMapsGeometry = () => loadGoogleMapsLibrary('geometry');
-
-// Simple function to initialize core Google Maps API (includes DirectionsService)
-export const initGoogleMapsCore = async (): Promise<void> => {
-  console.log("Loading Google Maps API...");
-  
-  if (window.google && window.google.maps && window.google.maps.DirectionsService) {
-    console.log("Google Maps API already loaded");
-    return; // Already loaded
   }
 
-  if (!GOOGLE_MAPS_API_KEY) {
-    throw new Error('Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment variables.');
-  }
+  async optimizeRoute(waypoints: Array<{ lat: number; lng: number; name: string }>): Promise<{
+    route: google.maps.DirectionsRoute;
+    totalDistance: number;
+    totalDuration: number;
+  } | null> {
+    if (!this.directionsService) {
+      await this.initialize();
+    }
 
-  try {
-    const scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
-    console.log("Loading Google Maps script...");
-    
-    await loadScript(scriptUrl);
-    console.log("Script loaded, waiting for Google Maps to initialize...");
-    
-    // Wait for Google Maps to be fully loaded
-    await new Promise<void>((resolve, reject) => {
-      let attempts = 0;
-      const maxAttempts = 100; // 10 seconds with 100ms intervals
-      
-      const checkLoaded = () => {
-        attempts++;
-        
-        if (window.google && window.google.maps && window.google.maps.DirectionsService) {
-          console.log('Google Maps API loaded successfully');
-          resolve();
-          return;
-        }
-        
-        if (attempts >= maxAttempts) {
-          console.error("Google Maps API failed to load within 10 seconds");
-          reject(new Error('Google Maps API failed to load within 10 seconds. This usually indicates an invalid API key or billing issue.'));
-          return;
-        }
-        
-        setTimeout(checkLoaded, 100);
+    if (waypoints.length < 2) {
+      return null;
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!this.directionsService) {
+        reject(new Error('Directions service not initialized'));
+        return;
+      }
+
+      const origin = waypoints[0];
+      const destination = waypoints[waypoints.length - 1];
+      const stops = waypoints.slice(1, -1);
+
+      const request: google.maps.DirectionsRequest = {
+        origin: { lat: origin.lat, lng: origin.lng },
+        destination: { lat: destination.lat, lng: destination.lng },
+        waypoints: stops.map(stop => ({ location: { lat: stop.lat, lng: stop.lng } })),
+        optimizeWaypoints: true,
+        travelMode: google.maps.TravelMode.DRIVING
       };
-      
-      // Start checking immediately
-      checkLoaded();
+
+      this.directionsService.route(request, (result, status) => {
+        if (status === window.google.maps.DirectionsStatus.OK && result) {
+          const route = result.routes[0];
+          const totalDistance = route.legs.reduce((sum, leg) => sum + (leg.distance?.value || 0), 0);
+          const totalDuration = route.legs.reduce((sum, leg) => sum + (leg.duration?.value || 0), 0);
+
+          resolve({
+            route,
+            totalDistance,
+            totalDuration
+          });
+        } else {
+          resolve(null);
+        }
+      });
     });
-  } catch (error) {
-    console.error('Failed to load Google Maps API:', error);
-    throw new Error('Failed to load Google Maps API. Please check your API key and billing settings.');
   }
-};
 
-interface PlaceResult {
-  name: string;
-  address: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  placeId: string;
-}
+  async geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+    if (!this.geocoder) {
+      await this.initialize();
+    }
 
-export async function searchPlaces(query: string): Promise<PlaceResult[]> {
-  await initGoogleMapsPlaces();
+    return new Promise((resolve, reject) => {
+      if (!this.geocoder) {
+        reject(new Error('Geocoder not initialized'));
+        return;
+      }
 
-  const request = {
-    textQuery: query,
-    fields: ['displayName', 'formattedAddress', 'geometry', 'id'],
-    includedType: 'store'
-  };
-
-  const { places } = await google.maps.places.Place.searchByText(request);
-
-  if (places.length) {
-    return places.map(place => ({
-        name: place.displayName || '',
-        address: place.formattedAddress || '',
-        coordinates: {
-            lat: place.location?.lat() || 0,
-            lng: place.location?.lng() || 0
-        },
-        placeId: place.id || ''
-    }));
-  } else {
-    return [];
+      this.geocoder.geocode({ address }, (results, status) => {
+        if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
+          const location = results[0].geometry.location;
+          resolve({
+            lat: location.lat(),
+            lng: location.lng()
+          });
+        } else {
+          resolve(null);
+        }
+      });
+    });
   }
 }
 
-export async function getPlaceDetails(placeId: string): Promise<PlaceResult> {
-  await initGoogleMapsPlaces();
-  
-  const place = new google.maps.places.Place({ id: placeId });
-  await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'geometry', 'id'] });
-
-  if (!place.location) {
-      throw new Error('Place details fetch failed: no geometry');
-  }
-
-  return {
-      name: place.displayName || '',
-      address: place.formattedAddress || '',
-      coordinates: {
-          lat: place.location.lat(),
-          lng: place.location.lng()
-      },
-      placeId: place.id || ''
-  };
-} 
+export const googlePlacesService = new GooglePlacesService(); 

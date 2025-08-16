@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '../lib/firebase';
-import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
+import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '../lib/firebase';
+import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 // Define the User type
 export interface ChorePreference {
@@ -24,9 +26,10 @@ interface AuthContextType {
   error: string | null;
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
-  registerWithEmail: (email: string, password: string, name: string) => Promise<void>; // Added registration
+  registerWithEmail: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   updateChorePreferences: (preferences: ChorePreference[]) => Promise<void>;
+  createGuestUser: () => Promise<void>;
   isAdmin: boolean;
 }
 
@@ -62,9 +65,110 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Create guest user to bypass authentication
+  const createGuestUser = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Create a temporary guest user
+      const guestUser: User = {
+        id: 'guest-' + Date.now(),
+        name: 'Guest User',
+        email: 'guest@example.com',
+        avatar: 'https://ui-avatars.com/api/?name=Guest+User&background=random',
+        chorePreferences: [],
+        isAdmin: false,
+      };
+
+      // Set user in context and store locally
+      setUser(guestUser);
+      await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(guestUser));
+      console.log('Guest user created successfully:', guestUser);
+
+    } catch (error: any) {
+      console.error('Error creating guest user:', error);
+      setError(`Failed to create guest user: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Simple Google Sign-In using Firebase web auth
+  const loginWithGoogle = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      if (!auth) {
+        throw new Error('Firebase auth is not initialized');
+      }
+
+      // Use Firebase's Google provider
+      const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
+
+      // Sign in with popup (works in Expo web and some mobile scenarios)
+      const result = await signInWithPopup(auth, provider);
+      console.log('Google sign-in successful:', result.user);
+
+      // Create user account
+      const googleUser: User = {
+        id: result.user.uid,
+        name: result.user.displayName || 'Google User',
+        email: result.user.email || 'google.user@gmail.com',
+        avatar: result.user.photoURL || 'https://ui-avatars.com/api/?name=Google+User&background=random',
+        chorePreferences: [],
+        isAdmin: checkIsAdmin(result.user.email || undefined),
+      };
+
+      setUser(googleUser);
+      await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(googleUser));
+      console.log('Google OAuth sign-in successful:', googleUser);
+
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      
+      // Handle specific error cases
+      if (error.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in was cancelled');
+      } else if (error.code === 'auth/popupInnerHTML-blocked') {
+        setError('Pop-up was blocked. Please allow pop-ups and try again.');
+      } else {
+        setError(`Google sign-in failed: ${error.message}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Listen for Firebase auth state changes
   useEffect(() => {
     setIsLoading(true);
+    
+    // First, try to load user from AsyncStorage
+    const loadUserFromStorage = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem(AUTH_USER_KEY);
+        if (storedUser) {
+          const userObj = JSON.parse(storedUser);
+          // Only load real users, not mock users
+          if (userObj.email && userObj.email !== 'google.user@example.com') {
+            setUser(userObj);
+            console.log('Loaded real user from storage:', userObj);
+          } else {
+            // Clear mock users from storage
+            await AsyncStorage.removeItem(AUTH_USER_KEY);
+            console.log('Cleared mock user from storage');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user from storage:', error);
+      }
+    };
+    
+    loadUserFromStorage();
     
     // Check if Firebase auth is available
     if (!auth) {
@@ -73,7 +177,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Set user info from Firebase
         const { uid, displayName, email, photoURL } = firebaseUser;
@@ -86,53 +190,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           isAdmin: checkIsAdmin(email || undefined),
         };
         setUser(userObj);
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userObj));
+        await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(userObj));
       } else {
         setUser(null);
-        localStorage.removeItem(AUTH_USER_KEY);
+        await AsyncStorage.removeItem(AUTH_USER_KEY);
       }
       setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
-
-  // Real Google sign-in
-  const loginWithGoogle = async () => {
-    if (!auth) {
-      setError('Authentication is not available. Please check your internet connection and try again.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
-      
-      console.log('Attempting Google sign-in...');
-      const result = await signInWithPopup(auth, provider);
-      console.log('Google sign-in successful:', result.user);
-      
-    } catch (error: any) {
-      console.error('Login error:', error);
-      
-      // Handle specific error cases
-      if (error.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in was cancelled. Please try again.');
-      } else if (error.code === 'auth/popup-blocked') {
-        setError('Pop-up was blocked by your browser. Please allow pop-ups and try again.');
-      } else if (error.code === 'auth/unauthorized-domain') {
-        setError('This domain is not authorized for Google sign-in.');
-      } else if (error.code === 'auth/configuration-not-found') {
-        setError('Firebase Authentication is not configured. Please enable it in Firebase Console: https://console.firebase.google.com/project/taska-9ee86/authentication');
-      } else {
-        setError(`Failed to login: ${error.message}`);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Email/password login for emulator testing
   const loginWithEmail = async (email: string, password: string) => {
@@ -149,7 +215,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('Email sign-in successful:', result.user);
     } catch (error: any) {
       console.error('Email login error:', error);
-      if (error.code === 'auth/user-not-found') {
+      if (error.code === 'auth/operation-not-allowed') {
+        setError('Email/password authentication is not enabled. Please enable it in Firebase Console.');
+      } else if (error.code === 'auth/user-not-found') {
         setError('No account found with this email.');
       } else if (error.code === 'auth/wrong-password') {
         setError('Incorrect password.');
@@ -164,25 +232,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Real logout
+  // Logout function
   const logout = async () => {
-    if (!auth) {
-      // If auth is not available, just clear local state
-      setUser(null);
-      localStorage.removeItem(AUTH_USER_KEY);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
     try {
-      await firebaseSignOut(auth);
+      // Sign out from Google Sign-In
+      // The signInWithPopup does not have a direct signOut method like signOut()
+      // For a simple logout, we can just set the user to null and remove from storage
       setUser(null);
-      localStorage.removeItem(AUTH_USER_KEY);
+      await AsyncStorage.removeItem(AUTH_USER_KEY);
+      console.log('User logged out successfully from Google');
     } catch (error) {
-      setError('Failed to logout. Please try again.');
-    } finally {
-      setIsLoading(false);
+      console.error('Logout error:', error);
+      // Even if Google sign-out fails, clear local state
+      setUser(null);
+      await AsyncStorage.removeItem(AUTH_USER_KEY);
     }
   };
 
@@ -201,7 +264,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Update state and localStorage
       setUser(updatedUser);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
+      await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
       
     } catch (error) {
       console.error("Error updating preferences:", error);
@@ -252,6 +315,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     registerWithEmail,
     logout,
     updateChorePreferences,
+    createGuestUser,
     isAdmin: checkIsAdmin(user?.email),
   };
 

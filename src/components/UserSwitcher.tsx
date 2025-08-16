@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 
 const UserSwitcher: React.FC = () => {
-  const { user, logout, loginWithEmail, loginWithGoogle } = useAuth();
+  const { user, logout, loginWithEmail, loginWithGoogle, createGuestUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -90,6 +90,7 @@ const UserSwitcher: React.FC = () => {
       setIsLoading(false);
     }
   };
+
 
   const handleLogout = async () => {
     try {
@@ -221,7 +222,7 @@ const UserSwitcher: React.FC = () => {
                 fill="#34A853"
               />
               <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 0.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
                 fill="#FBBC05"
               />
               <path
@@ -271,11 +272,31 @@ const UserSwitcher: React.FC = () => {
         <div className="text-xs text-gray-600 bg-white p-2 rounded border">
           <p className="font-medium mb-1">Testing Guide:</p>
           <ul className="space-y-1 text-xs">
-            <li>• <strong>Google login:</strong> Works immediately</li>
+            <li>• <strong>Google login:</strong> Works with Expo Auth Session</li>
             <li>• <strong>Admin accounts:</strong> Get sample data</li>
             <li>• <strong>Regular users:</strong> Start with blank data</li>
           </ul>
         </div>
+
+        {/* Skip Sign In Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start text-xs bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100"
+          onClick={async () => {
+            try {
+              await createGuestUser();
+              // Navigation will happen automatically via the tabs layout when user is set
+            } catch (error) {
+              console.error('Error creating guest user:', error);
+              alert('Failed to create guest user. Please try again.');
+            }
+          }}
+        >
+          <div className="flex items-center gap-2 w-full">
+            <span className="font-medium">🚀 Skip Sign In for Now</span>
+          </div>
+        </Button>
       </CardContent>
     </Card>
   );

@@ -15,7 +15,7 @@ interface LocationState {
 }
 
 const LoginPage: React.FC = () => {
-  const { loginWithGoogle, loginWithEmail, registerWithEmail, isLoading, error, user } = useAuth();
+  const { loginWithGoogle, loginWithEmail, registerWithEmail, createGuestUser, isLoading, error, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -161,7 +161,7 @@ const LoginPage: React.FC = () => {
                       fill="#34A853"
                     />
                     <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 0.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
                       fill="#FBBC05"
                     />
                     <path
@@ -319,6 +319,24 @@ const LoginPage: React.FC = () => {
               Don&apos;t have an account? It will be created automatically.
             </p>
           )}
+          
+          {/* Skip Sign In Button */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              try {
+                await createGuestUser();
+                // Navigation will happen automatically via the auth context when user is set
+              } catch (error) {
+                console.error('Error creating guest user:', error);
+                alert('Failed to create guest user. Please try again.');
+              }
+            }}
+            className="w-full py-3 bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100"
+          >
+            🚀 Skip Sign In for Now
+          </Button>
         </CardFooter>
       </Card>
     </div>

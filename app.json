@@ -1,0 +1,102 @@
+{
+  "expo": {
+    "name": "Taska Loop",
+    "slug": "taska-loop-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.taskaloop.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan barcodes and take photos of items",
+        "NSLocationWhenInUseUsageDescription": "This app uses location to find nearby stores and optimize shopping routes",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to select images for items",
+        "NSMicrophoneUsageDescription": "This app uses the microphone for voice commands and notes",
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "taska-loop",
+            "CFBundleURLSchemes": [
+              "taska-loop"
+            ]
+          }
+        ],
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.taskaloop.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "taska-mobile-3c860.firebaseapp.com"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "config": {
+        "firebase": {
+          "apiKey": "AIzaSyCTgbkVXeVWF34YPMzy5MnhpmKp-lyK6Gc",
+          "authDomain": "taska-mobile-3c860.firebaseapp.com",
+          "projectId": "taska-mobile-3c860",
+          "storageBucket": "taska-mobile-3c860.firebasestorage.app",
+          "messagingSenderId": "552365348974",
+          "appId": "1:552365348974:web:d58fe942284eeaeff26e7f",
+          "measurementId": "G-RRP375FX6B"
+        }
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access camera to scan barcodes."
+        }
+      ]
+    ],
+    "scheme": "taska-loop",
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}

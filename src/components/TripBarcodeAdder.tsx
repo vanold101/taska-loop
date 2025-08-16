@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { ScannedItem } from "./BarcodeScannerButton";
-import BarcodeScannerButton from "./BarcodeScannerButton";
+import BarcodeScanner from "./BarcodeScanner";
 import ProductDetails from "./ProductDetails";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,31 +32,32 @@ const TripBarcodeAdder = ({
   iconOnly = false
 }: TripBarcodeAdderProps) => {
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
-  const [scannedProduct, setScannedProduct] = useState<ScannedItem | null>(null);
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState<string>("");
   const [unit, setUnit] = useState<string>("ea");
   const { toast } = useToast();
 
-  const handleBarcodeScan = (item: ScannedItem) => {
-    setScannedProduct(item);
+  const handleBarcodeScan = (barcode: string) => {
+    setScannedBarcode(barcode);
     setIsProductDrawerOpen(true);
     setQuantity(1);
     setPrice("");
-    setUnit(item.quantity || "ea");
+    setUnit("ea");
     
     // Show success toast
     toast({
       title: "Product Scanned",
-      description: `Found: ${item.name || item.upc}`,
+      description: `Barcode: ${barcode}`,
     });
   };
 
   const handleAddToTrip = () => {
-    if (!scannedProduct || !tripId) return;
+    if (!scannedBarcode || !tripId) return;
     
     const newItem: Omit<TripItem, 'id'> = {
-      name: scannedProduct.name || scannedProduct.upc,
+      name: `Product (${scannedBarcode})`,
       quantity: quantity,
       price: price ? parseFloat(price) : undefined,
       unit: unit,
@@ -79,7 +79,7 @@ const TripBarcodeAdder = ({
   };
 
   const resetForm = () => {
-    setScannedProduct(null);
+    setScannedBarcode(null);
     setQuantity(1);
     setPrice("");
     setUnit("ea");
@@ -88,14 +88,21 @@ const TripBarcodeAdder = ({
 
   return (
     <>
-      <BarcodeScannerButton
-        onItemScanned={handleBarcodeScan}
-        buttonText={iconOnly ? "" : buttonText}
-        buttonVariant={buttonVariant}
-        buttonSize={buttonSize}
+      <Button
+        onClick={() => setIsScannerVisible(true)}
+        variant={buttonVariant}
+        size={buttonSize}
         className={className}
-        tripId={tripId}
+      >
+        {iconOnly ? "" : buttonText}
+      </Button>
+      
+      <BarcodeScanner
+        isVisible={isScannerVisible}
+        onClose={() => setIsScannerVisible(false)}
+        onBarcodeScanned={handleBarcodeScan}
       />
+
       <Drawer open={isProductDrawerOpen} onOpenChange={setIsProductDrawerOpen}>
         <DrawerContent className="max-h-[90vh] overflow-hidden">
           <DrawerHeader className="px-4 py-3 sm:px-6">
@@ -114,9 +121,9 @@ const TripBarcodeAdder = ({
               Review and add the scanned product to your shopping trip
             </DrawerDescription>
           </DrawerHeader>
-          {scannedProduct && (
+          {scannedBarcode && (
             <div className="px-4 pb-0 sm:px-6 overflow-y-auto">
-              <ProductDetails product={scannedProduct} />
+              <ProductDetails product={{ name: `Product (${scannedBarcode})`, upc: scannedBarcode }} />
               <Card className="mt-4 mb-4">
                 <CardHeader className="py-3">
                   <CardTitle className="text-base">Item Details</CardTitle>
@@ -126,7 +133,7 @@ const TripBarcodeAdder = ({
                     <Label htmlFor="name">Name</Label>
                     <Input
                       id="name"
-                      value={scannedProduct.name || scannedProduct.upc}
+                      value={`Product (${scannedBarcode})`}
                       readOnly
                     />
                   </div>
