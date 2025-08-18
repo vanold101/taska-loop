@@ -1,166 +1,228 @@
-import { useState } from "react";
-import BarcodeScannerButton from "../components/BarcodeScannerButton";
-import { ScannedItem } from "../components/BarcodeScannerButton";
-import BarcodeTestingGuide from "../components/BarcodeTestingGuide";
-import ProductDetails from "../components/ProductDetails";
-import { Button } from "@/components/ui/button";
-import BarcodeScannerTests from "@/components/BarcodeScannerTests";
-import NavBar from "@/components/NavBar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Camera, Settings, Info, ScanLine } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Camera } from 'expo-camera';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 
-const BarcodeTestPage = () => {
-  const [scannedProduct, setScannedProduct] = useState<ScannedItem | null>(null);
-  const [scanHistory, setScanHistory] = useState<ScannedItem[]>([]);
+export default function BarcodeTestPage() {
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [lastBarcode, setLastBarcode] = useState<string | null>(null);
+  const [scanHistory, setScanHistory] = useState<string[]>([]);
 
-  const handleItemScanned = (item: ScannedItem) => {
-    setScannedProduct(item);
-    setScanHistory(prev => [item, ...prev].slice(0, 5)); // Keep last 5 scans
+  useEffect(() => {
+    // Check camera permissions on component mount
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    })();
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      setCameraError(null);
+      
+      // Request camera permissions
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        setCameraError('Camera permission denied. Please enable camera access in your device settings.');
+        return;
+      }
+
+      setHasPermission(true);
+      setCameraActive(true);
+    } catch (error) {
+      console.error('Camera error:', error);
+      setCameraError('Failed to start camera');
+    }
+  };
+
+  const startBarcodeScanning = async () => {
+    if (!cameraActive) {
+      setCameraError('Camera must be active to start scanning');
+      return;
+    }
+
+    try {
+      setScanning(true);
+      console.log('Barcode scanning started - ready to scan');
+    } catch (error) {
+      console.error('Error setting up barcode detection:', error);
+      setCameraError('Failed to initialize barcode detection');
+      setScanning(false);
+    }
+  };
+
+  const stopBarcodeScanning = () => {
+    setScanning(false);
+  };
+
+  const stopCamera = () => {
+    stopBarcodeScanning();
+    setCameraActive(false);
+    setCameraError(null);
+    setLastBarcode(null);
+  };
+
+  const clearHistory = () => {
+    setScanHistory([]);
+    setLastBarcode(null);
   };
 
   return (
-    <div className="pb-24">
-      <NavBar />
-      <div className="container mx-auto px-4 pt-6">
-        <header className="py-6">
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gloop-premium-gradient-start to-gloop-premium-gradient-end">
-            Barcode Scanner Testing
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Test the barcode scanner with known UPCs and troubleshoot camera issues
-          </p>
-        </header>
+    <div className="min-h-screen bg-gray-100 p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 text-center">Barcode Scanner Test</h1>
         
-        <Tabs defaultValue="test">
-          <TabsList className="mb-4">
-            <TabsTrigger value="test"><ScanLine className="h-4 w-4 mr-2" /> Test Scanner</TabsTrigger>
-            <TabsTrigger value="troubleshoot"><AlertCircle className="h-4 w-4 mr-2" /> Troubleshooting</TabsTrigger>
-            <TabsTrigger value="compatibility"><Info className="h-4 w-4 mr-2" /> Compatibility</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="test">
-            <BarcodeScannerTests />
-          </TabsContent>
-          
-          <TabsContent value="troubleshoot">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <AlertCircle className="h-5 w-5 mr-2 text-orange-500" />
-                    Common Issues & Solutions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-lg">Camera access failed after showing camera briefly</h3>
-                    <div className="pl-5 space-y-2">
-                      <p><strong>Cause:</strong> This usually happens on mobile when the camera initialization takes too long or fails silently.</p>
-                      <p><strong>Solutions:</strong></p>
-                      <ul className="list-disc pl-5 space-y-1.5">
-                        <li>Make sure you're using <strong>HTTPS</strong> (especially on GitHub Pages)</li>
-                        <li>Try refreshing the page and granting camera permissions again</li>
-                        <li>Try using a different browser (Chrome works best)</li>
-                        <li>Use the manual entry option to add barcodes manually</li>
-                      </ul>
-                    </div>
-                    
-                    <h3 className="font-medium text-lg">Camera permissions denied or not appearing</h3>
-                    <div className="pl-5 space-y-2">
-                      <p><strong>Cause:</strong> Your browser's permission settings may be blocking camera access.</p>
-                      <p><strong>Solutions:</strong></p>
-                      <ul className="list-disc pl-5 space-y-1.5">
-                        <li>Check your browser's site settings (click on the lock/info icon in URL bar)</li>
-                        <li>Reset site permissions and try again</li>
-                        <li>On iOS, make sure camera access is enabled in Settings</li>
-                      </ul>
-                    </div>
-                    
-                    <h3 className="font-medium text-lg">Scanner can't detect barcodes</h3>
-                    <div className="pl-5 space-y-2">
-                      <p><strong>Cause:</strong> Poor lighting, blurry camera, or barcode quality issues.</p>
-                      <p><strong>Solutions:</strong></p>
-                      <ul className="list-disc pl-5 space-y-1.5">
-                        <li>Ensure good lighting - avoid glare on the barcode</li>
-                        <li>Hold your device steady and ensure the barcode is in focus</li>
-                        <li>Try moving closer or further from the barcode</li>
-                        <li>Enter the barcode manually as a fallback</li>
-                      </ul>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="compatibility">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="h-5 w-5 mr-2 text-blue-500" />
-                  Device & Browser Compatibility
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <h3 className="font-medium text-lg mb-2">Best Compatible Browsers</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="bg-card border rounded-lg p-3 flex items-center">
-                      <div className="bg-green-500/10 p-2 rounded-full mr-3">
-                        <Camera className="h-5 w-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Google Chrome</p>
-                        <p className="text-sm text-muted-foreground">Best overall compatibility</p>
-                      </div>
-                    </div>
-                    <div className="bg-card border rounded-lg p-3 flex items-center">
-                      <div className="bg-green-500/10 p-2 rounded-full mr-3">
-                        <Camera className="h-5 w-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Safari</p>
-                        <p className="text-sm text-muted-foreground">Good on iOS/macOS</p>
-                      </div>
-                    </div>
-                    <div className="bg-card border rounded-lg p-3 flex items-center">
-                      <div className="bg-green-500/10 p-2 rounded-full mr-3">
-                        <Camera className="h-5 w-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Firefox</p>
-                        <p className="text-sm text-muted-foreground">Good on most devices</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="font-medium text-lg mb-2">Manual Entry Option</h3>
-                  <p>If camera scanning doesn't work on your device, you can always use the manual barcode entry option:</p>
-                  <ol className="list-decimal pl-5 mt-2 space-y-1">
-                    <li>Click the barcode scanner button to open the scanner</li>
-                    <li>Click "Enter barcode manually" at the bottom of the dialog</li>
-                    <li>Enter the UPC/barcode number</li>
-                    <li>Click "Add" to add the item</li>
-                  </ol>
-                </div>
-                
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Camera Controls */}
+          <div className="space-y-6">
+            {/* Camera Controls */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">Camera Controls</h2>
+              <div className="flex gap-4 flex-wrap">
                 <Button 
-                  className="mt-4 w-full"
-                  variant="outline"
-                  onClick={() => window.history.back()}
+                  onClick={startCamera} 
+                  disabled={cameraActive}
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Return to Previous Page
+                  Start Camera
                 </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <Button 
+                  onClick={stopCamera} 
+                  disabled={!cameraActive}
+                  variant="destructive"
+                >
+                  Stop Camera
+                </Button>
+              </div>
+            </div>
+
+            {/* Barcode Scanning Controls */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">Barcode Scanning</h2>
+              <div className="space-y-4">
+                <div className="flex gap-4 flex-wrap">
+                  <Button 
+                    onClick={startBarcodeScanning} 
+                    disabled={!cameraActive || scanning}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    Start Scanning
+                  </Button>
+                  <Button 
+                    onClick={stopBarcodeScanning} 
+                    disabled={!scanning}
+                    variant="outline"
+                  >
+                    Stop Scanning
+                  </Button>
+                </div>
+                
+                <div className="text-center">
+                  <p className="text-lg">
+                    Scanning: {scanning ? 'Active' : 'Inactive'}
+                  </p>
+                  {cameraError && (
+                    <p className="text-red-600 mt-2">{cameraError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Last Scanned Barcode */}
+            {lastBarcode && (
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Last Scanned Barcode</h2>
+                <div className="bg-gray-100 p-4 rounded font-mono text-lg break-all">
+                  {lastBarcode}
+                </div>
+                <Button 
+                  onClick={clearHistory} 
+                  variant="outline" 
+                  className="mt-4"
+                >
+                  Clear History
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Camera View and History */}
+          <div className="space-y-6">
+            {/* Camera View */}
+            {cameraActive && !cameraError && hasPermission && (
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Camera Feed</h2>
+                <div className="relative overflow-hidden w-full aspect-video bg-black rounded-lg">
+                  <BarCodeScanner
+                    onBarCodeScanned={({ type, data }) => {
+                      if (scanning) {
+                        console.log('Barcode detected:', data);
+                        setLastBarcode(data);
+                        setScanHistory(prev => [data, ...prev.slice(0, 9)]); // Keep last 10 scans
+                        stopBarcodeScanning();
+                      }
+                    }}
+                    style={{ width: '100%', height: '100%' }}
+                    barCodeTypes={[
+                      BarCodeScanner.Constants.BarCodeType.upc_a,
+                      BarCodeScanner.Constants.BarCodeType.upc_e,
+                      BarCodeScanner.Constants.BarCodeType.ean13,
+                      BarCodeScanner.Constants.BarCodeType.ean8,
+                      BarCodeScanner.Constants.BarCodeType.code128,
+                      BarCodeScanner.Constants.BarCodeType.code39,
+                      BarCodeScanner.Constants.BarCodeType.qr
+                    ]}
+                  />
+                  {scanning && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-green-500/80 text-white px-4 py-2 rounded animate-pulse">
+                        Scanning for barcodes...
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Scan History */}
+            {scanHistory.length > 0 && (
+              <div className="bg-white p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Scan History</h2>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {scanHistory.map((barcode, index) => (
+                    <div key={index} className="bg-gray-100 p-3 rounded font-mono text-sm break-all">
+                      {barcode}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="mt-8 bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">How to Test Barcode Scanning:</h2>
+          <ol className="list-decimal list-inside space-y-2">
+            <li>Click "Start Camera" to activate your device's camera</li>
+            <li>Allow camera permissions when prompted by your browser</li>
+            <li>Click "Start Scanning" to begin barcode detection</li>
+            <li>Point your camera at a barcode (UPC, EAN, QR code, etc.)</li>
+            <li>The scanner will detect the barcode and display it</li>
+            <li>Click "Stop Scanning" to pause detection or "Stop Camera" to close</li>
+          </ol>
+          
+          <div className="mt-4 p-4 bg-blue-50 rounded">
+            <p className="text-sm text-blue-800">
+              <strong>Supported Barcode Types:</strong> UPC-A, UPC-E, EAN-13, EAN-8, Code 128, Code 39, QR Code, and more.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
-};
-
-export default BarcodeTestPage; 
+} 

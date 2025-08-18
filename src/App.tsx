@@ -22,6 +22,7 @@ import PantryPage from "./pages/PantryPage";
 import RecurringItemsPage from "./pages/RecurringItemsPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
+import SimpleCameraTestPage from "./pages/simple-camera-test";
 import LedgerPage from "./pages/Ledger";
 import NotFound from "./pages/NotFound";
 import DashboardPage from "./pages/DashboardPage";
@@ -131,6 +132,11 @@ const App = () => {
                             <Route path="/settings" element={
                               <ProtectedRoute>
                                 <SettingsPage />
+                              </ProtectedRoute>
+                            } />
+                            <Route path="/simple-camera-test" element={
+                              <ProtectedRoute>
+                                <SimpleCameraTestPage />
                               </ProtectedRoute>
                             } />
                             <Route path="/history" element={

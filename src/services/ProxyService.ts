@@ -10,7 +10,10 @@ const PROXY_CONFIGS = {
   corsAnywhere: {
     url: 'https://cors-anywhere.herokuapp.com/',
     headers: {
-      'Origin': typeof window !== 'undefined' ? window.location.origin : '',
+      // Guard for React Native where window/location may be undefined
+      'Origin': typeof window !== 'undefined' && (window as any).location && (window as any).location.origin
+        ? (window as any).location.origin
+        : '',
       'X-Requested-With': 'XMLHttpRequest'
     }
   },

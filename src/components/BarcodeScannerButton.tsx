@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ScanLine, Camera, X, CheckCircle2, AlertCircle, XCircle, Plus } from "lucide-react";
-import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { ScanLine, X, CheckCircle2, AlertCircle, XCircle, Plus } from "lucide-react";
+
 import { useToast } from "@/hooks/use-toast";
-import { isCameraSupported as checkCameraSupport, requestCameraAccess, stopMediaStream, retryWithDifferentConstraints, toggleTorch as toggleTorchUtil } from "@/utils/cameraUtils";
+import { Camera } from 'expo-camera';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 import { fetchProductFromOpenFoodFacts } from "@/services/OpenFoodFactsService";
 import { fetchWithProxy } from "@/services/ProxyService";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -108,17 +109,13 @@ const BarcodeScannerButton = ({
   const [isCameraInitializing, setIsCameraInitializing] = useState<boolean>(false);
   const [retryCount, setRetryCount] = useState<number>(0);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  // Clean up camera and intervals on unmount
+  // Clean up intervals on unmount
   useEffect(() => {
     return () => {
-      if (videoRef.current?.srcObject) {
-        stopMediaStream(videoRef.current.srcObject as MediaStream);
-      }
-      
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
       }
@@ -150,7 +147,7 @@ const BarcodeScannerButton = ({
     }
   }, [isOpen]);
 
-  // Initialize camera with retry attempts
+    // Initialize camera with retry attempts
   const initializeCamera = async () => {
     if (isCameraInitializing) return;
     
@@ -159,37 +156,22 @@ const BarcodeScannerButton = ({
       setCameraError(null);
       setScanStatus("Initializing camera...");
       
-      // Use the retry mechanism for more reliable camera access
-      const { stream, error } = await retryWithDifferentConstraints();
+      // Request camera permissions for Expo
+      const { status } = await Camera.requestCameraPermissionsAsync();
       
-      if (error) {
-        console.error("Camera initialization failed:", error);
-        setCameraError(error);
+      if (status !== 'granted') {
+        setCameraError('Camera permission denied. Please enable camera access in your device settings.');
         setScanStatus("Camera access failed");
         setCameraActive(false);
         return;
       }
+
+      // Camera permission granted
+      setCameraActive(true);
+      setScanStatus("Waiting for barcode...");
       
-      if (stream) {
-        setCameraActive(true);
-        setScanStatus("Waiting for barcode...");
-        
-        // Set up periodic scan attempts feedback
-        if (scanIntervalRef.current) {
-          clearInterval(scanIntervalRef.current);
-        }
-        
-        scanIntervalRef.current = setInterval(() => {
-          setScanAttempts(prev => {
-            const newValue = prev + 1;
-            // Provide feedback every 5 attempts
-            if (newValue % 5 === 0) {
-              setScanStatus("Still searching for barcode... Please ensure good lighting and hold steady.");
-            }
-            return newValue;
-          });
-        }, 2000); // Check every 2 seconds
-      }
+      // Start barcode detection
+      startBarcodeDetection();
     } catch (err) {
       console.error("Error initializing camera:", err);
       setCameraError(`Error accessing camera: ${err}`);
@@ -199,45 +181,7 @@ const BarcodeScannerButton = ({
     }
   };
 
-  const handleScanResult = async (error: any, result: any) => {
-    if (isProcessingScan) return;
 
-    const currentTime = Date.now();
-    // Allow new scan only after 3 seconds to prevent duplicates
-    if (result && (currentTime - lastScanTime > 3000)) {
-      setLastScanTime(currentTime);
-      setIsProcessingScan(true);
-      setScanStatus("Barcode detected! Processing...");
-      setDetectedBarcode(result.text);
-      setScanResult("detected");
-      
-      // Stop the scan attempts indicator
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-      }
-      
-      const scannedCode = result.text;
-      console.log(`[Scanner] Barcode detected: ${scannedCode}`);
-      
-      toast({
-        title: "Barcode Detected",
-        description: `UPC: ${scannedCode}. Fetching details...`,
-      });
-
-      // If onScan prop is provided, call it directly with the raw barcode
-      if (onScan) {
-        console.log(`[Scanner] Using onScan callback with barcode: ${scannedCode}`);
-        onScan(scannedCode);
-        handleClose();
-        return;
-      }
-
-      // Use Open Food Facts API to look up the product
-      if (onItemScanned) {
-        processScannedBarcode(scannedCode);
-      }
-    }
-  };
 
   // Separate function to process a barcode (can be called from manual input too)
   const processScannedBarcode = async (barcode: string) => {
@@ -331,6 +275,12 @@ const BarcodeScannerButton = ({
     }
   };
 
+  const startBarcodeDetection = async () => {
+    // For Expo, we'll use the BarCodeScanner component directly
+    // The scanning will be handled by the onBarCodeScanned prop
+    console.log('Barcode detection started - ready to scan');
+  };
+
   const handleCameraError = (error: any) => {
     console.error("Camera error in scanner component:", error);
     
@@ -359,10 +309,6 @@ const BarcodeScannerButton = ({
 
   const handleClose = () => {
     // Clean up resources and reset state
-    if (videoRef.current?.srcObject) {
-      stopMediaStream(videoRef.current.srcObject as MediaStream);
-    }
-    
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current);
     }
@@ -380,35 +326,23 @@ const BarcodeScannerButton = ({
 
   // Toggle torch implementation
   const toggleTorch = async () => {
-    if (!videoRef.current?.srcObject) return;
-    
-    const newTorchStatus = !torchEnabled;
-    const success = await toggleTorchUtil(videoRef.current.srcObject as MediaStream, newTorchStatus);
-    
-    if (success) {
-      setTorchEnabled(newTorchStatus);
-    } else {
-      toast({
-        title: "Torch Unavailable",
-        description: "Your device doesn't support flash/torch control.",
-        variant: "destructive",
-      });
-    }
+    // For Expo, torch control is handled by the BarCodeScanner component
+    // This is a placeholder for future torch implementation
+    toast({
+      title: "Torch Control",
+      description: "Torch control will be implemented in a future update.",
+      variant: "default",
+    });
   };
 
   const handleOpenScanner = async () => {
-    // Check if browser supports camera
-    const supported = checkCameraSupport();
-    setIsCameraSupported(supported);
-    
-    if (!supported) {
-      // Just show scanner dialog with manual input option if camera is not supported
-      setShowManualInput(true);
-      setCameraError("Your browser doesn't support camera access. Please enter the barcode manually.");
-    }
-    
-    // Open the scanner dialog
+    // Open the scanner dialog first
     setIsOpen(true);
+    
+    // Then initialize the camera
+    setTimeout(() => {
+      initializeCamera();
+    }, 100);
   };
   
   // Handle manual barcode input
@@ -433,26 +367,7 @@ const BarcodeScannerButton = ({
   };
 
   // Fix hasFlash detection function
-  useEffect(() => {
-    const checkFlashAvailability = async () => {
-      if (videoRef.current?.srcObject) {
-        try {
-          const videoTrack = (videoRef.current.srcObject as MediaStream).getVideoTracks()[0];
-          if (videoTrack) {
-            const capabilities = videoTrack.getCapabilities();
-            setHasFlash(capabilities.torch === true);
-          }
-        } catch (error) {
-          console.warn("Failed to check flash capabilities:", error);
-          setHasFlash(false);
-        }
-      }
-    };
 
-    if (cameraActive) {
-      checkFlashAvailability();
-    }
-  }, [cameraActive]);
 
   return (
     <>
@@ -482,18 +397,36 @@ const BarcodeScannerButton = ({
           
           {/* Camera view */}
           {!cameraError && cameraActive && (
-            <div className="relative overflow-hidden w-full aspect-square max-h-80 bg-muted rounded-md">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-full h-full">
-                  <BarcodeScannerComponent
-                    width="100%"
-                    height="100%"
-                    onUpdate={handleScanResult}
-                    onError={handleCameraError}
-                    torch={torchEnabled}
-                  />
-                </div>
-              </div>
+            <div className="relative overflow-hidden w-full aspect-square max-h-80 bg-black rounded-md">
+              <BarCodeScanner
+                onBarCodeScanned={({ type, data }) => {
+                  console.log('Barcode detected:', data);
+                  
+                  // Process the detected barcode
+                  if (onScan) {
+                    onScan(data);
+                    handleClose();
+                  } else if (onItemScanned) {
+                    processScannedBarcode(data);
+                  }
+                }}
+                style={{ 
+                  width: '100%', 
+                  height: '100%',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0
+                }}
+                barCodeTypes={[
+                  BarCodeScanner.Constants.BarCodeType.upc_a,
+                  BarCodeScanner.Constants.BarCodeType.upc_e,
+                  BarCodeScanner.Constants.BarCodeType.ean13,
+                  BarCodeScanner.Constants.BarCodeType.ean8,
+                  BarCodeScanner.Constants.BarCodeType.code128,
+                  BarCodeScanner.Constants.BarCodeType.code39,
+                  BarCodeScanner.Constants.BarCodeType.qr
+                ]}
+              />
               
               {/* Scanner UI overlay */}
               <div className="absolute inset-0 flex items-center justify-center">

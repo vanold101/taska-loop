@@ -30,6 +30,21 @@ if (storedTheme === 'dark') {
   }
 }
 
+// Also check app settings for dark mode preference
+try {
+  const appSettings = localStorage.getItem('appSettings');
+  if (appSettings) {
+    const settings = JSON.parse(appSettings);
+    if (settings.darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      themeColorMeta.content = '#0F172A';
+    }
+  }
+} catch (error) {
+  console.error('Error loading app settings:', error);
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
 
 // Remove event listener for system theme changes as we no longer respect system preferences

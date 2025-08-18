@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '../lib/firebase';
-import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser, GoogleAuthProvider } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 
@@ -109,35 +109,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       provider.addScope('profile');
       provider.addScope('email');
 
-      // Sign in with popup (works in Expo web and some mobile scenarios)
-      const result = await signInWithPopup(auth, provider);
-      console.log('Google sign-in successful:', result.user);
-
-      // Create user account
-      const googleUser: User = {
-        id: result.user.uid,
-        name: result.user.displayName || 'Google User',
-        email: result.user.email || 'google.user@gmail.com',
-        avatar: result.user.photoURL || 'https://ui-avatars.com/api/?name=Google+User&background=random',
-        chorePreferences: [],
-        isAdmin: checkIsAdmin(result.user.email || undefined),
-      };
-
-      setUser(googleUser);
-      await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(googleUser));
-      console.log('Google OAuth sign-in successful:', googleUser);
+      // Show a prompt to the user about Google login
+      Alert.alert(
+        'Google Sign-In',
+        'Google sign-in requires web browser setup. Would you like to:\n\n1. Continue as guest\n2. Use email login\n3. Try web version',
+        [
+          {
+            text: 'Continue as Guest',
+            onPress: () => {
+              const guestUser: User = {
+                id: 'guest-' + Date.now(),
+                name: 'Guest User',
+                email: 'guest@example.com',
+                avatar: 'https://ui-avatars.com/api/?name=Guest+User&background=random',
+                chorePreferences: [],
+                isAdmin: false,
+              };
+              setUser(guestUser);
+              AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(guestUser));
+              setError(null);
+            }
+          },
+          {
+            text: 'Email Login',
+            onPress: () => {
+              setError('Please use the email login option below.');
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
 
     } catch (error: any) {
       console.error('Google sign-in error:', error);
-      
-      // Handle specific error cases
-      if (error.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in was cancelled');
-      } else if (error.code === 'auth/popupInnerHTML-blocked') {
-        setError('Pop-up was blocked. Please allow pop-ups and try again.');
-      } else {
-        setError(`Google sign-in failed: ${error.message}`);
-      }
+      setError('Google sign-in not available. Please use email login or continue as guest.');
     } finally {
       setIsLoading(false);
     }
@@ -176,6 +184,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(false);
       return;
     }
+
+
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {

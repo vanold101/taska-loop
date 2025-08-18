@@ -26,7 +26,8 @@ import {
   updateProfile,
   connectAuthEmulator,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   Auth
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,13 +43,13 @@ const isDevelopment = () => {
 
 // Your web app's Firebase configuration - using provided credentials
 const firebaseConfig = {
-  apiKey: "AIzaSyCTgbkVXeVWF34YPMzy5MnhpmKp-lyK6Gc",
-  authDomain: "taska-mobile-3c860.firebaseapp.com",
-  projectId: "taska-mobile-3c860",
-  storageBucket: "taska-mobile-3c860.firebasestorage.app",
-  messagingSenderId: "552365348974",
-  appId: "1:552365348974:web:d58fe942284eeaeff26e7f",
-  measurementId: "G-RRP375FX6B"
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyCTgbkVXeVWF34YPMzy5MnhpmKp-lyK6Gc",
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "taska-mobile-3c860.firebaseapp.com",
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "taska-mobile-3c860",
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "taska-mobile-3c860.firebasestorage.app",
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "552365348974",
+  appId: process.env.VITE_FIREBASE_APP_ID || "1:552365348974:web:d58fe942284eeaeff26e7f",
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || "G-RRP375FX6B"
 };
 
 // Initialize Firebase with the provided config
@@ -147,7 +148,6 @@ export {
   createUserWithEmailAndPassword,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup,
   getToken,
   onMessage
 };

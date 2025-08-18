@@ -18,6 +18,16 @@ const DarkModeToggle: React.FC = () => {
     const newTheme = toggleTheme();
     setIsDarkMode(newTheme === 'dark');
     
+    // Save to settings
+    try {
+      const savedSettings = localStorage.getItem('appSettings') || '{}';
+      const settings = JSON.parse(savedSettings);
+      settings.darkMode = newTheme === 'dark';
+      localStorage.setItem('appSettings', JSON.stringify(settings));
+    } catch (error) {
+      console.error('Error saving dark mode setting:', error);
+    }
+    
     // Add haptic feedback on mobile devices
     if (navigator.vibrate) {
       navigator.vibrate(50);

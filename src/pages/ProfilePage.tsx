@@ -47,6 +47,7 @@ import { Switch } from "../components/ui/switch"
 import { Label } from "../components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
 import { Badge } from "../components/ui/badge"
+import { Separator } from "../components/ui/separator"
 
 export default function ProfilePage() {
   const { user, logout, isAdmin } = useAuth();
@@ -216,6 +217,23 @@ export default function ProfilePage() {
                 <CardDescription>Customize your app experience</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Settings className="h-5 w-5 text-slate-600" />
+                    <div>
+                      <Label className="text-base font-medium">Advanced Settings</Label>
+                      <p className="text-sm text-slate-500">Manage all app preferences and settings</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/settings')}
+                    className="border-slate-200"
+                  >
+                    Open Settings
+                  </Button>
+                </div>
+                <Separator />
                 <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>
                   <Select defaultValue="en">

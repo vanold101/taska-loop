@@ -21,7 +21,7 @@ export interface PlaceDetails {
 }
 
 class GooglePlacesMobileService {
-  private apiKey = 'AIzaSyAB-h4_VucPyVktYcdIW5At9edXaQXRL10';
+  private apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyAB-h4_VucPyVktYcdIW5At9edXaQXRL10';
 
   async getPlacePredictions(input: string): Promise<PlaceResult[]> {
     if (input.length < 3) {

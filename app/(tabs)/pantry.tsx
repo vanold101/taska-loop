@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Camera, CameraView } from 'expo-camera';
+import { fetchProductFromOpenFoodFacts } from '../../src/services/OpenFoodFactsService';
+import { findProductByBarcode } from '../../src/services/ProductService';
 
 export default function PantryPage() {
   const [pantryItems, setPantryItems] = useState<Array<{
@@ -33,6 +36,15 @@ export default function PantryPage() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isFetchingProduct, setIsFetchingProduct] = useState(false);
+  const [scannedProduct, setScannedProduct] = useState<{
+    name?: string;
+    brand?: string;
+    image?: string;
+    category?: string;
+    ingredients?: string;
+    quantity?: string;
+  } | null>(null);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,21 +53,61 @@ export default function PantryPage() {
 
   const categories = ['Produce', 'Dairy', 'Bakery', 'Pantry', 'Meat', 'Seafood', 'Snacks', 'Beverages', 'Frozen', 'Household'];
 
-
-
-  // Set camera permission to true for now (mock scanner)
+  // Request camera permission on mount
   useEffect(() => {
-    setHasPermission(true);
+    (async () => {
+      try {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasPermission(status === 'granted');
+      } catch (e) {
+        setHasPermission(false);
+      }
+    })();
   }, []);
 
-  const handleBarCodeScanned = (data: string) => {
-    setScanned(true);
-    setScannedBarcode(data);
-    setIsBarcodeScannerVisible(false);
-    setIsScanning(false);
-    // Auto-fill item name with barcode for now (in real app, this would query a product database)
-    setNewItemName(`Product ${data.slice(-6)}`);
-    setIsAddItemModalVisible(true);
+  const handleBarCodeScanned = async (result: any) => {
+    if (result && result.data) {
+      const barcode = result.data;
+      setScanned(true);
+      setScannedBarcode(barcode);
+      setIsBarcodeScannerVisible(false);
+      setIsScanning(false);
+      setIsAddItemModalVisible(true);
+      setIsFetchingProduct(true);
+      setScannedProduct(null);
+
+      try {
+        // Try Open Food Facts first
+        const offProduct = await fetchProductFromOpenFoodFacts(barcode);
+        if (offProduct) {
+          setScannedProduct(offProduct);
+          if (offProduct.name && offProduct.name.trim().length > 0) {
+            setNewItemName(offProduct.name);
+          } else {
+            setNewItemName(`Item (${barcode})`);
+          }
+          // Try to map category heuristically
+          if (offProduct.category) {
+            const match = categories.find(cat => offProduct.category!.toLowerCase().includes(cat.toLowerCase()));
+            if (match) setNewItemCategory(match);
+          }
+        } else {
+          // Fallback to local mock product DB
+          const localProduct = findProductByBarcode(barcode);
+          if (localProduct) {
+            setScannedProduct({ name: localProduct.name, category: localProduct.defaultCategory });
+            setNewItemName(localProduct.name);
+            if (localProduct.defaultCategory) setNewItemCategory(localProduct.defaultCategory);
+          } else {
+            setNewItemName(`Item (${barcode})`);
+          }
+        }
+      } catch (e) {
+        setNewItemName(`Item (${barcode})`);
+      } finally {
+        setIsFetchingProduct(false);
+      }
+    }
   };
 
   const addItem = () => {
@@ -100,19 +152,8 @@ export default function PantryPage() {
   };
 
   const startScanning = async () => {
-    try {
-      setIsScanning(true);
-      // Simulate scanning for now
-      setTimeout(() => {
-        // Mock barcode scan for testing
-        const mockBarcode = '1234567890123';
-        handleBarCodeScanned(mockBarcode);
-      }, 2000);
-    } catch (error) {
-      console.error('Error starting scanner:', error);
-      Alert.alert('Scanner Error', 'Failed to start camera scanner');
-      setIsScanning(false);
-    }
+    // Real scanning is handled by BarCodeScanner component
+    setIsScanning(true);
   };
 
   const stopScanning = () => {
@@ -137,6 +178,14 @@ export default function PantryPage() {
         }
       ]
     );
+  };
+
+  const updateItemQuantity = (itemId: string, delta: number) => {
+    setPantryItems(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const nextQty = Math.max(0, (Number(item.quantity) || 0) + delta);
+      return { ...item, quantity: nextQty };
+    }));
   };
 
   const getCategoryIcon = (category: string) => {
@@ -334,9 +383,23 @@ export default function PantryPage() {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.itemDetails}>
-                  <Text style={styles.itemQuantity}>
-                    {item.quantity} {item.unit}
-                  </Text>
+                  <View style={styles.quantityRow}>
+                    <TouchableOpacity
+                      style={[styles.qtyButton, styles.qtyMinus]}
+                      onPress={() => updateItemQuantity(item.id, -1)}
+                    >
+                      <Ionicons name="remove" size={18} color="#fff" />
+                    </TouchableOpacity>
+                    <Text style={styles.itemQuantity}>
+                      {item.quantity} {item.unit}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.qtyButton, styles.qtyPlus]}
+                      onPress={() => updateItemQuantity(item.id, 1)}
+                    >
+                      <Ionicons name="add" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
                   {item.expiry && (
                     <Text style={styles.itemExpiry}>
                       Expires: {item.expiry}
@@ -384,6 +447,33 @@ export default function PantryPage() {
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* Product details from API lookup */}
+            {isFetchingProduct ? (
+              <View style={styles.productInfo}>
+                <Text style={styles.productInfoTitle}>Looking up product details…</Text>
+              </View>
+            ) : scannedProduct ? (
+              <View style={styles.productInfo}>
+                {!!scannedProduct.name && (
+                  <Text style={styles.productName}>{scannedProduct.name}</Text>
+                )}
+                {!!scannedProduct.brand && (
+                  <Text style={styles.productMeta}>Brand: {scannedProduct.brand}</Text>
+                )}
+                {!!scannedProduct.quantity && (
+                  <Text style={styles.productMeta}>Quantity: {scannedProduct.quantity}</Text>
+                )}
+                {!!scannedProduct.category && (
+                  <Text style={styles.productMeta}>Category: {scannedProduct.category}</Text>
+                )}
+                {!!scannedProduct.ingredients && (
+                  <Text style={styles.productDesc} numberOfLines={3}>
+                    {scannedProduct.ingredients}
+                  </Text>
+                )}
+              </View>
+            ) : null}
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Item Name</Text>
@@ -482,40 +572,44 @@ export default function PantryPage() {
               </TouchableOpacity>
             </View>
             
-                         <View style={styles.scannerContent}>
-               {hasPermission ? (
-                 <>
-                   <View style={styles.cameraPlaceholder}>
-                     <Ionicons name="camera" size={80} color="white" />
-                     <Text style={styles.scanText}>Camera Scanner</Text>
-                     <Text style={styles.scanSubtext}>Web camera integration</Text>
-                   </View>
-                   <View style={styles.scanOverlay}>
-                     <View style={styles.scanFrame} />
-                     <Text style={styles.scanText}>
-                       {isScanning ? 'Scanning for barcodes...' : 'Camera ready'}
-                     </Text>
-                     <Text style={styles.scanSubtext}>
-                       {isScanning ? 'Point camera at barcode' : 'Camera access granted'}
-                     </Text>
-                   </View>
-                 </>
-               ) : (
-                 <View style={styles.permissionOverlay}>
-                   <Ionicons name="camera" size={64} color="white" />
-                   <Text style={styles.scanText}>Camera Permission Required</Text>
-                   <Text style={styles.scanSubtext}>Please allow camera access to scan barcodes</Text>
-                   <TouchableOpacity
-                     style={styles.permissionButton}
-                     onPress={() => {
-                       setHasPermission(true);
-                     }}
-                   >
-                     <Text style={styles.permissionButtonText}>Enable Scanner</Text>
-                   </TouchableOpacity>
-                 </View>
-               )}
-             </View>
+            <View style={styles.scannerContent}>
+              {hasPermission ? (
+                <>
+                  <CameraView
+                    style={styles.camera}
+                    facing="back"
+                    onBarcodeScanned={scanned ? undefined : ({ type, data }: { type: string; data: string }) => handleBarCodeScanned({ type, data })}
+                    barcodeScannerSettings={{
+                      barcodeTypes: ['qr', 'upc_a', 'upc_e', 'ean13', 'ean8', 'code128', 'code39']
+                    }}
+                  />
+                  <View style={styles.scanOverlay}>
+                    <View style={styles.scanFrame} />
+                    <Text style={styles.scanText}>
+                      {isScanning ? 'Scanning for barcodes...' : 'Camera ready'}
+                    </Text>
+                    <Text style={styles.scanSubtext}>
+                      {isScanning ? 'Point camera at barcode' : 'Camera access granted'}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.permissionOverlay}>
+                  <Ionicons name="camera" size={64} color="white" />
+                  <Text style={styles.scanText}>Camera Permission Required</Text>
+                  <Text style={styles.scanSubtext}>Please allow camera access to scan barcodes</Text>
+                  <TouchableOpacity
+                    style={styles.permissionButton}
+                    onPress={async () => {
+                      const { status } = await Camera.requestCameraPermissionsAsync();
+                      setHasPermission(status === 'granted');
+                    }}
+                  >
+                    <Text style={styles.permissionButtonText}>Enable Scanner</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </SafeAreaView>
         </Modal>
       )}
@@ -674,10 +768,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   itemQuantity: {
     fontSize: 16,
     fontWeight: '500',
     color: '#007AFF',
+  },
+  qtyButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyMinus: {
+    backgroundColor: '#FF3B30',
+  },
+  qtyPlus: {
+    backgroundColor: '#34C759',
   },
   itemExpiry: {
     fontSize: 14,
@@ -811,6 +923,33 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 8,
   },
+  productInfo: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: 16,
+  },
+  productInfoTitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  productMeta: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+  },
+  productDesc: {
+    fontSize: 13,
+    color: '#444',
+    marginTop: 8,
+  },
   clearBarcodeButton: {
     padding: 4,
   },
@@ -907,6 +1046,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
   scanFrame: {
     width: 250,
@@ -922,12 +1062,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 20,
     textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   scanSubtext: {
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   permissionOverlay: {
     flex: 1,
@@ -947,11 +1097,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  camera: {
+    flex: 1,
+    width: '100%',
+  },
   cameraPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000000',
+    position: 'relative',
   },
 });
 

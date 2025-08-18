@@ -2,6 +2,106 @@ import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { BarCodeScanner, BarCodeScannerResult } from 'expo-barcode-scanner';
 
+// Web camera utilities
+export const isCameraSupported = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+};
+
+export const requestCameraAccess = async (constraints: MediaStreamConstraints = {}): Promise<{ stream: MediaStream | null; error: string | null }> => {
+  try {
+    if (!isCameraSupported()) {
+      return { stream: null, error: 'Camera not supported in this browser' };
+    }
+
+    const defaultConstraints: MediaStreamConstraints = {
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        ...(constraints.video as any)
+      },
+      audio: false
+    };
+
+    const stream = await navigator.mediaDevices.getUserMedia(defaultConstraints);
+    return { stream, error: null };
+  } catch (error: any) {
+    console.error('Camera access error:', error);
+    let errorMessage = 'Failed to access camera';
+    
+    if (error.name === 'NotAllowedError') {
+      errorMessage = 'Camera access denied. Please allow camera permissions.';
+    } else if (error.name === 'NotFoundError') {
+      errorMessage = 'No camera found on this device.';
+    } else if (error.name === 'NotSupportedError') {
+      errorMessage = 'Camera not supported in this browser.';
+    } else if (error.name === 'NotReadableError') {
+      errorMessage = 'Camera is already in use by another application.';
+    }
+    
+    return { stream: null, error: errorMessage };
+  }
+};
+
+export const stopMediaStream = (stream: MediaStream | null): void => {
+  if (stream) {
+    stream.getTracks().forEach(track => {
+      track.stop();
+    });
+  }
+};
+
+export const retryWithDifferentConstraints = async (fallbackConstraints: MediaStreamConstraints): Promise<{ stream: MediaStream | null; error: string | null }> => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+    return { stream, error: null };
+  } catch (error: any) {
+    return { stream: null, error: error.message || 'Failed to access camera with fallback constraints' };
+  }
+};
+
+export const toggleTorch = async (stream: MediaStream | null): Promise<boolean> => {
+  if (!stream) return false;
+  
+  try {
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) return false;
+    
+    const capabilities = videoTrack.getCapabilities();
+    // Check if torch is supported using type assertion
+    if ('torch' in capabilities && capabilities.torch) {
+      const settings = videoTrack.getSettings();
+      const currentTorch = 'torch' in settings ? settings.torch : false;
+      
+      // Use type assertion for advanced constraints
+      await videoTrack.applyConstraints({
+        advanced: [{ torch: !currentTorch } as any]
+      });
+      return !currentTorch;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error toggling torch:', error);
+    return false;
+  }
+};
+
+export const checkTorchAvailability = async (stream: MediaStream | null): Promise<boolean> => {
+  if (!stream) return false;
+  
+  try {
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) return false;
+    
+    const capabilities = videoTrack.getCapabilities();
+    // Check if torch is supported using 'in' operator
+    return 'torch' in capabilities && !!capabilities.torch;
+  } catch (error) {
+    return false;
+  }
+};
+
 export interface CameraSettings {
   type: 'front' | 'back';
   flashMode: 'off' | 'on' | 'auto' | 'torch';

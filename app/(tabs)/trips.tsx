@@ -95,10 +95,10 @@ export default function TripsPage() {
 
   // Route optimization function
   const optimizeRoute = async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
     const eligibleTrips = trips.filter(trip => 
-      trip.status === 'active' && 
-      trip.coordinates && 
-      (trip.date === new Date().toISOString().split('T')[0] || trip.status === 'started')
+      trip.coordinates &&
+      (trip.status === 'started' || (trip.status === 'active' && trip.date === todayStr))
     );
     
     if (eligibleTrips.length < 2) {
@@ -121,7 +121,7 @@ export default function TripsPage() {
       };
 
       const routeResponse = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${waypoints[0].lat},${waypoints[0].lng}&waypoints=optimize:true|${waypoints.slice(1).map(wp => `${wp.lat},${wp.lng}`).join('|')}&key=AIzaSyAB-h4_VucPyVktYcdIW5At9edXaQXRL10`
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${waypoints[0].lat},${waypoints[0].lng}&waypoints=optimize:true|${waypoints.slice(1).map(wp => `${wp.lat},${wp.lng}`).join('|')}&key=${process.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyAB-h4_VucPyVktYcdIW5At9edXaQXRL10'}`
       );
 
       const routeData = await routeResponse.json();
@@ -133,18 +133,23 @@ export default function TripsPage() {
         
         setOptimizedRoute(route);
         
+        // Build route path from Google Directions response
         const path = [];
-        if (typeof currentLocation.latitude === 'number' && typeof currentLocation.longitude === 'number' &&
-            !isNaN(currentLocation.latitude) && !isNaN(currentLocation.longitude)) {
-          path.push({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
-          waypoints.forEach(waypoint => {
-            if (typeof waypoint.lat === 'number' && typeof waypoint.lng === 'number' &&
-                !isNaN(waypoint.lat) && !isNaN(waypoint.lng)) {
-              path.push({ latitude: waypoint.lat, longitude: waypoint.lng });
-            }
-          });
-          setRoutePath(path);
-        }
+        
+        // Start with user's current location
+        path.push({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
+        
+        // Add each leg's end point (destination of each segment)
+        route.legs.forEach((leg: any) => {
+          if (leg.end_location) {
+            path.push({ 
+              latitude: leg.end_location.lat, 
+              longitude: leg.end_location.lng 
+            });
+          }
+        });
+        
+        setRoutePath(path);
         
         Alert.alert(
           'Route Optimized!',
@@ -307,7 +312,7 @@ export default function TripsPage() {
     }
   };
 
-  const activeTrips = trips.filter(trip => trip.status === 'active');
+  const activeTrips = trips.filter(trip => trip.status === 'active' || trip.status === 'started');
   const completedTrips = trips.filter(trip => trip.status === 'completed');
 
   return (
@@ -581,12 +586,7 @@ export default function TripsPage() {
               />
               
               {/* Trip location markers */}
-              {trips.filter(trip => trip.coordinates && 
-                typeof trip.coordinates.lat === 'number' && 
-                typeof trip.coordinates.lng === 'number' &&
-                !isNaN(trip.coordinates.lat) && 
-                !isNaN(trip.coordinates.lng)
-              ).map(trip => (
+              {trips.filter(trip => trip.coordinates).map(trip => (
                 <Marker
                   key={trip.id}
                   coordinate={{
@@ -595,17 +595,12 @@ export default function TripsPage() {
                   }}
                   title={trip.store}
                   description={`${trip.status} • $${trip.budget}`}
-                  pinColor={trip.status === 'active' ? '#4CAF50' : '#FF9800'}
+                  pinColor={trip.status === 'active' ? '#4CAF50' : trip.status === 'started' ? '#9C27B0' : '#FF9800'}
                 />
               ))}
               
               {/* Route path */}
-              {routePath.length > 1 && routePath.every(point => 
-                typeof point.latitude === 'number' && 
-                typeof point.longitude === 'number' &&
-                !isNaN(point.latitude) && 
-                !isNaN(point.longitude)
-              ) && (
+              {routePath.length > 1 && (
                 <Polyline
                   coordinates={routePath}
                   strokeColor="#007AFF"

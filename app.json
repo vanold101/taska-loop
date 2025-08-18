@@ -73,13 +73,12 @@
       "bundler": "metro",
       "config": {
         "firebase": {
-          "apiKey": "AIzaSyCTgbkVXeVWF34YPMzy5MnhpmKp-lyK6Gc",
-          "authDomain": "taska-mobile-3c860.firebaseapp.com",
-          "projectId": "taska-mobile-3c860",
-          "storageBucket": "taska-mobile-3c860.firebasestorage.app",
-          "messagingSenderId": "552365348974",
-          "appId": "1:552365348974:web:d58fe942284eeaeff26e7f",
-          "measurementId": "G-RRP375FX6B"
+          "apiKey": "your_firebase_api_key_here",
+          "authDomain": "your_project_id.firebaseapp.com",
+          "projectId": "your_project_id",
+          "storageBucket": "your_project_id.appspot.com",
+          "messagingSenderId": "your_messaging_sender_id",
+          "appId": "your_app_id"
         }
       }
     },
