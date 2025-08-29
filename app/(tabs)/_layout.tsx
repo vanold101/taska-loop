@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { useEffect } from 'react';
@@ -25,24 +25,46 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        headerShown: false,
+        tabBarActiveTintColor: '#2E8BFF',
+        tabBarInactiveTintColor: '#757575',
+        tabBarStyle: {
+          backgroundColor: '#1E1E1E',
+          borderTopWidth: 1,
+          borderTopColor: '#2C2C2C',
+          paddingBottom: Platform.select({ ios: 20, android: 12, default: 12 }),
+          paddingTop: 8,
+          height: Platform.select({ ios: 85, android: 75, default: 75 }),
+          marginBottom: 0,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+        },
+        tabBarLabelStyle: {
+          fontSize: 9,
+          fontWeight: '600',
+          marginTop: 0,
+        },
+        tabBarIconStyle: {
+          marginTop: 2,
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          title: 'Dashboard',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="grid" size={20} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="trips"
         options={{
-          title: 'Trips',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="car" size={size} color={color} />
+          title: 'Shopping',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="bag" size={20} color={color} />
           ),
         }}
       />
@@ -50,8 +72,8 @@ export default function TabLayout() {
         name="pantry"
         options={{
           title: 'Pantry',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="basket" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="restaurant" size={20} color={color} />
           ),
         }}
       />
@@ -59,18 +81,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="recurring"
         options={{
-          title: 'Recurring',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="repeat" size={size} color={color} />
+          title: 'Lists',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="list" size={20} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
+          title: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-circle" size={20} color={color} />
           ),
         }}
       />

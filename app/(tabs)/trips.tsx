@@ -1,45 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal, FlatList, Dimensions, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { googlePlacesMobileService, PlaceResult, PlaceDetails } from '../../src/services/googlePlacesMobile';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import LocationAutocomplete from '../../src/components/LocationAutocomplete';
 import TripsTutorial from '../../src/components/TripsTutorial';
+// import * as Location from 'expo-location';
+
+// Distance calculation utility function (Haversine formula)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c; // Distance in kilometers
+  return distance;
+};
+
+// Polyline decoder utility function
+const decodePolyline = (encoded: string) => {
+  const poly = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLat = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLng = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    poly.push({
+      latitude: lat / 1e5,
+      longitude: lng / 1e5,
+    });
+  }
+
+  return poly;
+};
 
 export default function TripsPage() {
-  const [trips, setTrips] = useState([
-    { 
-      id: '1', 
-      store: 'Walmart', 
-      status: 'active' as 'active' | 'started' | 'completed', 
-      date: '2025-01-15', 
-      budget: 150, 
-      items: ['Milk', 'Bread', 'Eggs'],
-      location: 'Columbus, OH',
-      coordinates: { lat: 39.9612, lng: -82.9988 }
-    },
-    { 
-      id: '2', 
-      store: 'Target', 
-      status: 'active' as 'active' | 'started' | 'completed', 
-      date: '2025-01-16', 
-      budget: 80, 
-      items: ['Toothpaste', 'Shampoo'],
-      location: 'Columbus, OH',
-      coordinates: { lat: 39.9615, lng: -82.9990 }
-    },
-    { 
-      id: '3', 
-      store: 'Kroger', 
-      status: 'active' as 'active' | 'started' | 'completed', 
-      date: '2025-01-17', 
-      budget: 200, 
-      items: ['Vegetables', 'Meat', 'Dairy'],
-      location: 'Columbus, OH',
-      coordinates: { lat: 39.9618, lng: -82.9992 }
-    }
-  ]);
+  const mapRef = useRef<MapView>(null);
+  const { date } = useLocalSearchParams();
+  const [trips, setTrips] = useState<any[]>([]);
   
   const [isAddTripModalVisible, setIsAddTripModalVisible] = useState(false);
   const [newTripStore, setNewTripStore] = useState('');
@@ -49,26 +78,49 @@ export default function TripsPage() {
   const [newTripItem, setNewTripItem] = useState('');
   const [tripItemInputs, setTripItemInputs] = useState<{ [key: string]: string }>({});
   
-  // Location autocomplete state
-  const [locationSuggestions, setLocationSuggestions] = useState<PlaceResult[]>([]);
-  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  // Location state
   const [selectedLocation, setSelectedLocation] = useState<PlaceDetails | null>(null);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
   // Map state
   const [currentLocation, setCurrentLocation] = useState({
-    latitude: 39.9612,
-    longitude: -82.9988,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    latitude: 40.1451, // Default to Powell, OH area
+    longitude: -83.0753,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
   });
   
   // Route optimization state
   const [optimizedRoute, setOptimizedRoute] = useState<any>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [routePath, setRoutePath] = useState<any[]>([]);
+  const [optimizedRouteList, setOptimizedRouteList] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'today' | 'all'>('today');
   const [showTutorial, setShowTutorial] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(
+    (date as string) || new Date().toISOString().split('T')[0]
+  );
+
+  // Update selected date when the param changes
+  useEffect(() => {
+    if (date) {
+      setSelectedDate(date as string);
+    }
+  }, [date]);
+
+  // Track user location from the map
+  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+
+  // Initialize with a reasonable default region but no specific user location
+  useEffect(() => {
+    loadTaskBasedTrips();
+  }, []);
+
+  // Load trips based on actual tasks with locations
+  const loadTaskBasedTrips = () => {
+    // This would normally come from a shared state or context
+    // For now, only create trips if user manually adds them
+    console.log('Loading task-based trips - currently empty until user adds trips');
+  };
 
   const addTrip = () => {
     if (newTripStore.trim()) {
@@ -80,7 +132,7 @@ export default function TripsPage() {
         budget: newTripBudget.trim() ? parseFloat(newTripBudget) : 0,
         items: [] as string[],
         location: selectedLocation ? selectedLocation.formatted_address : (newTripLocation.trim() || 'No location specified'),
-        coordinates: selectedLocation ? selectedLocation.geometry.location : { lat: 39.9612, lng: -82.9988 }
+        coordinates: selectedLocation ? selectedLocation.geometry.location : undefined // No hardcoded coordinates
       };
       setTrips([...trips, newTrip]);
       setNewTripStore('');
@@ -90,150 +142,155 @@ export default function TripsPage() {
       setNewTripItem('');
       setSelectedLocation(null);
       setIsAddTripModalVisible(false);
+      
+      if (!selectedLocation && newTripLocation.trim()) {
+        Alert.alert('Note', 'Location was added as text only. For map features, please select a location from the search suggestions.');
+      } else if (selectedLocation) {
+        Alert.alert('Success', `Trip to ${newTripStore} added with location coordinates!`);
+      } else {
+        Alert.alert('Success', `Trip to ${newTripStore} added successfully!`);
+      }
     }
   };
 
-  // Route optimization function
+  // Get user location from the map when it's available
+  const handleUserLocationChange = (event: any) => {
+    const { coordinate } = event.nativeEvent;
+    setUserLocation(coordinate);
+  };
+
+  // Completely rewritten route optimization function
   const optimizeRoute = async () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    // Check if we have trips to optimize
     const eligibleTrips = trips.filter(trip => 
       trip.coordinates &&
-      (trip.status === 'started' || (trip.status === 'active' && trip.date === todayStr))
+      (trip.status === 'started' || (trip.status === 'active' && trip.date === selectedDate))
     );
     
-    if (eligibleTrips.length < 2) {
-      Alert.alert('Route Optimization', 'Need at least 2 eligible trips (today\'s trips or started trips) with locations to optimize a route.');
+    if (eligibleTrips.length < 1) {
+      Alert.alert('Route Optimization', 'Need at least 1 trip with a location to optimize a route.');
+      return;
+    }
+
+    // Check if we have user location
+    if (!userLocation) {
+      Alert.alert(
+        'Location Required', 
+        'Please allow location access. The map needs to detect your current location to create an optimized route.',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
     setIsOptimizing(true);
     
     try {
-      const waypoints = eligibleTrips.map(trip => ({
-        lat: trip.coordinates!.lat,
-        lng: trip.coordinates!.lng,
-        name: trip.store
+      // Calculate distances from user location to each trip
+      const tripsWithDistance = eligibleTrips.map(trip => ({
+        ...trip,
+        distanceFromUser: calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          trip.coordinates!.lat,
+          trip.coordinates!.lng
+        )
       }));
 
-      const origin = {
-        lat: currentLocation.latitude,
-        lng: currentLocation.longitude
-      };
+      // Sort by distance (closest first)
+      const sortedTrips = tripsWithDistance.sort((a, b) => a.distanceFromUser - b.distanceFromUser);
 
-      const routeResponse = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${waypoints[0].lat},${waypoints[0].lng}&waypoints=optimize:true|${waypoints.slice(1).map(wp => `${wp.lat},${wp.lng}`).join('|')}&key=${process.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyAB-h4_VucPyVktYcdIW5At9edXaQXRL10'}`
-      );
-
-      const routeData = await routeResponse.json();
-      
-      if (routeData.routes && routeData.routes.length > 0) {
-        const route = routeData.routes[0];
-        const totalDistance = route.legs.reduce((sum: number, leg: any) => sum + (leg.distance?.value || 0), 0);
-        const totalDuration = route.legs.reduce((sum: number, leg: any) => sum + (leg.duration?.value || 0), 0);
-        
-        setOptimizedRoute(route);
-        
-        // Build route path from Google Directions response
-        const path = [];
-        
-        // Start with user's current location
-        path.push({ latitude: currentLocation.latitude, longitude: currentLocation.longitude });
-        
-        // Add each leg's end point (destination of each segment)
-        route.legs.forEach((leg: any) => {
-          if (leg.end_location) {
-            path.push({ 
-              latitude: leg.end_location.lat, 
-              longitude: leg.end_location.lng 
-            });
-          }
-        });
-        
-        setRoutePath(path);
-        
-        Alert.alert(
-          'Route Optimized!',
-          `Optimal route found:\n\n` +
-          `Total Distance: ${(totalDistance / 1000).toFixed(1)} km\n` +
-          `Total Time: ${Math.round(totalDuration / 60)} minutes\n\n` +
-          `Route Order:\n${route.legs.map((leg: any, index: number) => 
-            `${index + 1}. ${leg.end_address || 'Location'}`
-          ).join('\n')}`,
-          [
-            { text: 'Close', style: 'cancel' },
-            { 
-              text: 'View on Map', 
-              onPress: () => {
-                Alert.alert('Map Updated', 'Route is now displayed on the map!');
-              }
-            }
-          ]
-        );
-      } else {
-        throw new Error('No route found');
-      }
-    } catch (error) {
-      console.error('Route optimization error:', error);
-      const mockRoute = {
-        legs: eligibleTrips.map((trip, index) => ({
-          distance: { text: `${Math.floor(Math.random() * 10) + 5} km` },
-          duration: { text: `${Math.floor(Math.random() * 15) + 10} min` },
-          end_address: trip.store
+      // Create the route starting from user location
+      const routeCoordinates = [
+        { latitude: userLocation.latitude, longitude: userLocation.longitude },
+        ...sortedTrips.map(trip => ({ 
+          latitude: trip.coordinates!.lat, 
+          longitude: trip.coordinates!.lng 
         }))
-      };
+      ];
+
+      // Set the route path for map display
+      setRoutePath(routeCoordinates);
       
-      setOptimizedRoute(mockRoute);
-      
+      // Store the optimized route list for the route display
+      setOptimizedRouteList(sortedTrips);
+
+      // Fit map to show the entire route
+      if (mapRef.current) {
+        mapRef.current.fitToCoordinates(routeCoordinates, {
+          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+          animated: true,
+        });
+      }
+
+      // Calculate total estimated distance
+      const totalDistance = sortedTrips.reduce((sum, trip) => sum + trip.distanceFromUser, 0);
+
       Alert.alert(
-        'Route Optimization',
-        `Optimizing route for ${eligibleTrips.length} locations:\n${eligibleTrips.map(trip => `• ${trip.store}`).join('\n')}\n\nRoute optimization completed!`,
+        'Route Optimized!',
+        `Route created starting from your current location:\n\n` +
+        `Total Estimated Distance: ${totalDistance.toFixed(1)} km\n\n` +
+        `Route Order (closest first):\n${sortedTrips.map((trip, index) => 
+          `${index + 1}. ${trip.store} (${trip.distanceFromUser.toFixed(1)} km away)`
+        ).join('\n')}`,
         [
           { text: 'Close', style: 'cancel' },
           { 
             text: 'View Route', 
             onPress: () => {
-              Alert.alert('Route Displayed', 'Optimized route is now shown on the map!');
+              if (mapRef.current) {
+                mapRef.current.fitToCoordinates(routeCoordinates, {
+                  edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+                  animated: true,
+                });
+              }
             }
           }
         ]
       );
+
+    } catch (error) {
+      console.error('Route optimization error:', error);
+      Alert.alert('Error', 'Failed to optimize route. Please try again.');
     } finally {
       setIsOptimizing(false);
     }
   };
 
-  // Location autocomplete functions
-  const handleLocationInputChange = async (text: string) => {
-    setNewTripLocation(text);
-    
-    if (text.length > 2) {
-      setIsLoadingLocation(true);
-      try {
-        const predictions = await googlePlacesMobileService.getPlacePredictions(text);
-        setLocationSuggestions(predictions);
-        setShowLocationSuggestions(true);
-      } catch (error) {
-        console.error('Error getting location predictions:', error);
-      } finally {
-        setIsLoadingLocation(false);
-      }
-    } else {
-      setLocationSuggestions([]);
-      setShowLocationSuggestions(false);
-    }
-  };
-
-  const handleLocationSelect = async (place: PlaceResult) => {
+  // Location handling for the autocomplete component
+  const handleLocationSelectFromAutocomplete = async (location: any) => {
     try {
-      const details = await googlePlacesMobileService.getPlaceDetails(place.place_id);
-      if (details) {
-        setSelectedLocation(details);
-        setNewTripLocation(details.formatted_address);
-        setLocationSuggestions([]);
-        setShowLocationSuggestions(false);
+      const placeDetails = await googlePlacesMobileService.getPlaceDetails(location.place_id);
+      if (placeDetails) {
+        setSelectedLocation(placeDetails);
+        setNewTripLocation(location.description);
       }
     } catch (error) {
       console.error('Error getting place details:', error);
+      // Fallback: just use the description
+      setNewTripLocation(location.description);
+    }
+  };
+
+  // Open optimized route in Google Maps
+  const openInGoogleMaps = () => {
+    if (!userLocation || optimizedRouteList.length === 0) {
+      Alert.alert('Error', 'No route available to open in Google Maps.');
+      return;
+    }
+
+    try {
+      // Create waypoints string for Google Maps
+      const waypoints = optimizedRouteList.map(trip => 
+        `${trip.coordinates.lat},${trip.coordinates.lng}`
+      ).join('|');
+
+      // Create Google Maps URL with user location as origin and optimized waypoints
+      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${optimizedRouteList[optimizedRouteList.length - 1].coordinates.lat},${optimizedRouteList[optimizedRouteList.length - 1].coordinates.lng}${optimizedRouteList.length > 1 ? `&waypoints=${waypoints.split('|').slice(0, -1).join('|')}` : ''}&travelmode=driving`;
+
+      Linking.openURL(googleMapsUrl);
+    } catch (error) {
+      console.error('Error opening Google Maps:', error);
+      Alert.alert('Error', 'Failed to open Google Maps. Please try again.');
     }
   };
 
@@ -253,7 +310,7 @@ export default function TripsPage() {
   const removeItemFromTrip = (tripId: string, itemIndex: number) => {
     setTrips(trips.map(trip => 
       trip.id === tripId 
-        ? { ...trip, items: trip.items.filter((_, index) => index !== itemIndex) }
+        ? { ...trip, items: trip.items.filter((_: any, index: number) => index !== itemIndex) }
         : trip
     ));
   };
@@ -314,10 +371,17 @@ export default function TripsPage() {
 
   const activeTrips = trips.filter(trip => trip.status === 'active' || trip.status === 'started');
   const completedTrips = trips.filter(trip => trip.status === 'completed');
+  
+  // Filter trips by selected date
+  const selectedDateTrips = trips.filter(trip => trip.date === selectedDate);
+  const selectedDateActiveTrips = selectedDateTrips.filter(trip => trip.status === 'active' || trip.status === 'started');
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View>
@@ -378,10 +442,10 @@ export default function TripsPage() {
         {/* Today's Routes */}
         {activeTab === 'today' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Today's Routes ({activeTrips.filter(trip => trip.date === new Date().toISOString().split('T')[0] || trip.status === 'started').length})</Text>
+            <Text style={styles.sectionTitle}>{selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Routes ({selectedDateActiveTrips.length})</Text>
             
-            {activeTrips.filter(trip => trip.date === new Date().toISOString().split('T')[0] || trip.status === 'started').length > 0 ? (
-              activeTrips.filter(trip => trip.date === new Date().toISOString().split('T')[0] || trip.status === 'started').map(trip => (
+            {selectedDateActiveTrips.length > 0 ? (
+              selectedDateActiveTrips.map(trip => (
                 <View key={trip.id} style={styles.tripCard}>
                   <View style={styles.tripHeader}>
                     <View style={styles.tripInfo}>
@@ -454,7 +518,7 @@ export default function TripsPage() {
                 </View>
               ))
             ) : (
-              <Text style={styles.noTripsText}>No routes planned for today</Text>
+              <Text style={styles.noTripsText}>No routes planned for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
             )}
           </View>
         )}
@@ -494,7 +558,7 @@ export default function TripsPage() {
                     <View style={styles.shoppingListSection}>
                       <Text style={styles.shoppingListTitle}>Shopping List ({trip.items.length} items):</Text>
                       {trip.items.length > 0 ? (
-                        trip.items.map((item, index) => (
+                        trip.items.map((item: any, index: number) => (
                           <View key={index} style={styles.shoppingListItem}>
                             <Text style={styles.shoppingItemText}>{item}</Text>
                             <TouchableOpacity 
@@ -566,6 +630,7 @@ export default function TripsPage() {
           
           <View style={styles.mapContainer}>
             <MapView
+              ref={mapRef}
               provider={PROVIDER_GOOGLE}
               style={styles.map}
               initialRegion={currentLocation}
@@ -573,20 +638,12 @@ export default function TripsPage() {
               showsMyLocationButton={true}
               showsCompass={true}
               showsScale={true}
+              onUserLocationChange={handleUserLocationChange}
             >
-              {/* User's current location marker */}
-              <Marker
-                coordinate={{
-                  latitude: currentLocation.latitude,
-                  longitude: currentLocation.longitude,
-                }}
-                title="Your Location"
-                description="You are here"
-                pinColor="#007AFF"
-              />
+              {/* User location is shown by showsUserLocation={true} */}
               
-              {/* Trip location markers */}
-              {trips.filter(trip => trip.coordinates).map(trip => (
+              {/* Only show trip markers if there are trips for the selected date with coordinates */}
+              {selectedDateTrips.filter(trip => trip.coordinates && trip.date === selectedDate).map(trip => (
                 <Marker
                   key={trip.id}
                   coordinate={{
@@ -599,13 +656,12 @@ export default function TripsPage() {
                 />
               ))}
               
-              {/* Route path */}
+              {/* Only show route path if there are actual routes */}
               {routePath.length > 1 && (
                 <Polyline
                   coordinates={routePath}
-                  strokeColor="#007AFF"
+                  strokeColor="#2E8BFF"
                   strokeWidth={4}
-                  lineDashPattern={[1]}
                 />
               )}
             </MapView>
@@ -631,6 +687,49 @@ export default function TripsPage() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Optimized Route List */}
+        {optimizedRouteList.length > 0 && userLocation && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Optimized Route</Text>
+            <View style={styles.routeListContainer}>
+              
+              {/* Starting Point */}
+              <View style={styles.routeItem}>
+                <View style={styles.routeNumber}>
+                  <Text style={styles.routeNumberText}>START</Text>
+                </View>
+                <View style={styles.routeItemContent}>
+                  <Text style={styles.routeItemTitle}>Your Current Location</Text>
+                  <Text style={styles.routeItemSubtitle}>Starting point</Text>
+                </View>
+                <Ionicons name="location" size={20} color="#2E8BFF" />
+              </View>
+
+              {/* Route Destinations */}
+              {optimizedRouteList.map((trip, index) => (
+                <View key={trip.id} style={styles.routeItem}>
+                  <View style={styles.routeNumber}>
+                    <Text style={styles.routeNumberText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.routeItemContent}>
+                    <Text style={styles.routeItemTitle}>{trip.store}</Text>
+                    <Text style={styles.routeItemSubtitle}>
+                      {trip.distanceFromUser.toFixed(1)} km from you • {trip.location}
+                    </Text>
+                  </View>
+                  <Ionicons name="storefront" size={20} color="#FF9800" />
+                </View>
+              ))}
+
+              {/* Google Maps Button */}
+              <TouchableOpacity style={styles.googleMapsButton} onPress={openInGoogleMaps}>
+                <Ionicons name="navigate" size={20} color="#FFFFFF" />
+                <Text style={styles.googleMapsButtonText}>Open in Google Maps</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Optimized Route Display */}
         {optimizedRoute && (
@@ -716,41 +815,12 @@ export default function TripsPage() {
               autoFocus
             />
 
-            <View style={styles.locationContainer}>
-              <TextInput
-                style={styles.tripInput}
-                placeholder="Location (optional)..."
-                placeholderTextColor="#666"
-                value={newTripLocation}
-                onChangeText={handleLocationInputChange}
-                autoFocus={false}
-              />
-              {isLoadingLocation && (
-                <View style={styles.loadingIndicator}>
-                  <Text style={styles.loadingText}>Searching...</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Location Suggestions */}
-            {showLocationSuggestions && locationSuggestions.length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                <FlatList
-                  data={locationSuggestions}
-                  keyExtractor={(item) => item.place_id}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.suggestionItem}
-                      onPress={() => handleLocationSelect(item)}
-                    >
-                      <Text style={styles.suggestionMainText}>{item.structured_formatting.main_text}</Text>
-                      <Text style={styles.suggestionSecondaryText}>{item.structured_formatting.secondary_text}</Text>
-                    </TouchableOpacity>
-                  )}
-                  style={styles.suggestionsList}
-                />
-              </View>
-            )}
+            <LocationAutocomplete
+              placeholder="Search for store location..."
+              value={newTripLocation}
+              onChangeText={setNewTripLocation}
+              onLocationSelect={handleLocationSelectFromAutocomplete}
+            />
 
             {selectedLocation && (
               <View style={styles.selectedLocationInfo}>
@@ -841,12 +911,14 @@ export default function TripsPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
   },
   header: {
     padding: 20,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 20,
+    backgroundColor: '#1E1E1E',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
   },
   headerContent: {
     flexDirection: 'row',
@@ -856,53 +928,51 @@ const styles = StyleSheet.create({
   helpButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#2E8BFF',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 8,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: '#B3B3B3',
+    fontWeight: '400',
   },
   addTripContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
   },
   addTripButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#2E8BFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   addTripText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 8,
   },
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
   },
   tabButton: {
     flex: 1,
@@ -914,36 +984,40 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   activeTabButton: {
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#2E8BFF',
   },
   tabButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
+    fontWeight: '600',
+    color: '#B3B3B3',
     marginLeft: 6,
   },
   activeTabButtonText: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   section: {
     padding: 20,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 20,
-    marginHorizontal: 20,
-    borderRadius: 12,
+    backgroundColor: '#1E1E1E',
+    marginBottom: 16,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   tripCard: {
-    backgroundColor: '#F2F2F7',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
+    backgroundColor: '#121212',
+    padding: 18,
+    borderRadius: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
   },
   tripHeader: {
     flexDirection: 'row',
@@ -955,19 +1029,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tripTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 6,
   },
   tripLocation: {
     fontSize: 14,
-    color: '#666',
+    color: '#B3B3B3',
     marginBottom: 4,
+    fontWeight: '500',
   },
   tripDate: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 13,
+    color: '#B3B3B3',
+    fontWeight: '400',
   },
   tripStatus: {
     marginLeft: 12,
@@ -976,14 +1052,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tripBudget: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#4CAF50',
-    marginBottom: 4,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#28A745',
+    marginBottom: 6,
   },
   tripItems: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#0068F0',
+    fontWeight: '500',
   },
   tripActions: {
     flexDirection: 'row',
@@ -995,35 +1072,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   startButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E8BFF',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 6,
-    minWidth: 80,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 90,
     justifyContent: 'center',
   },
   startButtonText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 4,
   },
   completeButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#2E8BFF',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 6,
-    minWidth: 80,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 90,
     justifyContent: 'center',
   },
   completeButtonText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 4,
   },
   deleteButton: {
@@ -1031,7 +1108,7 @@ const styles = StyleSheet.create({
   },
   noTripsText: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: '#B3B3B3',
     textAlign: 'center',
     fontStyle: 'italic',
   },
@@ -1050,7 +1127,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   addItemButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E8BFF',
     padding: 12,
     borderRadius: 8,
     justifyContent: 'center',
@@ -1168,7 +1245,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepNumber: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2E8BFF',
     color: 'white',
     borderRadius: 12,
     width: 24,
@@ -1200,22 +1277,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-  },
-  googleMapsButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  googleMapsButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   clearRouteButton: {
     backgroundColor: '#F44336',
@@ -1280,7 +1341,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#FF9800',
+    backgroundColor: '#2E8BFF',
     borderRadius: 8,
     marginLeft: 8,
     alignItems: 'center',
@@ -1346,7 +1407,7 @@ const styles = StyleSheet.create({
   selectedLocationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F5E8',
+    backgroundColor: '#1E1E1E',
     padding: 8,
     borderRadius: 6,
     marginBottom: 16,
@@ -1370,5 +1431,63 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000000',
     marginBottom: 10,
+  },
+  // Route list styles
+  routeListContainer: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  routeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
+  },
+  routeNumber: {
+    width: 50,
+    height: 30,
+    backgroundColor: '#2E8BFF',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  routeNumberText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  routeItemContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  routeItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  routeItemSubtitle: {
+    fontSize: 14,
+    color: '#B3B3B3',
+  },
+  googleMapsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2E8BFF',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
+  },
+  googleMapsButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

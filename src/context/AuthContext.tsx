@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '../lib/firebase';
+import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithCredential } from '../lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser, GoogleAuthProvider } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 
 // Define the User type
 export interface ChorePreference {
@@ -59,6 +61,9 @@ const checkIsAdmin = (email?: string): boolean => {
   return ADMIN_EMAILS.includes(email.toLowerCase());
 };
 
+// Configure WebBrowser for AuthSession
+WebBrowser.maybeCompleteAuthSession();
+
 // Create the AuthProvider component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -94,7 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Simple Google Sign-In using Firebase web auth
+  // Simplified Google Sign-In using Expo AuthSession with ID Token flow
   const loginWithGoogle = async () => {
     try {
       setIsLoading(true);
@@ -104,34 +109,102 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Firebase auth is not initialized');
       }
 
-      // Use Firebase's Google provider
-      const provider = new GoogleAuthProvider();
-      provider.addScope('profile');
-      provider.addScope('email');
+      // Use Expo's default redirect URI which is more reliable
+      const redirectUri = AuthSession.makeRedirectUri();
+      console.log('Using redirect URI:', redirectUri);
 
-      // Show a prompt to the user about Google login
+      // Configure the auth request for ID Token flow (simpler than code flow)
+      const request = new AuthSession.AuthRequest({
+        clientId: '450834374704-in65o5g8nl418v4hspq0seg7t4th7n1o.apps.googleusercontent.com',
+        scopes: ['openid', 'profile', 'email'],
+        responseType: AuthSession.ResponseType.IdToken,
+        redirectUri,
+        prompt: AuthSession.Prompt.SelectAccount,
+      });
+
+      console.log('Starting Google OAuth flow with ID Token...');
+
+      // Use simple endpoint configuration instead of discovery
+      const result = await request.promptAsync({
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+      });
+
+      console.log('OAuth result:', result.type);
+
+      if (result.type === 'success') {
+        console.log('OAuth success, checking for ID token...');
+        
+        if (result.params.id_token) {
+          console.log('Got ID token directly, signing in to Firebase...');
+          
+          // Create Google credential and sign in with Firebase
+          const googleCredential = GoogleAuthProvider.credential(result.params.id_token);
+          const firebaseResult = await signInWithCredential(auth, googleCredential);
+
+          if (firebaseResult.user) {
+            const firebaseUser = firebaseResult.user;
+            const newUser: User = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Google User',
+              email: firebaseUser.email || '',
+              avatar: firebaseUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(firebaseUser.displayName || 'User')}&background=random`,
+              chorePreferences: [],
+              isAdmin: checkIsAdmin(firebaseUser.email || ''),
+            };
+
+            setUser(newUser);
+            await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
+            setError(null);
+            console.log('Google login completed successfully!');
+          }
+        } else {
+          console.error('No ID token in result params:', Object.keys(result.params));
+          throw new Error('No ID token received from Google');
+        }
+      } else if (result.type === 'cancel') {
+        setError('Google sign-in was cancelled');
+        console.log('User cancelled Google sign-in');
+      } else if (result.type === 'error') {
+        console.error('OAuth error:', result.error);
+        setError(`OAuth error: ${result.error?.description || result.error?.code || 'Unknown error'}`);
+      } else {
+        console.log('OAuth failed with result:', result);
+        setError('Google sign-in failed. Please try again.');
+      }
+
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      
+      // Provide more specific error messages and offer fallback
+      if (error.message?.includes('JSON')) {
+        setError('Configuration error. You can continue as guest or use email login.');
+      } else if (error.message?.includes('network')) {
+        setError('Network error. Please check your internet connection and try again.');
+      } else if (error.message?.includes('cancelled')) {
+        setError('Sign-in was cancelled');
+      } else if (error.message?.includes('popup') || error.message?.includes('browser')) {
+        setError('Browser error. You can try again or continue as guest.');
+      } else {
+        setError(`Google sign-in failed: ${error.message || 'Unknown error'}. You can continue as guest or use email login.`);
+      }
+
+      // Show alert with options if Google login fails
       Alert.alert(
-        'Google Sign-In',
-        'Google sign-in requires web browser setup. Would you like to:\n\n1. Continue as guest\n2. Use email login\n3. Try web version',
+        'Google Sign-In Failed',
+        'Google sign-in is currently unavailable. Would you like to continue as a guest user or try email login?',
         [
           {
             text: 'Continue as Guest',
-            onPress: () => {
-              const guestUser: User = {
-                id: 'guest-' + Date.now(),
-                name: 'Guest User',
-                email: 'guest@example.com',
-                avatar: 'https://ui-avatars.com/api/?name=Guest+User&background=random',
-                chorePreferences: [],
-                isAdmin: false,
-              };
-              setUser(guestUser);
-              AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(guestUser));
-              setError(null);
+            onPress: async () => {
+              try {
+                await createGuestUser();
+              } catch (guestError) {
+                console.error('Guest user creation failed:', guestError);
+              }
             }
           },
           {
-            text: 'Email Login',
+            text: 'Try Email Login',
             onPress: () => {
               setError('Please use the email login option below.');
             }
@@ -142,10 +215,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         ]
       );
-
-    } catch (error: any) {
-      console.error('Google sign-in error:', error);
-      setError('Google sign-in not available. Please use email login or continue as guest.');
     } finally {
       setIsLoading(false);
     }
@@ -245,15 +314,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Logout function
   const logout = async () => {
     try {
-      // Sign out from Google Sign-In
-      // The signInWithPopup does not have a direct signOut method like signOut()
-      // For a simple logout, we can just set the user to null and remove from storage
+      // Sign out from Firebase
+      if (auth) {
+        await firebaseSignOut(auth);
+      }
+      
+      // Google sign-out is handled by Firebase auth
+      
+      // Clear local state
       setUser(null);
       await AsyncStorage.removeItem(AUTH_USER_KEY);
-      console.log('User logged out successfully from Google');
+      console.log('User logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
-      // Even if Google sign-out fails, clear local state
+      // Even if sign-out fails, clear local state
       setUser(null);
       await AsyncStorage.removeItem(AUTH_USER_KEY);
     }

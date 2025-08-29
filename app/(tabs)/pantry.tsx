@@ -51,6 +51,18 @@ export default function PantryPage() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'expiry' | 'category'>('name');
 
+  // Edit item state
+  const [isEditItemModalVisible, setIsEditItemModalVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState<{
+    id: string;
+    name: string;
+    quantity: number;
+    unit: string;
+    category: string;
+    expiry: string | null;
+    barcode: string | null;
+  } | null>(null);
+
   const categories = ['Produce', 'Dairy', 'Bakery', 'Pantry', 'Meat', 'Seafood', 'Snacks', 'Beverages', 'Frozen', 'Household'];
 
   // Request camera permission on mount
@@ -188,6 +200,26 @@ export default function PantryPage() {
     }));
   };
 
+  const startEditItem = (item: typeof pantryItems[0]) => {
+    setEditingItem(item);
+    setIsEditItemModalVisible(true);
+  };
+
+  const saveEditItem = () => {
+    if (editingItem) {
+      setPantryItems(prev => prev.map(item => 
+        item.id === editingItem.id ? editingItem : item
+      ));
+      setEditingItem(null);
+      setIsEditItemModalVisible(false);
+    }
+  };
+
+  const cancelEditItem = () => {
+    setEditingItem(null);
+    setIsEditItemModalVisible(false);
+  };
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Produce': return 'leaf';
@@ -244,7 +276,10 @@ export default function PantryPage() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Pantry</Text>
           <Text style={styles.subtitle}>Manage your household items</Text>
@@ -375,12 +410,20 @@ export default function PantryPage() {
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemCategory}>{item.category}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => deleteItem(item.id)}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                  </TouchableOpacity>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => startEditItem(item)}
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={20} color="#2E8BFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => deleteItem(item.id)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={styles.itemDetails}>
                   <View style={styles.quantityRow}>
@@ -613,6 +656,111 @@ export default function PantryPage() {
           </SafeAreaView>
         </Modal>
       )}
+
+      {/* Edit Item Modal */}
+      <Modal
+        visible={isEditItemModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsEditItemModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={cancelEditItem}
+            >
+              <Ionicons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Item</Text>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={saveEditItem}
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Item Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editingItem?.name || ''}
+                onChangeText={(text) => setEditingItem(prev => prev ? {...prev, name: text} : null)}
+                placeholder="Enter item name"
+              />
+            </View>
+
+            <View style={styles.inputRow}>
+              <View style={[styles.inputGroup, {flex: 1, marginRight: 10}]}>
+                <Text style={styles.inputLabel}>Quantity</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingItem?.quantity.toString() || ''}
+                  onChangeText={(text) => setEditingItem(prev => prev ? {...prev, quantity: Number(text) || 0} : null)}
+                  placeholder="Quantity"
+                  keyboardType="numeric"
+                />
+              </View>
+              
+              <View style={[styles.inputGroup, {flex: 1}]}>
+                <Text style={styles.inputLabel}>Unit</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingItem?.unit || ''}
+                  onChangeText={(text) => setEditingItem(prev => prev ? {...prev, unit: text} : null)}
+                  placeholder="e.g. pieces, lbs, cups"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScrollView}>
+                {categories.map(category => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryOption,
+                      editingItem?.category === category && styles.categoryOptionActive
+                    ]}
+                    onPress={() => setEditingItem(prev => prev ? {...prev, category} : null)}
+                  >
+                    <Text style={[
+                      styles.categoryOptionText,
+                      editingItem?.category === category && styles.categoryOptionTextActive
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Expiry Date (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={editingItem?.expiry || ''}
+                onChangeText={(text) => setEditingItem(prev => prev ? {...prev, expiry: text || null} : null)}
+                placeholder="YYYY-MM-DD"
+              />
+            </View>
+
+            {editingItem?.barcode && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Barcode</Text>
+                <TextInput
+                  style={[styles.input, styles.readOnlyInput]}
+                  value={editingItem.barcode}
+                  editable={false}
+                />
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -620,22 +768,25 @@ export default function PantryPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
   },
   header: {
     padding: 20,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 20,
+    backgroundColor: '#1E1E1E',
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 8,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: '#B3B3B3',
+    fontWeight: '400',
   },
   addItemContainer: {
     paddingHorizontal: 20,
@@ -644,52 +795,57 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   addItemButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#2E8BFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
     flex: 1,
   },
   addItemText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 8,
   },
   scanButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#2E8BFF',
+    padding: 18,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   section: {
     padding: 20,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 20,
-    marginHorizontal: 20,
-    borderRadius: 12,
+    backgroundColor: '#1E1E1E',
+    marginBottom: 16,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   categoryCard: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
@@ -724,14 +880,14 @@ const styles = StyleSheet.create({
   },
   categoryCount: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#B3B3B3',
   },
   itemsContainer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
   itemCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -758,10 +914,31 @@ const styles = StyleSheet.create({
   },
   itemCategory: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#B3B3B3',
+  },
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#1E1E1E',
   },
   deleteButton: {
     padding: 8,
+  },
+  readOnlyInput: {
+    backgroundColor: '#2C2C2C',
+    color: '#B3B3B3',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  categoryScrollView: {
+    maxHeight: 50,
   },
   itemDetails: {
     flexDirection: 'row',
@@ -776,7 +953,7 @@ const styles = StyleSheet.create({
   itemQuantity: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#007AFF',
+    color: '#0068F0',
   },
   qtyButton: {
     width: 28,
@@ -797,7 +974,7 @@ const styles = StyleSheet.create({
   },
   itemBarcode: {
     fontSize: 12,
-    color: '#8E8E93',
+    color: '#B3B3B3',
     fontFamily: 'monospace',
   },
   emptyState: {
@@ -807,7 +984,7 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#8E8E93',
+    color: '#B3B3B3',
     marginTop: 16,
   },
   emptyStateSubtext: {
@@ -836,14 +1013,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     marginRight: 8,
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   filterChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#2E8BFF',
+    borderColor: '#0068F0',
   },
   filterChipText: {
     fontSize: 14,
@@ -866,13 +1043,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     marginRight: 8,
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   sortButtonActive: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E8BFF',
     borderColor: '#4CAF50',
   },
   sortButtonText: {
@@ -885,14 +1062,14 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
@@ -911,7 +1088,7 @@ const styles = StyleSheet.create({
   barcodeInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#1E1E1E',
     padding: 8,
     borderRadius: 6,
     marginBottom: 16,
@@ -919,12 +1096,12 @@ const styles = StyleSheet.create({
   barcodeText: {
     flex: 1,
     fontSize: 14,
-    color: '#007AFF',
+    color: '#0068F0',
     fontWeight: '500',
     marginLeft: 8,
   },
   productInfo: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
@@ -984,13 +1161,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   categoryOptionActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#2E8BFF',
+    borderColor: '#0068F0',
   },
   categoryOptionText: {
     fontSize: 14,
@@ -1001,7 +1178,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E8BFF',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -1086,7 +1263,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.8)',
   },
   permissionButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2E8BFF',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

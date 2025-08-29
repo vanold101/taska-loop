@@ -28,7 +28,8 @@
           {
             "CFBundleURLName": "taska-loop",
             "CFBundleURLSchemes": [
-              "taska-loop"
+              "taska-loop",
+              "exp+taska-loop-mobile"
             ]
           }
         ],
@@ -62,6 +63,18 @@
             {
               "scheme": "https",
               "host": "taska-mobile-3c860.firebaseapp.com"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "taska-loop"
+            },
+            {
+              "scheme": "exp+taska-loop-mobile"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

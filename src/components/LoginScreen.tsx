@@ -95,7 +95,7 @@ export default function LoginScreen() {
           <View style={styles.content}>
             {/* App Logo/Icon */}
             <View style={styles.logoContainer}>
-              <Ionicons name="home" size={80} color="#FF9800" />
+              <Ionicons name="home" size={80} color="#2E8BFF" />
               <Text style={styles.appName}>Taska Loop</Text>
               <Text style={styles.tagline}>Smart Household Management</Text>
             </View>
@@ -122,7 +122,7 @@ export default function LoginScreen() {
                 disabled={isLoggingIn}
               >
                 {isLoggingIn ? (
-                  <ActivityIndicator color="#666" size="small" />
+                  <ActivityIndicator color="#B3B3B3" size="small" />
                 ) : (
                   <>
                     <Ionicons name="logo-google" size={24} color="#DB4437" />
@@ -140,10 +140,11 @@ export default function LoginScreen() {
 
               {showRegister && (
                 <View style={styles.inputContainer}>
-                  <Ionicons name="person" size={20} color="#666" style={styles.inputIcon} />
+                  <Ionicons name="person" size={20} color="#B3B3B3" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Full Name"
+                    placeholderTextColor="#757575"
                     value={name}
                     onChangeText={setName}
                     autoCapitalize="words"
@@ -153,10 +154,11 @@ export default function LoginScreen() {
               )}
               
               <View style={styles.inputContainer}>
-                <Ionicons name="mail" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons name="mail" size={20} color="#B3B3B3" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Email"
+                  placeholderTextColor="#757575"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -166,10 +168,11 @@ export default function LoginScreen() {
               </View>
               
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons name="lock-closed" size={20} color="#B3B3B3" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
+                  placeholderTextColor="#757575"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -249,7 +252,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
   },
   keyboardView: {
     flex: 1,
@@ -270,13 +273,13 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#FFFFFF',
     marginTop: 16,
     marginBottom: 8,
   },
   tagline: {
     fontSize: 16,
-    color: '#666666',
+    color: '#B3B3B3',
     textAlign: 'center',
   },
   welcomeContainer: {
@@ -286,13 +289,13 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 12,
     textAlign: 'center',
   },
   welcomeSubtitle: {
     fontSize: 16,
-    color: '#666666',
+    color: '#B3B3B3',
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,
@@ -305,19 +308,14 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#2C2C2C',
     marginBottom: 16,
     paddingHorizontal: 16,
     width: '100%',
     maxWidth: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   inputIcon: {
     marginRight: 12,
@@ -326,21 +324,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#000000',
+    color: '#FFFFFF',
   },
   actionButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#2E8BFF',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
     width: '100%',
     maxWidth: 320,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   disabledButton: {
     opacity: 0.6,
@@ -356,13 +349,15 @@ const styles = StyleSheet.create({
   },
   toggleButtonText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#2E8BFF',
     textDecorationLine: 'underline',
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFEBEE',
+    backgroundColor: '#1E1E1E',
+    borderColor: '#2C2C2C',
+    borderWidth: 1,
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
@@ -377,7 +372,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 12,
-    color: '#8E8E93',
+    color: '#757575',
     textAlign: 'center',
     marginTop: 16,
     paddingHorizontal: 20,
@@ -388,31 +383,26 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: '#8E8E93',
+    color: '#757575',
   },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#2C2C2C',
     paddingVertical: 14,
     paddingHorizontal: 32,
     marginBottom: 16,
     width: '100%',
     maxWidth: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   googleButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#FFFFFF',
     marginLeft: 10,
   },
   divider: {
@@ -425,24 +415,24 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#2C2C2C',
   },
   dividerText: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#757575',
     marginHorizontal: 10,
   },
   skipButton: {
     marginTop: 20,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#1E1E1E',
     borderWidth: 1,
-    borderColor: '#D0D0D0',
+    borderColor: '#2C2C2C',
   },
   skipButtonText: {
     fontSize: 14,
-    color: '#666666',
+    color: '#B3B3B3',
     textAlign: 'center',
     fontWeight: '500',
   },

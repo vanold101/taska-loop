@@ -26,8 +26,7 @@ import {
   updateProfile,
   connectAuthEmulator,
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithCredential,
   Auth
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -148,6 +147,7 @@ export {
   createUserWithEmailAndPassword,
   updateProfile,
   GoogleAuthProvider,
+  signInWithCredential,
   getToken,
   onMessage
 };

@@ -264,7 +264,10 @@ export default function RecurringItemsPage() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Recurring Items</Text>
           <Text style={styles.subtitle}>Manage items you buy regularly</Text>
@@ -354,16 +357,16 @@ export default function RecurringItemsPage() {
                   style={styles.actionButton}
                   onPress={() => markAsPurchased(item.id)}
                 >
-                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                  <Text style={styles.actionButtonText}>Mark Purchased</Text>
+                  <Ionicons name="checkmark-circle" size={20} color="#2E8BFF" />
+                  <Text style={[styles.actionButtonText, { color: '#2E8BFF' }]}>Mark Purchased</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={[styles.actionButton, styles.editButton]}
                   onPress={() => router.push('/pantry')}
                 >
-                  <Ionicons name="create" size={20} color="#2196F3" />
-                  <Text style={styles.actionButtonText}>Edit</Text>
+                  <Ionicons name="create" size={20} color="#2E8BFF" />
+                  <Text style={[styles.actionButtonText, { color: '#2E8BFF' }]}>Edit</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
@@ -371,7 +374,7 @@ export default function RecurringItemsPage() {
                   onPress={() => deleteItem(item.id)}
                 >
                   <Ionicons name="trash-outline" size={20} color="#F44336" />
-                  <Text style={styles.actionButtonText}>Delete</Text>
+                  <Text style={[styles.actionButtonText, { color: '#F44336' }]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -393,7 +396,7 @@ export default function RecurringItemsPage() {
             <TextInput
               style={styles.itemInput}
               placeholder="Item name (required)..."
-              placeholderTextColor="#666"
+              placeholderTextColor="#757575"
               value={newItemName}
               onChangeText={setNewItemName}
               autoFocus
@@ -403,7 +406,7 @@ export default function RecurringItemsPage() {
               <TextInput
                 style={[styles.itemInput, { flex: 1, marginRight: 8 }]}
                 placeholder="Quantity..."
-                placeholderTextColor="#666"
+                placeholderTextColor="#757575"
                 value={newItemQuantity}
                 onChangeText={setNewItemQuantity}
                 keyboardType="numeric"
@@ -412,7 +415,7 @@ export default function RecurringItemsPage() {
               <TextInput
                 style={[styles.itemInput, { flex: 1, marginLeft: 8 }]}
                 placeholder="Unit..."
-                placeholderTextColor="#666"
+                placeholderTextColor="#757575"
                 value={newItemUnit}
                 onChangeText={setNewItemUnit}
               />
@@ -421,7 +424,7 @@ export default function RecurringItemsPage() {
             <TextInput
               style={styles.itemInput}
               placeholder="Estimated cost..."
-              placeholderTextColor="#666"
+              placeholderTextColor="#757575"
               value={newItemCost}
               onChangeText={setNewItemCost}
               keyboardType="numeric"
@@ -480,23 +483,23 @@ export default function RecurringItemsPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
   },
   header: {
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#1E1E1E',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#2C2C2C',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666666',
+    color: '#B3B3B3',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -506,27 +509,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   summaryCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#1E1E1E',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     flex: 1,
     marginHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 3,
   },
   summaryNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#666666',
+    color: '#B3B3B3',
     textAlign: 'center',
   },
   addItemContainer: {
@@ -534,12 +537,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addItemButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#0068F0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 16,
   },
   addItemText: {
     color: 'white',
@@ -553,18 +556,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   itemCard: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#1E1E1E',
+    padding: 18,
+    borderRadius: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 3,
   },
   inactiveItem: {
@@ -582,11 +585,11 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   inactiveText: {
-    color: '#666666',
+    color: '#B3B3B3',
   },
   itemMeta: {
     flexDirection: 'row',
@@ -594,8 +597,8 @@ const styles = StyleSheet.create({
   },
   itemCategory: {
     fontSize: 14,
-    color: '#666666',
-    backgroundColor: '#F2F2F7',
+    color: '#B3B3B3',
+    backgroundColor: '#121212',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -603,7 +606,7 @@ const styles = StyleSheet.create({
   },
   itemQuantity: {
     fontSize: 14,
-    color: '#666666',
+    color: '#B3B3B3',
   },
   itemStatus: {
     marginLeft: 12,
@@ -629,13 +632,13 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: 12,
-    color: '#666666',
+    color: '#B3B3B3',
     marginBottom: 2,
   },
   dateValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#000000',
+    color: '#FFFFFF',
   },
   costText: {
     fontSize: 16,
@@ -649,7 +652,7 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -665,7 +668,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 12,
-    color: '#666666',
+    color: '#B3B3B3',
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -685,18 +688,18 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 20,
     textAlign: 'center',
   },
   itemInput: {
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#2C2C2C',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: 'white',
-    color: '#000000',
+    backgroundColor: '#121212',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   inputRow: {
@@ -709,7 +712,7 @@ const styles = StyleSheet.create({
   frequencyLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 12,
   },
   frequencyOptions: {
@@ -720,7 +723,7 @@ const styles = StyleSheet.create({
   frequencyOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -729,11 +732,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   frequencyOptionActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0068F0',
   },
   frequencyOptionText: {
     fontSize: 14,
-    color: '#666666',
+    color: '#B3B3B3',
     marginLeft: 4,
     fontWeight: '500',
   },
@@ -747,7 +750,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     borderRadius: 8,
     marginRight: 8,
     alignItems: 'center',
@@ -759,7 +762,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E8BFF',
     borderRadius: 8,
     marginLeft: 8,
     alignItems: 'center',

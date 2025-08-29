@@ -108,18 +108,18 @@ export default function LocationAutocomplete({
   return (
     <View style={styles.container}>
       <View style={styles.inputContainer}>
-        <Ionicons name="location" size={20} color="#666" style={styles.locationIcon} />
+        <Ionicons name="location" size={20} color="#B3B3B3" style={styles.locationIcon} />
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor="#999"
+          placeholderTextColor="#757575"
           value={value}
           onChangeText={handleInputChange}
           onFocus={() => {
             if (suggestions.length > 0) setShowSuggestions(true);
           }}
         />
-        {isLoading && <ActivityIndicator size="small" color="#007AFF" />}
+        {isLoading && <ActivityIndicator size="small" color="#2E8BFF" />}
       </View>
 
       {showSuggestions && suggestions.length > 0 && (
@@ -132,6 +132,7 @@ export default function LocationAutocomplete({
                 style={styles.suggestionItem}
                 onPress={() => handleLocationSelect(item)}
               >
+                <Ionicons name="location" size={16} color="#2E8BFF" style={styles.suggestionIcon} />
                 <View style={styles.suggestionContent}>
                   <Text style={styles.suggestionMainText}>{item.main_text}</Text>
                   {item.secondary_text && (
@@ -140,10 +141,12 @@ export default function LocationAutocomplete({
                     </Text>
                   )}
                 </View>
-                <Ionicons name="chevron-forward" size={16} color="#999" />
+                <Ionicons name="chevron-forward" size={16} color="#757575" />
               </TouchableOpacity>
             )}
             style={styles.suggestionsList}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
           />
         </View>
       )}
@@ -154,19 +157,19 @@ export default function LocationAutocomplete({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    zIndex: 9999,
+    zIndex: 10000,
     marginBottom: 20,
-    elevation: 9999,
+    elevation: 10000,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: '#2C2C2C',
   },
   locationIcon: {
     marginRight: 8,
@@ -174,28 +177,25 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
+    color: '#FFFFFF',
   },
   suggestionsContainer: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: '#1E1E1E',
     borderRadius: 8,
     marginTop: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 9999,
-    zIndex: 9999,
-    maxHeight: 200,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#2C2C2C',
+    elevation: 15000,
+    zIndex: 15000,
+    maxHeight: 200,
   },
   suggestionsList: {
     maxHeight: 200,
+    borderRadius: 8,
   },
   suggestionItem: {
     flexDirection: 'row',
@@ -203,19 +203,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    borderBottomColor: '#2C2C2C',
+    backgroundColor: '#1E1E1E',
+  },
+  suggestionIcon: {
+    marginRight: 12,
   },
   suggestionContent: {
     flex: 1,
+    marginRight: 8,
   },
   suggestionMainText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
+    fontWeight: '600',
+    color: '#FFFFFF',
     marginBottom: 2,
   },
   suggestionSecondaryText: {
     fontSize: 14,
-    color: '#666',
+    color: '#B3B3B3',
   },
 });

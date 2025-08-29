@@ -308,7 +308,10 @@ export default function SettingsPage() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Settings</Text>
           <Text style={styles.subtitle}>Customize your app experience</Text>
@@ -320,65 +323,65 @@ export default function SettingsPage() {
           
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Ionicons name="moon" size={20} color="#007AFF" />
+              <Ionicons name="moon" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Dark Mode</Text>
             </View>
             <Switch
               value={isDarkMode}
               onValueChange={handleDarkModeToggle}
-              trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
+              trackColor={{ false: '#E9ECEF', true: '#0068F0' }}
               thumbColor={isDarkMode ? '#FFFFFF' : '#FFFFFF'}
             />
           </View>
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Ionicons name="notifications" size={20} color="#007AFF" />
+              <Ionicons name="notifications" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Push Notifications</Text>
             </View>
             <Switch
               value={notificationsEnabled}
               onValueChange={handleNotificationsToggle}
-              trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
+              trackColor={{ false: '#E9ECEF', true: '#0068F0' }}
               thumbColor={notificationsEnabled ? '#FFFFFF' : '#FFFFFF'}
             />
           </View>
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Ionicons name="location" size={20} color="#007AFF" />
+              <Ionicons name="location" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Location Services</Text>
             </View>
             <Switch
               value={locationEnabled}
               onValueChange={handleLocationToggle}
-              trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
+              trackColor={{ false: '#E9ECEF', true: '#0068F0' }}
               thumbColor={locationEnabled ? '#FFFFFF' : '#FFFFFF'}
             />
           </View>
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Ionicons name="finger-print" size={20} color="#007AFF" />
+              <Ionicons name="finger-print" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Biometric Login</Text>
             </View>
             <Switch
               value={biometricEnabled}
               onValueChange={handleBiometricToggle}
-              trackColor={{ false: '#E0E0E0', true: '#007AFF' }}
+              trackColor={{ false: '#E9ECEF', true: '#0068F0' }}
               thumbColor={biometricEnabled ? '#FFFFFF' : '#FFFFFF'}
             />
           </View>
 
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Ionicons name="sync" size={20} color="#007AFF" />
+              <Ionicons name="sync" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Auto Sync</Text>
             </View>
             <Switch
               value={autoSync}
               onValueChange={handleAutoSyncToggle}
-              trackColor={{ false: '#E0E0E0', true: '#FFFFFF' }}
+              trackColor={{ false: '#E0E0E0', true: '#0068F0' }}
               thumbColor={autoSync ? '#FFFFFF' : '#FFFFFF'}
             />
           </View>
@@ -411,7 +414,7 @@ export default function SettingsPage() {
           
           <TouchableOpacity style={styles.settingButton} onPress={editProfile}>
             <View style={styles.settingInfo}>
-              <Ionicons name="person" size={20} color="#007AFF" />
+              <Ionicons name="person" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Edit Profile</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -419,7 +422,7 @@ export default function SettingsPage() {
 
           <TouchableOpacity style={styles.settingButton} onPress={householdSettings}>
             <View style={styles.settingInfo}>
-              <Ionicons name="people" size={20} color="#007AFF" />
+              <Ionicons name="people" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Household Settings</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -427,7 +430,7 @@ export default function SettingsPage() {
 
           <TouchableOpacity style={styles.settingButton} onPress={openPaymentMethods}>
             <View style={styles.settingInfo}>
-              <Ionicons name="card" size={20} color="#007AFF" />
+              <Ionicons name="card" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Payment Methods</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -448,7 +451,7 @@ export default function SettingsPage() {
           
           <TouchableOpacity style={styles.settingButton} onPress={openSupport}>
             <View style={styles.settingInfo}>
-              <Ionicons name="help-circle" size={20} color="#007AFF" />
+              <Ionicons name="help-circle" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Help & Support</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -456,7 +459,7 @@ export default function SettingsPage() {
 
           <TouchableOpacity style={styles.settingButton} onPress={openPrivacyPolicy}>
             <View style={styles.settingInfo}>
-              <Ionicons name="shield-checkmark" size={20} color="#007AFF" />
+              <Ionicons name="shield-checkmark" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Privacy Policy</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -464,7 +467,7 @@ export default function SettingsPage() {
 
           <TouchableOpacity style={styles.settingButton} onPress={openTermsOfService}>
             <View style={styles.settingInfo}>
-              <Ionicons name="document-text" size={20} color="#007AFF" />
+              <Ionicons name="document-text" size={20} color="#0068F0" />
               <Text style={styles.settingTitle}>Terms of Service</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -535,6 +538,7 @@ export default function SettingsPage() {
             <TextInput
               style={styles.modalInput}
               placeholder="Full Name"
+              placeholderTextColor="#757575"
               value={profileData.name}
               onChangeText={(text) => setProfileData({...profileData, name: text})}
             />
@@ -542,6 +546,7 @@ export default function SettingsPage() {
             <TextInput
               style={styles.modalInput}
               placeholder="Email"
+              placeholderTextColor="#757575"
               value={profileData.email}
               onChangeText={(text) => setProfileData({...profileData, email: text})}
               keyboardType="email-address"
@@ -550,6 +555,7 @@ export default function SettingsPage() {
             <TextInput
               style={styles.modalInput}
               placeholder="Phone"
+              placeholderTextColor="#757575"
               value={profileData.phone}
               onChangeText={(text) => setProfileData({...profileData, phone: text})}
               keyboardType="phone-pad"
@@ -588,6 +594,7 @@ export default function SettingsPage() {
             <TextInput
               style={styles.modalInput}
               placeholder="Household Name"
+              placeholderTextColor="#757575"
               value={householdData.name}
               onChangeText={(text) => setHouseholdData({...householdData, name: text})}
             />
@@ -627,7 +634,7 @@ export default function SettingsPage() {
               <Text style={styles.inviteCodeLabel}>Invite Code:</Text>
               <Text style={styles.inviteCodeValue}>{householdData.inviteCode}</Text>
               <TouchableOpacity style={styles.copyButton}>
-                <Ionicons name="copy" size={16} color="#007AFF" />
+                <Ionicons name="copy" size={16} color="#0068F0" />
                 <Text style={styles.copyButtonText}>Copy</Text>
               </TouchableOpacity>
             </View>
@@ -665,7 +672,7 @@ export default function SettingsPage() {
             {paymentMethods.map((method) => (
               <View key={method.id} style={styles.paymentMethodItem}>
                 <View style={styles.paymentMethodInfo}>
-                  <Ionicons name="card" size={24} color="#007AFF" />
+                  <Ionicons name="card" size={24} color="#0068F0" />
                   <View style={styles.paymentMethodDetails}>
                     <Text style={styles.paymentMethodType}>{method.type}</Text>
                     <Text style={styles.paymentMethodNumber}>•••• {method.last4}</Text>
@@ -720,6 +727,7 @@ export default function SettingsPage() {
             <TextInput
               style={styles.confirmationInput}
               placeholder="Type DELETE to confirm"
+              placeholderTextColor="#757575"
               value={deleteAccountConfirmation}
               onChangeText={setDeleteAccountConfirmation}
               autoCapitalize="characters"
@@ -750,61 +758,56 @@ export default function SettingsPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
   },
   header: {
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#1E1E1E',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#2C2C2C',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 8,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666666',
+    color: '#B3B3B3',
+    fontWeight: '400',
   },
   section: {
-    margin: 20,
-    marginTop: 10,
+    margin: 16,
+    marginTop: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#1E1E1E',
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
   },
   settingButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#1E1E1E',
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
   },
   settingInfo: {
     flexDirection: 'row',
@@ -813,8 +816,9 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 16,
-    color: '#000000',
+    color: '#FFFFFF',
     marginLeft: 12,
+    fontWeight: '600',
   },
   dangerButton: {
     borderWidth: 1,
@@ -827,37 +831,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#1E1E1E',
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
   },
   infoLabel: {
     fontSize: 16,
-    color: '#666666',
+    color: '#B3B3B3',
   },
   infoValue: {
     fontSize: 16,
-    color: '#000000',
+    color: '#FFFFFF',
     fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: '#1E1E1E',
     padding: 24,
     borderRadius: 16,
     width: '90%',
     maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
   },
   modalHeader: {
     alignItems: 'center',
@@ -866,26 +869,26 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     marginTop: 16,
     textAlign: 'center',
   },
   modalDescription: {
     fontSize: 16,
-    color: '#666666',
+    color: '#B3B3B3',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 16,
   },
   confirmationInput: {
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#2C2C2C',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: '#121212',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -894,7 +897,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     borderRadius: 8,
     marginRight: 8,
     alignItems: 'center',
@@ -919,18 +922,18 @@ const styles = StyleSheet.create({
   // New modal styles
   modalInput: {
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#2C2C2C',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 16,
-    backgroundColor: 'white',
-    color: '#000000',
+    backgroundColor: '#121212',
+    color: '#FFFFFF',
   },
   saveButton: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E8BFF',
     borderRadius: 8,
     marginLeft: 8,
     alignItems: 'center',
@@ -947,21 +950,21 @@ const styles = StyleSheet.create({
   membersTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   memberItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     padding: 8,
     borderRadius: 6,
     marginBottom: 4,
   },
   memberText: {
     fontSize: 14,
-    color: '#000000',
+    color: '#FFFFFF',
   },
   removeMemberButton: {
     padding: 4,
@@ -981,20 +984,20 @@ const styles = StyleSheet.create({
   inviteCode: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#1E1E1E',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   inviteCodeLabel: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#0068F0',
     fontWeight: '500',
     marginRight: 8,
   },
   inviteCodeValue: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#0068F0',
     fontWeight: '600',
     marginRight: 8,
   },
@@ -1005,7 +1008,7 @@ const styles = StyleSheet.create({
   },
   copyButtonText: {
     fontSize: 12,
-    color: '#007AFF',
+    color: '#0068F0',
     marginLeft: 4,
   },
   // Payment methods modal styles
@@ -1013,7 +1016,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
@@ -1030,7 +1033,7 @@ const styles = StyleSheet.create({
   paymentMethodType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 2,
   },
   paymentMethodNumber: {
@@ -1049,7 +1052,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E8BFF',
     padding: 12,
     borderRadius: 8,
     marginTop: 16,
@@ -1062,7 +1065,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   closeButton: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#121212',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
