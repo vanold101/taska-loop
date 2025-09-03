@@ -62,9 +62,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="trips"
         options={{
-          title: 'Shopping',
+          title: 'Trips',
           tabBarIcon: ({ color }) => (
-            <Ionicons name="bag" size={20} color={color} />
+            <Ionicons name="car" size={20} color={color} />
           ),
         }}
       />

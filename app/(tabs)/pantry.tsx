@@ -62,6 +62,10 @@ export default function PantryPage() {
     expiry: string | null;
     barcode: string | null;
   } | null>(null);
+  
+  // Item detail state
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [showItemDetail, setShowItemDetail] = useState(false);
 
   const categories = ['Produce', 'Dairy', 'Bakery', 'Pantry', 'Meat', 'Seafood', 'Snacks', 'Beverages', 'Frozen', 'Household'];
 
@@ -203,6 +207,33 @@ export default function PantryPage() {
   const startEditItem = (item: typeof pantryItems[0]) => {
     setEditingItem(item);
     setIsEditItemModalVisible(true);
+  };
+
+  // Handle item selection for detail view
+  const handleItemSelect = (item: any) => {
+    console.log('Item selected:', item);
+    setSelectedItem(item);
+    setShowItemDetail(true);
+  };
+
+  // Handle item deletion from detail modal
+  const handleDeleteItemFromDetail = () => {
+    Alert.alert(
+      'Delete Item',
+      `Are you sure you want to delete ${selectedItem.name} from your pantry?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setPantryItems(pantryItems.filter(item => item.id !== selectedItem.id));
+            setShowItemDetail(false);
+            setSelectedItem(null);
+          },
+        },
+      ]
+    );
   };
 
   const saveEditItem = () => {
@@ -397,7 +428,12 @@ export default function PantryPage() {
             </View>
           ) : (
             filteredItems.map(item => (
-              <View key={item.id} style={styles.itemCard}>
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.itemCard}
+                onPress={() => handleItemSelect(item)}
+                activeOpacity={0.7}
+              >
                 <View style={styles.itemHeader}>
                   <View style={styles.categoryIconContainer}>
                     <Ionicons 
@@ -413,23 +449,24 @@ export default function PantryPage() {
                   <View style={styles.itemActions}>
                     <TouchableOpacity
                       style={styles.editButton}
-                      onPress={() => startEditItem(item)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        startEditItem(item);
+                      }}
                     >
                       <Ionicons name="ellipsis-horizontal" size={20} color="#2E8BFF" />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => deleteItem(item.id)}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                    </TouchableOpacity>
+                    <Ionicons name="chevron-forward" size={16} color="#B3B3B3" style={{ marginLeft: 8 }} />
                   </View>
                 </View>
                 <View style={styles.itemDetails}>
                   <View style={styles.quantityRow}>
                     <TouchableOpacity
                       style={[styles.qtyButton, styles.qtyMinus]}
-                      onPress={() => updateItemQuantity(item.id, -1)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        updateItemQuantity(item.id, -1);
+                      }}
                     >
                       <Ionicons name="remove" size={18} color="#fff" />
                     </TouchableOpacity>
@@ -438,7 +475,10 @@ export default function PantryPage() {
                     </Text>
                     <TouchableOpacity
                       style={[styles.qtyButton, styles.qtyPlus]}
-                      onPress={() => updateItemQuantity(item.id, 1)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        updateItemQuantity(item.id, 1);
+                      }}
                     >
                       <Ionicons name="add" size={18} color="#fff" />
                     </TouchableOpacity>
@@ -454,7 +494,7 @@ export default function PantryPage() {
                     </Text>
                   )}
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
@@ -760,6 +800,146 @@ export default function PantryPage() {
             )}
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* Item Detail Modal */}
+      <Modal
+        visible={showItemDetail}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowItemDetail(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.itemDetailModal}>
+            {selectedItem && (
+              <>
+                <View style={styles.itemDetailHeader}>
+                  <View style={styles.itemDetailTitleSection}>
+                    <View style={styles.itemDetailIconContainer}>
+                      <Ionicons 
+                        name={getCategoryIcon(selectedItem.category) as any} 
+                        size={24} 
+                        color={getCategoryColor(selectedItem.category)} 
+                      />
+                    </View>
+                    <View>
+                      <Text style={styles.itemDetailTitle}>{selectedItem.name}</Text>
+                      <Text style={styles.itemDetailCategory}>{selectedItem.category}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setShowItemDetail(false)}
+                  >
+                    <Ionicons name="close" size={24} color="#B3B3B3" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.itemDetailContent} showsVerticalScrollIndicator={false}>
+                  {/* Item Info */}
+                  <View style={styles.itemDetailSection}>
+                    <Text style={styles.itemDetailSectionTitle}>Item Information</Text>
+                    
+                    <View style={styles.itemDetailRow}>
+                      <Ionicons name="layers" size={16} color="#2E8BFF" />
+                      <Text style={styles.itemDetailText}>
+                        Quantity: {selectedItem.quantity} {selectedItem.unit}
+                      </Text>
+                    </View>
+
+                    {selectedItem.expiry && (
+                      <View style={styles.itemDetailRow}>
+                        <Ionicons name="time" size={16} color="#FF9800" />
+                        <Text style={styles.itemDetailText}>
+                          Expires: {new Date(selectedItem.expiry).toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </Text>
+                      </View>
+                    )}
+
+                    {selectedItem.barcode && (
+                      <View style={styles.itemDetailRow}>
+                        <Ionicons name="barcode" size={16} color="#757575" />
+                        <Text style={styles.itemDetailText}>
+                          Barcode: {selectedItem.barcode}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Quantity Controls */}
+                  <View style={styles.itemDetailSection}>
+                    <Text style={styles.itemDetailSectionTitle}>Quantity Controls</Text>
+                    
+                    <View style={styles.quantityControlRow}>
+                      <TouchableOpacity
+                        style={styles.quantityControlButton}
+                        onPress={() => {
+                          const updatedItem = {
+                            ...selectedItem,
+                            quantity: Math.max(0, selectedItem.quantity - 1)
+                          };
+                          setPantryItems(pantryItems.map(item => 
+                            item.id === selectedItem.id ? updatedItem : item
+                          ));
+                          setSelectedItem(updatedItem);
+                        }}
+                      >
+                        <Ionicons name="remove" size={20} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      
+                      <Text style={styles.quantityDisplayText}>
+                        {selectedItem.quantity} {selectedItem.unit}
+                      </Text>
+                      
+                      <TouchableOpacity
+                        style={[styles.quantityControlButton, styles.quantityPlusButton]}
+                        onPress={() => {
+                          const updatedItem = {
+                            ...selectedItem,
+                            quantity: selectedItem.quantity + 1
+                          };
+                          setPantryItems(pantryItems.map(item => 
+                            item.id === selectedItem.id ? updatedItem : item
+                          ));
+                          setSelectedItem(updatedItem);
+                        }}
+                      >
+                        <Ionicons name="add" size={20} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Item Actions */}
+                  <View style={styles.itemDetailActions}>
+                    <TouchableOpacity 
+                      style={styles.detailActionButton}
+                      onPress={() => {
+                        setShowItemDetail(false);
+                        startEditItem(selectedItem);
+                      }}
+                    >
+                      <Ionicons name="pencil" size={18} color="#FFFFFF" />
+                      <Text style={styles.detailActionButtonText}>Edit Item</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.detailActionButton, styles.deleteDetailActionButton]}
+                      onPress={handleDeleteItemFromDetail}
+                    >
+                      <Ionicons name="trash" size={18} color="#FFFFFF" />
+                      <Text style={styles.detailActionButtonText}>Delete Item</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </>
+            )}
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1284,6 +1464,127 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#000000',
     position: 'relative',
+  },
+  // Item detail modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  itemDetailModal: {
+    backgroundColor: '#121212',
+    borderRadius: 20,
+    padding: 0,
+    margin: 20,
+    marginTop: 80,
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  itemDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
+  },
+  itemDetailTitleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  itemDetailIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1E1E1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  itemDetailTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  itemDetailCategory: {
+    fontSize: 16,
+    color: '#B3B3B3',
+  },
+  itemDetailContent: {
+    flex: 1,
+  },
+  itemDetailSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
+  },
+  itemDetailSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  itemDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  itemDetailText: {
+    fontSize: 16,
+    color: '#B3B3B3',
+    marginLeft: 12,
+  },
+  quantityControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  quantityControlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F44336',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityPlusButton: {
+    backgroundColor: '#4CAF50',
+  },
+  quantityDisplayText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    minWidth: 100,
+    textAlign: 'center',
+  },
+  itemDetailActions: {
+    padding: 20,
+    gap: 12,
+  },
+  detailActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2E8BFF',
+    borderRadius: 8,
+    padding: 14,
+  },
+  deleteDetailActionButton: {
+    backgroundColor: '#F44336',
+  },
+  detailActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

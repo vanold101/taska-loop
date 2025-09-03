@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Share } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Share, PanResponder, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -47,8 +47,31 @@ export default function HomePage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showTaskDetails, setShowTaskDetails] = useState(false);
   const [selectedDateTasks, setSelectedDateTasks] = useState<typeof tasks>([]);
+  const [selectedDateTrips, setSelectedDateTrips] = useState<typeof mockTrips>([]);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [showYearView, setShowYearView] = useState(false);
+  
+  // Task toggle state
+  const [activeTasksTab, setActiveTasksTab] = useState<'today' | 'all'>('today');
+  
+  // Trip toggle state
+  const [activeTripsTab, setActiveTripsTab] = useState<'today' | 'all'>('today');
+  
+  // Swipe animation state
+  const [swipedTaskId, setSwipedTaskId] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTripDatePicker, setShowTripDatePicker] = useState(false);
+  
+  // Mock trips data state
+  const [mockTrips, setMockTrips] = useState([
+    { id: '1', title: 'Grocery Shopping', location: 'Walmart Supercenter', time: '10:00 AM', date: new Date().toISOString().split('T')[0] },
+    { id: '2', title: 'Hardware Store', location: 'Home Depot', time: '2:00 PM', date: new Date().toISOString().split('T')[0] },
+    { id: '3', title: 'Gas Station', location: 'Shell', time: '5:00 PM', date: new Date(Date.now() + 86400000).toISOString().split('T')[0] },
+    { id: '4', title: 'Pharmacy', location: 'CVS', time: '3:00 PM', date: new Date(Date.now() + 172800000).toISOString().split('T')[0] }
+  ]);
   
 
 
@@ -115,7 +138,14 @@ export default function HomePage() {
 
   const addTrip = () => {
     if (newTripTitle.trim()) {
-      Alert.alert('Trip Added', `${newTripTitle} has been added to your trips for ${newTripDate || selectedDate.toDateString()}`);
+      const newTrip = {
+        id: Date.now().toString(),
+        title: newTripTitle.trim(),
+        location: newTripLocation || 'No location',
+        time: '12:00 PM', // Default time
+        date: newTripDate || selectedDate.toISOString().split('T')[0]
+      };
+      setMockTrips([...mockTrips, newTrip]);
       setNewTripTitle('');
       setNewTripLocation('');
       setNewTripDate('');
@@ -189,6 +219,88 @@ export default function HomePage() {
     );
   };
 
+  const startEditTask = (task: any) => {
+    setEditingTask(task);
+    setNewTaskTitle(task.title);
+    setNewTaskPriority(task.priority);
+    setNewTaskDueDate(task.dueDate);
+    setNewTaskLocation(task.location);
+    setIsAddTaskModalVisible(true);
+  };
+
+  const updateTask = () => {
+    if (newTaskTitle.trim() && editingTask) {
+      const updatedTask = {
+        ...editingTask,
+        title: newTaskTitle.trim(),
+        priority: newTaskPriority,
+        dueDate: newTaskDueDate || selectedDate.toISOString().split('T')[0],
+        location: newTaskLocation || 'No location'
+      };
+      
+      const newTasks = tasks.map(task => 
+        task.id === editingTask.id ? updatedTask : task
+      );
+      setTasks(newTasks);
+      
+      setNewTaskTitle('');
+      setNewTaskPriority('medium');
+      setNewTaskDueDate('');
+      setNewTaskLocation('');
+      setEditingTask(null);
+      setIsAddTaskModalVisible(false);
+      
+      // Always refresh the filtered views based on current selected date
+      const dateString = selectedDate.toISOString().split('T')[0];
+      const dayTasks = newTasks.filter(task => task.dueDate === dateString);
+      setSelectedDateTasks(dayTasks);
+      
+      // Also refresh trips for the selected date
+      const dayTrips = mockTrips.filter(trip => trip.date === dateString);
+      setSelectedDateTrips(dayTrips);
+    }
+  };
+
+  const startEditTrip = (trip: any) => {
+    setEditingTask(trip);
+    setNewTripTitle(trip.title);
+    setNewTripDate(trip.date);
+    setNewTripLocation(trip.location);
+    setIsAddTripModalVisible(true);
+  };
+
+  const updateTrip = () => {
+    if (newTripTitle.trim() && editingTask) {
+      const updatedTrip = {
+        ...editingTask,
+        title: newTripTitle.trim(),
+        date: newTripDate || selectedDate.toISOString().split('T')[0],
+        location: newTripLocation || 'No location'
+      };
+      
+      // Update the mock trips data
+      const tripIndex = mockTrips.findIndex(t => t.id === editingTask.id);
+      if (tripIndex !== -1) {
+        const newMockTrips = [...mockTrips];
+        newMockTrips[tripIndex] = updatedTrip;
+        setMockTrips(newMockTrips);
+        
+        // Force re-render of filtered views by updating the selected date trips
+        if (selectedDate) {
+          const dateString = selectedDate.toISOString().split('T')[0];
+          const dayTrips = newMockTrips.filter(trip => trip.date === dateString);
+          setSelectedDateTrips(dayTrips);
+        }
+      }
+      
+      setNewTripTitle('');
+      setNewTripDate('');
+      setNewTripLocation('');
+      setEditingTask(null);
+      setIsAddTripModalVisible(false);
+    }
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high': return '#F44336';
@@ -260,7 +372,9 @@ export default function HomePage() {
   const openTasksForDate = (date: Date) => {
     const dateString = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString().split('T')[0];
     const dayTasks = tasks.filter(task => task.dueDate === dateString);
+    const dayTrips = mockTrips.filter(trip => trip.date === dateString);
     setSelectedDateTasks(dayTasks);
+    setSelectedDateTrips(dayTrips);
     setSelectedDate(date);
     // Do not open modal automatically; the UI updates inline
   };
@@ -297,6 +411,193 @@ export default function HomePage() {
       openTasksForDate(newDate);
       setShowFullCalendar(false);
     }
+  };
+
+  // Swipeable Task Item Component
+  const SwipeableTaskItem = ({ task, onToggle, onEdit }: { 
+    task: any; 
+    onToggle: (id: string) => void; 
+    onEdit: (task: any) => void; 
+  }) => {
+    const translateX = useRef(new Animated.Value(0)).current;
+    const [isSwiped, setIsSwiped] = useState(false);
+
+    const panResponder = PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10;
+      },
+      onPanResponderGrant: () => {
+        translateX.setOffset(0);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) { // Only allow left swipe
+          translateX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        translateX.flattenOffset();
+        if (gestureState.dx < -50) { // Swipe left threshold
+          Animated.spring(translateX, {
+            toValue: -80,
+            useNativeDriver: true,
+          }).start();
+          setIsSwiped(true);
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+          setIsSwiped(false);
+        }
+      },
+    });
+
+    const resetSwipe = () => {
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
+      setIsSwiped(false);
+    };
+
+    return (
+      <View style={styles.swipeableContainer}>
+        {/* Swipe Actions Background */}
+        <View style={styles.swipeActionsBackground}>
+          <TouchableOpacity 
+            style={styles.editButton}
+            onPress={() => {
+              onEdit(task);
+              resetSwipe();
+            }}
+          >
+            <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Task Item */}
+        <Animated.View
+          style={[
+            styles.taskListItem,
+            { transform: [{ translateX }] }
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <TouchableOpacity 
+            style={styles.taskListItemContent}
+            onPress={() => onToggle(task.id)}
+          >
+            <Ionicons 
+              name={task.completed ? 'checkmark-circle' : 'ellipse-outline'} 
+              size={20} 
+              color={task.completed ? '#4CAF50' : '#2E8BFF'} 
+            />
+            <View style={styles.taskListContent}>
+              <Text style={[styles.taskListTitle, task.completed && styles.taskListTitleCompleted]}>
+                {task.title}
+              </Text>
+              <Text style={styles.taskListLocation}>{task.location}</Text>
+              {task.dueDate && (
+                <Text style={styles.taskListDueDate}>
+                  Due: {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </Text>
+              )}
+            </View>
+            <View style={styles.taskListActions}>
+              <Ionicons 
+                name={getPriorityIcon(task.priority)} 
+                size={16} 
+                color={getPriorityColor(task.priority)} 
+              />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  // Swipeable Trip Item Component
+  const SwipeableTripItem = ({ trip, onEdit }: { 
+    trip: any; 
+    onEdit: (trip: any) => void; 
+  }) => {
+    const translateX = useRef(new Animated.Value(0)).current;
+    const [isSwiped, setIsSwiped] = useState(false);
+
+    const panResponder = PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10;
+      },
+      onPanResponderGrant: () => {
+        translateX.setOffset(0);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) { // Only allow left swipe
+          translateX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        translateX.flattenOffset();
+        if (gestureState.dx < -50) { // Swipe left threshold
+          Animated.spring(translateX, {
+            toValue: -80,
+            useNativeDriver: true,
+          }).start();
+          setIsSwiped(true);
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+          setIsSwiped(false);
+        }
+      },
+    });
+
+    const resetSwipe = () => {
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
+      setIsSwiped(false);
+    };
+
+    return (
+      <View style={styles.swipeableContainer}>
+        {/* Swipe Actions Background - Always present but positioned behind */}
+        <View style={styles.swipeActionsBackground}>
+          <TouchableOpacity 
+            style={styles.editButton}
+            onPress={() => {
+              onEdit(trip);
+              resetSwipe();
+            }}
+          >
+            <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Trip Item */}
+        <Animated.View
+          style={[
+            styles.taskListItem,
+            { transform: [{ translateX }] }
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.taskListItemContent}>
+            <Ionicons name="car-outline" size={20} color="#2E8BFF" />
+            <View style={styles.taskListContent}>
+              <Text style={styles.taskListTitle}>{trip.title}</Text>
+              <Text style={styles.taskListLocation}>{trip.location} • {trip.time}</Text>
+            </View>
+            <View style={styles.taskListActions}>
+              <Ionicons name="chevron-forward" size={16} color="#757575" />
+            </View>
+          </View>
+        </Animated.View>
+      </View>
+    );
   };
 
   return (
@@ -388,96 +689,165 @@ export default function HomePage() {
 
         
 
-        {/* Selected Day Tasks Card */}
+        {/* Tasks Toggle Section */}
         <View style={[styles.card, { backgroundColor: '#1E1E1E', minHeight: 150 }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>
-              {selectedDate.toDateString() === new Date().toDateString() ? 'Today' : selectedDate.toDateString().split(' ').slice(0, 3).join(' ')} Tasks
-            </Text>
-            <TouchableOpacity onPress={() => setIsAddTaskModalVisible(true)}>
+            <View style={styles.cardTitleSection}>
+              <Text style={styles.cardTitle}>Tasks</Text>
+              <View style={styles.toggleButtons}>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, activeTasksTab === 'today' && styles.toggleButtonActive]}
+                  onPress={() => setActiveTasksTab('today')}
+                >
+                  <Text style={[styles.toggleButtonText, activeTasksTab === 'today' && styles.toggleButtonTextActive]}>
+                    {selectedDate.toDateString() === new Date().toDateString() ? 'Today\'s Tasks' : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Tasks`}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, activeTasksTab === 'all' && styles.toggleButtonActive]}
+                  onPress={() => setActiveTasksTab('all')}
+                >
+                  <Text style={[styles.toggleButtonText, activeTasksTab === 'all' && styles.toggleButtonTextActive]}>
+                    All Tasks
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <TouchableOpacity 
+              onPress={() => {
+                setEditingTask(null);
+                setNewTaskTitle('');
+                setNewTaskPriority('medium');
+                setNewTaskDueDate('');
+                setNewTaskLocation('');
+                setIsAddTaskModalVisible(true);
+              }}
+            >
               <Ionicons name="add-circle-outline" size={24} color="#2E8BFF" />
             </TouchableOpacity>
           </View>
           <View style={styles.cardContent}>
-            {(() => {
-              const dayTasks = tasks.filter(t => t.dueDate === new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).toISOString().split('T')[0]);
-              if (dayTasks.length === 0) {
-                return (
-                  <View style={styles.emptyState}>
-                    <Ionicons name="checkmark-done-outline" size={32} color="#757575" />
-                    <Text style={styles.emptyStateText}>No tasks today</Text>
-                  </View>
-                );
-              }
-              return dayTasks.map(t => (
-                <TouchableOpacity 
-                  key={t.id} 
-                  style={styles.taskListItem}
-                  onPress={() => toggleTask(t.id)}
-                >
-                  <Ionicons 
-                    name={t.completed ? 'checkmark-circle' : 'ellipse-outline'} 
-                    size={20} 
-                    color={t.completed ? '#4CAF50' : '#2E8BFF'} 
+            {activeTasksTab === 'today' ? (
+              // Selected day's tasks (not necessarily "today")
+              (() => {
+                const selectedDayTasks = tasks.filter(t => t.dueDate === selectedDate.toISOString().split('T')[0]);
+                
+                if (selectedDayTasks.length === 0) {
+                  return (
+                    <View style={styles.emptyState}>
+                      <Ionicons name="checkmark-done-outline" size={32} color="#757575" />
+                      <Text style={styles.emptyStateText}>No tasks on {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                    </View>
+                  );
+                }
+                return selectedDayTasks.map(t => (
+                  <SwipeableTaskItem
+                    key={t.id}
+                    task={t}
+                    onToggle={toggleTask}
+                    onEdit={startEditTask}
                   />
-                  <View style={styles.taskListContent}>
-                    <Text style={[styles.taskListTitle, t.completed && styles.taskListTitleCompleted]}>
-                      {t.title}
-                    </Text>
-                    <Text style={styles.taskListLocation}>{t.location}</Text>
-                  </View>
-                  <View style={styles.taskListActions}>
-                    <Ionicons 
-                      name={getPriorityIcon(t.priority)} 
-                      size={16} 
-                      color={getPriorityColor(t.priority)} 
-                    />
-                  </View>
-                </TouchableOpacity>
-              ));
-            })()}
+                ));
+              })()
+            ) : (
+              // All tasks
+              tasks.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="checkmark-done-outline" size={32} color="#757575" />
+                  <Text style={styles.emptyStateText}>No tasks created yet</Text>
+                </View>
+              ) : (
+                tasks.map(t => (
+                  <SwipeableTaskItem
+                    key={t.id}
+                    task={t}
+                    onToggle={toggleTask}
+                    onEdit={startEditTask}
+                  />
+                ))
+              )
+            )}
           </View>
         </View>
 
-        {/* Selected Day Trips Card */}
+        {/* Trips Toggle Section */}
         <View style={[styles.card, { backgroundColor: '#1E1E1E', minHeight: 150 }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>
-              {selectedDate.toDateString() === new Date().toDateString() ? 'Today' : selectedDate.toDateString().split(' ').slice(0, 3).join(' ')} Trips
-            </Text>
-            <TouchableOpacity onPress={() => setIsAddTripModalVisible(true)}>
+            <View style={styles.cardTitleSection}>
+              <Text style={styles.cardTitle}>Trips</Text>
+              <View style={styles.toggleButtons}>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, activeTripsTab === 'today' && styles.toggleButtonActive]}
+                  onPress={() => setActiveTripsTab('today')}
+                >
+                  <Text style={[styles.toggleButtonText, activeTripsTab === 'today' && styles.toggleButtonTextActive]}>
+                    {selectedDate.toDateString() === new Date().toDateString() ? 'Today\'s Trips' : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Trips`}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, activeTripsTab === 'all' && styles.toggleButtonActive]}
+                  onPress={() => setActiveTripsTab('all')}
+                >
+                  <Text style={[styles.toggleButtonText, activeTripsTab === 'all' && styles.toggleButtonTextActive]}>
+                    All Trips
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <TouchableOpacity 
+              onPress={() => {
+                setEditingTask(null);
+                setNewTripTitle('');
+                setNewTripDate('');
+                setNewTripLocation('');
+                setIsAddTripModalVisible(true);
+              }}
+            >
               <Ionicons name="add-circle-outline" size={24} color="#2E8BFF" />
             </TouchableOpacity>
           </View>
           <View style={styles.cardContent}>
-            {(() => {
-              const mockTrips = [
-                { id: '1', title: 'Grocery Shopping', location: 'Walmart Supercenter', time: '10:00 AM' },
-                { id: '2', title: 'Hardware Store', location: 'Home Depot', time: '2:00 PM' }
-              ];
-              const dayTrips = selectedDate.toDateString() === new Date().toDateString() ? mockTrips : [];
-              
-              if (dayTrips.length === 0) {
-                return (
-                  <View style={styles.emptyState}>
-                    <Ionicons name="car-outline" size={32} color="#757575" />
-                    <Text style={styles.emptyStateText}>No trips planned</Text>
-                  </View>
-                );
-              }
-              return dayTrips.map(trip => (
-                <View key={trip.id} style={styles.taskListItem}>
-                  <Ionicons name="car-outline" size={20} color="#2E8BFF" />
-                  <View style={styles.taskListContent}>
-                    <Text style={styles.taskListTitle}>{trip.title}</Text>
-                    <Text style={styles.taskListLocation}>{trip.location} • {trip.time}</Text>
-                  </View>
-                  <View style={styles.taskListActions}>
-                    <Ionicons name="chevron-forward" size={16} color="#757575" />
-                  </View>
-                </View>
-              ));
-            })()}
+            {activeTripsTab === 'today' ? (
+              // Selected day's trips (not necessarily "today")
+              (() => {
+                const selectedDayTrips = mockTrips.filter(trip => trip.date === selectedDate.toISOString().split('T')[0]);
+                
+                if (selectedDayTrips.length === 0) {
+                  return (
+                    <View style={styles.emptyState}>
+                      <Ionicons name="car-outline" size={32} color="#757575" />
+                      <Text style={styles.emptyStateText}>No trips on {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                    </View>
+                  );
+                }
+                return selectedDayTrips.map(trip => (
+                  <SwipeableTripItem
+                    key={trip.id}
+                    trip={trip}
+                    onEdit={startEditTrip}
+                  />
+                ));
+              })()
+            ) : (
+              // All trips
+              (() => {
+                if (mockTrips.length === 0) {
+                  return (
+                    <View style={styles.emptyState}>
+                      <Ionicons name="car-outline" size={32} color="#757575" />
+                      <Text style={styles.emptyStateText}>No trips created yet</Text>
+                    </View>
+                  );
+                }
+                return mockTrips.map(trip => (
+                  <SwipeableTripItem
+                    key={trip.id}
+                    trip={trip}
+                    onEdit={startEditTrip}
+                  />
+                ));
+              })()
+            )}
           </View>
         </View>
 
@@ -791,7 +1161,7 @@ export default function HomePage() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Task</Text>
+            <Text style={styles.modalTitle}>{editingTask ? 'Edit Task' : 'Add New Task'}</Text>
             
             <TextInput
               style={styles.taskInput}
@@ -824,12 +1194,105 @@ export default function HomePage() {
               </View>
             </View>
 
-            <TextInput
-              style={styles.taskInput}
-              placeholder="Due date (optional) - YYYY-MM-DD..."
-              value={newTaskDueDate}
-              onChangeText={setNewTaskDueDate}
-            />
+            <View style={styles.datePickerContainer}>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowDatePicker(!showDatePicker)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.datePickerButtonText, newTaskDueDate && styles.datePickerButtonTextFilled]}>
+                  {newTaskDueDate ? `Due: ${newTaskDueDate}` : 'Select due date (optional)'}
+                </Text>
+                <Ionicons 
+                  name={showDatePicker ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#2E8BFF" 
+                />
+              </TouchableOpacity>
+              
+              {/* Inline Calendar */}
+              {showDatePicker && (
+                <View style={styles.inlineCalendar}>
+                  <View style={styles.inlineCalendarHeader}>
+                    <TouchableOpacity onPress={() => {
+                      const newMonth = new Date(currentMonth);
+                      newMonth.setMonth(newMonth.getMonth() - 1);
+                      setCurrentMonth(newMonth);
+                    }}>
+                      <Ionicons name="chevron-back" size={20} color="#2E8BFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.inlineCalendarMonth}>
+                      {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </Text>
+                    <TouchableOpacity onPress={() => {
+                      const newMonth = new Date(currentMonth);
+                      newMonth.setMonth(newMonth.getMonth() + 1);
+                      setCurrentMonth(newMonth);
+                    }}>
+                      <Ionicons name="chevron-forward" size={20} color="#2E8BFF" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={styles.inlineCalendarWeekdays}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <Text key={day} style={styles.inlineCalendarWeekday}>{day}</Text>
+                    ))}
+                  </View>
+                  
+                  <View style={styles.inlineCalendarGrid}>
+                    {(() => {
+                      const days = getDaysInMonth(currentMonth);
+                      const startDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+                      
+                      // Add empty cells for padding
+                      for (let i = 0; i < startDay; i++) {
+                        days.unshift(null);
+                      }
+                      
+                      // Fill remaining cells to complete the grid (6 rows x 7 columns = 42 total cells)
+                      const totalCells = 42;
+                      const remainingCells = totalCells - days.length;
+                      for (let i = 0; i < remainingCells; i++) {
+                        days.push(null);
+                      }
+                      
+                      return days.map((day, index) => (
+                        <View key={index} style={styles.inlineCalendarDay}>
+                          {day ? (
+                            <TouchableOpacity
+                              style={[
+                                styles.inlineCalendarDayButton,
+                                day.tasksCount > 0 && styles.inlineCalendarDayWithTasks,
+                                newTaskDueDate === new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day.date).toISOString().split('T')[0] && styles.inlineCalendarDaySelected
+                              ]}
+                              onPress={() => {
+                                const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day.date);
+                                setNewTaskDueDate(selectedDate.toISOString().split('T')[0]);
+                                setShowDatePicker(false);
+                              }}
+                            >
+                              <Text style={[
+                                styles.inlineCalendarDayNumber,
+                                newTaskDueDate === new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day.date).toISOString().split('T')[0] && styles.inlineCalendarDayNumberSelected
+                              ]}>
+                                {day.date}
+                              </Text>
+                              {day.tasksCount > 0 && (
+                                <View style={styles.inlineCalendarDayTaskIndicator}>
+                                  <Text style={styles.inlineCalendarDayTaskCount}>{day.tasksCount}</Text>
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={styles.inlineCalendarDayEmpty} />
+                          )}
+                        </View>
+                      ));
+                    })()}
+                  </View>
+                </View>
+              )}
+            </View>
 
             <LocationAutocomplete
               placeholder="Location (optional)..."
@@ -841,16 +1304,23 @@ export default function HomePage() {
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={styles.cancelButton}
-                onPress={() => setIsAddTaskModalVisible(false)}
+                onPress={() => {
+                  setIsAddTaskModalVisible(false);
+                  setEditingTask(null);
+                  setNewTaskTitle('');
+                  setNewTaskPriority('medium');
+                  setNewTaskDueDate('');
+                  setNewTaskLocation('');
+                }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.saveButton}
-                onPress={addTask}
+                onPress={editingTask ? updateTask : addTask}
               >
-                <Text style={styles.saveButtonText}>Add Task</Text>
+                <Text style={styles.saveButtonText}>{editingTask ? 'Update Task' : 'Add Task'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -866,7 +1336,7 @@ export default function HomePage() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Trip</Text>
+            <Text style={styles.modalTitle}>{editingTask ? 'Edit Trip' : 'Add New Trip'}</Text>
             
             <TextInput
               style={styles.taskInput}
@@ -877,13 +1347,105 @@ export default function HomePage() {
               autoFocus
             />
 
-            <TextInput
-              style={styles.taskInput}
-              placeholder="Date (optional) - YYYY-MM-DD..."
-              placeholderTextColor="#757575"
-              value={newTripDate}
-              onChangeText={setNewTripDate}
-            />
+            <View style={styles.datePickerContainer}>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowTripDatePicker(!showTripDatePicker)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.datePickerButtonText, newTripDate && styles.datePickerButtonTextFilled]}>
+                  {newTripDate ? `Date: ${newTripDate}` : 'Select date (optional)'}
+                </Text>
+                <Ionicons 
+                  name={showTripDatePicker ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#2E8BFF" 
+                />
+              </TouchableOpacity>
+              
+              {/* Inline Calendar for Trip Date */}
+              {showTripDatePicker && (
+                <View style={styles.inlineCalendar}>
+                  <View style={styles.inlineCalendarHeader}>
+                    <TouchableOpacity onPress={() => {
+                      const newMonth = new Date(currentMonth);
+                      newMonth.setMonth(newMonth.getMonth() - 1);
+                      setCurrentMonth(newMonth);
+                    }}>
+                      <Ionicons name="chevron-back" size={20} color="#2E8BFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.inlineCalendarMonth}>
+                      {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </Text>
+                    <TouchableOpacity onPress={() => {
+                      const newMonth = new Date(currentMonth);
+                      newMonth.setMonth(newMonth.getMonth() + 1);
+                      setCurrentMonth(newMonth);
+                    }}>
+                      <Ionicons name="chevron-forward" size={20} color="#2E8BFF" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={styles.inlineCalendarWeekdays}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <Text key={day} style={styles.inlineCalendarWeekday}>{day}</Text>
+                    ))}
+                  </View>
+                  
+                  <View style={styles.inlineCalendarGrid}>
+                    {(() => {
+                      const days = getDaysInMonth(currentMonth);
+                      const startDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+                      
+                      // Add empty cells for padding
+                      for (let i = 0; i < startDay; i++) {
+                        days.unshift(null);
+                      }
+                      
+                      // Fill remaining cells to complete the grid (6 rows x 7 columns = 42 total cells)
+                      const totalCells = 42;
+                      const remainingCells = totalCells - days.length;
+                      for (let i = 0; i < remainingCells; i++) {
+                        days.push(null);
+                      }
+                      
+                      return days.map((day, index) => (
+                        <View key={index} style={styles.inlineCalendarDay}>
+                          {day ? (
+                            <TouchableOpacity
+                              style={[
+                                styles.inlineCalendarDayButton,
+                                day.tasksCount > 0 && styles.inlineCalendarDayWithTasks,
+                                newTripDate === new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day.date).toISOString().split('T')[0] && styles.inlineCalendarDaySelected
+                              ]}
+                              onPress={() => {
+                                const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day.date);
+                                setNewTripDate(selectedDate.toISOString().split('T')[0]);
+                                setShowTripDatePicker(false);
+                              }}
+                            >
+                              <Text style={[
+                                styles.inlineCalendarDayNumber,
+                                newTripDate === new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day.date).toISOString().split('T')[0] && styles.inlineCalendarDayNumberSelected
+                              ]}>
+                                {day.date}
+                              </Text>
+                              {day.tasksCount > 0 && (
+                                <View style={styles.inlineCalendarDayTaskIndicator}>
+                                  <Text style={styles.inlineCalendarDayTaskCount}>{day.tasksCount}</Text>
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={styles.inlineCalendarDayEmpty} />
+                          )}
+                        </View>
+                      ));
+                    })()}
+                  </View>
+                </View>
+              )}
+            </View>
 
             <LocationAutocomplete
               placeholder="Location (optional)..."
@@ -895,16 +1457,22 @@ export default function HomePage() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setIsAddTripModalVisible(false)}
+                onPress={() => {
+                  setIsAddTripModalVisible(false);
+                  setEditingTask(null);
+                  setNewTripTitle('');
+                  setNewTripDate('');
+                  setNewTripLocation('');
+                }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={styles.saveButton}
-                onPress={addTrip}
+                onPress={editingTask ? updateTrip : addTrip}
               >
-                <Text style={styles.saveButtonText}>Add Trip</Text>
+                <Text style={styles.saveButtonText}>{editingTask ? 'Update Trip' : 'Add Trip'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1201,6 +1769,9 @@ const styles = StyleSheet.create({
   cardHeader: {
     padding: 20,
     paddingBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   cardTitle: {
     fontSize: 22,
@@ -1454,7 +2025,6 @@ const styles = StyleSheet.create({
     borderColor: '#2C2C2C',
     borderRadius: 8,
     marginHorizontal: 4,
-    alignItems: 'center',
     backgroundColor: '#121212',
   },
   prioritySelected: {
@@ -1464,6 +2034,7 @@ const styles = StyleSheet.create({
   priorityText: {
     fontSize: 14,
     color: '#B3B3B3',
+    textAlign: 'center',
   },
   priorityTextSelected: {
     color: 'white',
@@ -1665,5 +2236,184 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '500',
     marginLeft: 8,
+  },
+  // Swipe gesture styles
+  swipeableContainer: {
+    position: 'relative',
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  swipeActionsBackground: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E1E1E',
+    paddingRight: 16,
+  },
+  editButton: {
+    backgroundColor: '#2E8BFF',
+    padding: 8,
+    borderRadius: 6,
+    marginRight: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 32,
+    minHeight: 32,
+  },
+  taskListItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E1E1E',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  taskListDueDate: {
+    fontSize: 12,
+    color: '#757575',
+    marginTop: 2,
+  },
+  // Toggle button styles
+  cardTitleSection: {
+    flex: 1,
+  },
+  toggleButtons: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: '#121212',
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#2E8BFF',
+    borderColor: '#2E8BFF',
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    color: '#B3B3B3',
+    fontWeight: '500',
+  },
+  toggleButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  // Inline calendar styles
+  datePickerContainer: {
+    marginBottom: 16,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#121212',
+  },
+  datePickerButtonText: {
+    fontSize: 16,
+    color: '#B3B3B3',
+  },
+  datePickerButtonTextFilled: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  inlineCalendar: {
+    backgroundColor: '#121212',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  inlineCalendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  inlineCalendarMonth: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  inlineCalendarWeekdays: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  inlineCalendarWeekday: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B3B3B3',
+    paddingVertical: 8,
+  },
+  inlineCalendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  inlineCalendarDay: {
+    width: '14.28%',
+    aspectRatio: 1,
+    padding: 2,
+  },
+  inlineCalendarDayButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: '#1E1E1E',
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  inlineCalendarDayWithTasks: {
+    backgroundColor: '#1E1E1E',
+    borderColor: '#2E8BFF',
+  },
+  inlineCalendarDaySelected: {
+    backgroundColor: '#2E8BFF',
+    borderColor: '#2E8BFF',
+  },
+  inlineCalendarDayNumber: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  inlineCalendarDayNumberSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  inlineCalendarDayEmpty: {
+    flex: 1,
+    width: '100%',
+    aspectRatio: 1,
+  },
+  inlineCalendarDayTaskIndicator: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#2E8BFF',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inlineCalendarDayTaskCount: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'white',
   },
 });

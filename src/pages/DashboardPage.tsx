@@ -68,7 +68,7 @@ const DashboardPage = () => {
         monthInfo.count += 1;
         
         // Aggregate by category
-        trip.items.forEach(item => {
+        trip.items.forEach((item: any) => {
           if (item.category) {
             monthInfo.byCategory[item.category] = (monthInfo.byCategory[item.category] || 0) + 
               (item.price || 0) * item.quantity;
@@ -242,7 +242,7 @@ const DashboardPage = () => {
                         <XAxis dataKey="month" />
                         <YAxis />
                         <Tooltip 
-                          content={({ active, payload }) => {
+                          content={({ active, payload }: any) => {
                             if (active && payload && payload.length) {
                               return (
                                 <div className="rounded-lg border bg-background p-2 shadow-sm">

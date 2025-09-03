@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { googlePlacesMobileService, PlaceResult, PlaceDetails } from '../../src/services/googlePlacesMobile';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
 import LocationAutocomplete from '../../src/components/LocationAutocomplete';
 import TripsTutorial from '../../src/components/TripsTutorial';
 // import * as Location from 'expo-location';
@@ -66,7 +67,9 @@ const decodePolyline = (encoded: string) => {
 };
 
 export default function TripsPage() {
-  const mapRef = useRef<MapView>(null);
+
+
+  const mapRef = useRef<any>(null);
   const { date } = useLocalSearchParams();
   const [trips, setTrips] = useState<any[]>([]);
   
@@ -95,10 +98,13 @@ export default function TripsPage() {
   const [routePath, setRoutePath] = useState<any[]>([]);
   const [optimizedRouteList, setOptimizedRouteList] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'today' | 'all'>('today');
+  const [includeTaskLocations, setIncludeTaskLocations] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(
     (date as string) || new Date().toISOString().split('T')[0]
   );
+  const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [showTripDetail, setShowTripDetail] = useState(false);
 
   // Update selected date when the param changes
   useEffect(() => {
@@ -119,11 +125,31 @@ export default function TripsPage() {
   const loadTaskBasedTrips = () => {
     // This would normally come from a shared state or context
     // For now, only create trips if user manually adds them
-    console.log('Loading task-based trips - currently empty until user adds trips');
   };
 
   const addTrip = () => {
-    if (newTripStore.trim()) {
+    try {
+
+      
+      if (!newTripStore.trim()) {
+        Alert.alert('Error', 'Please enter a store name.');
+        return;
+      }
+
+      // Validate coordinates if we have a selected location
+      let coordinates = undefined;
+      if (selectedLocation) {
+        
+        if (selectedLocation.geometry && 
+            selectedLocation.geometry.location &&
+            typeof selectedLocation.geometry.location.lat === 'number' && 
+            typeof selectedLocation.geometry.location.lng === 'number') {
+          coordinates = selectedLocation.geometry.location;
+        } else {
+          coordinates = undefined;
+        }
+      }
+
       const newTrip = {
         id: Date.now().toString(),
         store: newTripStore.trim(),
@@ -132,8 +158,11 @@ export default function TripsPage() {
         budget: newTripBudget.trim() ? parseFloat(newTripBudget) : 0,
         items: [] as string[],
         location: selectedLocation ? selectedLocation.formatted_address : (newTripLocation.trim() || 'No location specified'),
-        coordinates: selectedLocation ? selectedLocation.geometry.location : undefined // No hardcoded coordinates
+        coordinates: coordinates // Only set if valid
       };
+
+
+
       setTrips([...trips, newTrip]);
       setNewTripStore('');
       setNewTripLocation('');
@@ -143,13 +172,10 @@ export default function TripsPage() {
       setSelectedLocation(null);
       setIsAddTripModalVisible(false);
       
-      if (!selectedLocation && newTripLocation.trim()) {
-        Alert.alert('Note', 'Location was added as text only. For map features, please select a location from the search suggestions.');
-      } else if (selectedLocation) {
-        Alert.alert('Success', `Trip to ${newTripStore} added with location coordinates!`);
-      } else {
-        Alert.alert('Success', `Trip to ${newTripStore} added successfully!`);
-      }
+      // Trip added successfully - no popup needed
+    } catch (error) {
+      console.error('❌ Error adding trip:', error);
+      Alert.alert('Error', 'Failed to add trip. Please try again.');
     }
   };
 
@@ -161,84 +187,161 @@ export default function TripsPage() {
 
   // Completely rewritten route optimization function
   const optimizeRoute = async () => {
-    // Check if we have trips to optimize
-    const eligibleTrips = trips.filter(trip => 
-      trip.coordinates &&
-      (trip.status === 'started' || (trip.status === 'active' && trip.date === selectedDate))
-    );
-    
-    if (eligibleTrips.length < 1) {
-      Alert.alert('Route Optimization', 'Need at least 1 trip with a location to optimize a route.');
-      return;
-    }
-
-    // Check if we have user location
-    if (!userLocation) {
-      Alert.alert(
-        'Location Required', 
-        'Please allow location access. The map needs to detect your current location to create an optimized route.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    setIsOptimizing(true);
-    
     try {
-      // Calculate distances from user location to each trip
-      const tripsWithDistance = eligibleTrips.map(trip => ({
-        ...trip,
-        distanceFromUser: calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          trip.coordinates!.lat,
-          trip.coordinates!.lng
-        )
-      }));
-
-      // Sort by distance (closest first)
-      const sortedTrips = tripsWithDistance.sort((a, b) => a.distanceFromUser - b.distanceFromUser);
-
-      // Create the route starting from user location
-      const routeCoordinates = [
-        { latitude: userLocation.latitude, longitude: userLocation.longitude },
-        ...sortedTrips.map(trip => ({ 
-          latitude: trip.coordinates!.lat, 
-          longitude: trip.coordinates!.lng 
-        }))
-      ];
-
-      // Set the route path for map display
-      setRoutePath(routeCoordinates);
+      // Get eligible trips
+      let eligibleTrips = trips.filter(trip => 
+        trip && 
+        trip.coordinates &&
+        trip.coordinates.lat && 
+        trip.coordinates.lng &&
+        typeof trip.coordinates.lat === 'number' &&
+        typeof trip.coordinates.lng === 'number' &&
+        !isNaN(trip.coordinates.lat) &&
+        !isNaN(trip.coordinates.lng) &&
+        (trip.status === 'started' || (trip.status === 'active' && trip.date === selectedDate))
+      );
       
+      // If toggle is on, include task locations (for now, just add them without coordinates)
+      if (includeTaskLocations) {
+        // Add simple task locations for demonstration
+        const simpleTaskLocations = [
+          { id: 'task1', store: 'Buy groceries', location: 'Walmart Supercenter', coordinates: { lat: 40.1451, lng: -83.0753 }, status: 'active', budget: 0, items: [], distanceFromUser: 0 },
+          { id: 'task2', store: 'Pick up dry cleaning', location: 'Dry Clean Pro', coordinates: { lat: 40.1455, lng: -83.0758 }, status: 'active', budget: 0, items: [], distanceFromUser: 0 },
+          { id: 'task3', store: 'Get gas', location: 'Shell Station', coordinates: { lat: 40.1448, lng: -83.0750 }, status: 'active', budget: 0, items: [], distanceFromUser: 0 }
+        ];
+        
+        // Combine trips and task locations
+        eligibleTrips = [...eligibleTrips, ...simpleTaskLocations];
+      }
+      
+
+      
+      if (eligibleTrips.length < 1) {
+        Alert.alert('Route Optimization', 'Need at least 1 trip with a valid location to optimize a route.');
+        return;
+      }
+
+      // Limit the number of trips to prevent API limits and performance issues
+      const maxTrips = 24; // Google Maps allows 23 waypoints + origin + destination = 25 total
+      if (eligibleTrips.length > maxTrips) {
+        Alert.alert(
+          'Too Many Destinations', 
+          `You have ${eligibleTrips.length} trips, but we can only optimize routes for up to ${maxTrips} destinations at once. The ${maxTrips} closest trips will be optimized.`,
+          [{ text: 'OK' }]
+        );
+      }
+
+      // Check if we have user location
+      if (!userLocation) {
+        Alert.alert(
+          'Location Required', 
+          'Please allow location access. The map needs to detect your current location to create an optimized route.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      setIsOptimizing(true);
+      
+      // Calculate distances from user location to each trip
+      const tripsWithDistance = eligibleTrips.map(trip => {
+        try {
+          const distance = calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            trip.coordinates!.lat,
+            trip.coordinates!.lng
+          );
+          return {
+            ...trip,
+            distanceFromUser: isNaN(distance) ? 999999 : distance // Put invalid distances at the end
+          };
+        } catch (error) {
+          console.error('Error calculating distance for trip:', trip.id, error);
+          return {
+            ...trip,
+            distanceFromUser: 999999 // Put error trips at the end
+          };
+        }
+      });
+
+
+
+      // Sort by distance (closest first) and limit to maxTrips
+      const sortedTrips = tripsWithDistance
+        .sort((a, b) => a.distanceFromUser - b.distanceFromUser)
+        .slice(0, maxTrips); // Limit to maximum allowed trips
+      
+
+
       // Store the optimized route list for the route display
       setOptimizedRouteList(sortedTrips);
 
-      // Fit map to show the entire route
-      if (mapRef.current) {
-        mapRef.current.fitToCoordinates(routeCoordinates, {
-          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
-          animated: true,
-        });
+      // MapViewDirections will handle the actual routing, we just need to fit the map
+      try {
+        const allLocations = [
+          { latitude: userLocation.latitude, longitude: userLocation.longitude },
+          ...sortedTrips.map(trip => ({ 
+            latitude: trip.coordinates!.lat, 
+            longitude: trip.coordinates!.lng 
+          })).filter(location => 
+            typeof location.latitude === 'number' &&
+            typeof location.longitude === 'number' &&
+            !isNaN(location.latitude) &&
+            !isNaN(location.longitude)
+          )
+        ];
+
+        // Fit map to show all locations (with safety checks)
+        if (mapRef.current && allLocations.length > 1) {
+          try {
+            mapRef.current.fitToCoordinates(allLocations, {
+              edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+              animated: true,
+            });
+          } catch (mapError) {
+            console.error('Error fitting map to coordinates:', mapError);
+            // Continue without fitting the map
+          }
+        }
+      } catch (locationError) {
+        console.error('Error preparing locations for map:', locationError);
+        // Continue with the route optimization
       }
 
-      // Calculate total estimated distance
-      const totalDistance = sortedTrips.reduce((sum, trip) => sum + trip.distanceFromUser, 0);
+      // Calculate total estimated distance (safely)
+      const totalDistance = sortedTrips.reduce((sum, trip) => {
+        const distance = trip.distanceFromUser || 0;
+        return sum + (isNaN(distance) ? 0 : distance);
+      }, 0);
+
+      // Create route description with error handling
+      const routeDescription = sortedTrips.map((trip, index) => {
+        try {
+          const distance = trip.distanceFromUser || 0;
+          const distanceStr = isNaN(distance) ? 'unknown' : distance.toFixed(1);
+          const storeName = trip.store || 'Unknown Store';
+          return `${index + 1}. ${storeName} (${distanceStr} km away)`;
+        } catch (error) {
+          console.error('Error formatting trip in route description:', error);
+          return `${index + 1}. ${trip.store || 'Unknown'} (distance error)`;
+        }
+      }).join('\n');
 
       Alert.alert(
         'Route Optimized!',
         `Route created starting from your current location:\n\n` +
-        `Total Estimated Distance: ${totalDistance.toFixed(1)} km\n\n` +
-        `Route Order (closest first):\n${sortedTrips.map((trip, index) => 
-          `${index + 1}. ${trip.store} (${trip.distanceFromUser.toFixed(1)} km away)`
-        ).join('\n')}`,
+        `Total Estimated Distance: ${isNaN(totalDistance) ? 'unknown' : totalDistance.toFixed(1)} km\n\n` +
+        `Route Order (closest first):\n${routeDescription}` +
+        (sortedTrips.length < eligibleTrips.length ? 
+          `\n\nNote: Showing ${sortedTrips.length} of ${eligibleTrips.length} destinations (API limit).` : ''),
         [
           { text: 'Close', style: 'cancel' },
           { 
             text: 'View Route', 
             onPress: () => {
-              if (mapRef.current) {
-                mapRef.current.fitToCoordinates(routeCoordinates, {
+              if (mapRef.current && routePath.length > 0) {
+                mapRef.current.fitToCoordinates(routePath, {
                   edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
                   animated: true,
                 });
@@ -259,94 +362,280 @@ export default function TripsPage() {
   // Location handling for the autocomplete component
   const handleLocationSelectFromAutocomplete = async (location: any) => {
     try {
+      
+      if (!location || !location.place_id) {
+        console.warn('⚠️ Invalid location object or missing place_id');
+        setNewTripLocation(location?.description || 'Unknown location');
+        return;
+      }
+
       const placeDetails = await googlePlacesMobileService.getPlaceDetails(location.place_id);
+      
       if (placeDetails) {
-        setSelectedLocation(placeDetails);
+        // Validate the place details structure
+        if (placeDetails.geometry && 
+            placeDetails.geometry.location &&
+            typeof placeDetails.geometry.location.lat === 'number' && 
+            typeof placeDetails.geometry.location.lng === 'number') {
+          setSelectedLocation(placeDetails);
+          setNewTripLocation(location.description);
+        } else {
+          setSelectedLocation(null);
+          setNewTripLocation(location.description);
+        }
+      } else {
+        setSelectedLocation(null);
         setNewTripLocation(location.description);
       }
     } catch (error) {
-      console.error('Error getting place details:', error);
+      console.error('❌ Error getting place details:', error);
       // Fallback: just use the description
-      setNewTripLocation(location.description);
+      setSelectedLocation(null);
+      setNewTripLocation(location?.description || 'Error loading location');
+      Alert.alert('Location Error', 'Could not load location details. Using location name only.');
     }
   };
 
   // Open optimized route in Google Maps
   const openInGoogleMaps = () => {
-    if (!userLocation || optimizedRouteList.length === 0) {
-      Alert.alert('Error', 'No route available to open in Google Maps.');
-      return;
-    }
-
     try {
-      // Create waypoints string for Google Maps
-      const waypoints = optimizedRouteList.map(trip => 
+      
+      if (!userLocation) {
+        Alert.alert('Error', 'Your current location is required to open the route in Google Maps.');
+        return;
+      }
+
+      if (optimizedRouteList.length === 0) {
+        Alert.alert('Error', 'No destinations available to open in Google Maps.');
+        return;
+      }
+
+      // Validate that all trips have valid coordinates
+      const validTrips = optimizedRouteList.filter(trip => 
+        trip.coordinates && 
+        typeof trip.coordinates.lat === 'number' && 
+        typeof trip.coordinates.lng === 'number'
+      );
+
+      if (validTrips.length === 0) {
+        Alert.alert('Error', 'No valid coordinates found for the route destinations.');
+        return;
+      }
+
+
+
+      // Create waypoints string for Google Maps (excluding the last destination)
+      const waypoints = validTrips.slice(0, -1).map(trip => 
         `${trip.coordinates.lat},${trip.coordinates.lng}`
       ).join('|');
 
-      // Create Google Maps URL with user location as origin and optimized waypoints
-      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${optimizedRouteList[optimizedRouteList.length - 1].coordinates.lat},${optimizedRouteList[optimizedRouteList.length - 1].coordinates.lng}${optimizedRouteList.length > 1 ? `&waypoints=${waypoints.split('|').slice(0, -1).join('|')}` : ''}&travelmode=driving`;
+      const destination = validTrips[validTrips.length - 1];
+
+      // Create Google Maps URL with user location as origin
+      let googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${destination.coordinates.lat},${destination.coordinates.lng}&travelmode=driving`;
+      
+      // Add waypoints if we have any
+      if (waypoints) {
+        googleMapsUrl += `&waypoints=${waypoints}`;
+      }
 
       Linking.openURL(googleMapsUrl);
     } catch (error) {
-      console.error('Error opening Google Maps:', error);
+      console.error('❌ Error opening Google Maps:', error);
       Alert.alert('Error', 'Failed to open Google Maps. Please try again.');
     }
   };
 
+  // Handle trip selection for detail view
+  const handleTripSelect = (trip: any) => {
+    try {
+      if (!trip || !trip.id) {
+        console.error('Invalid trip object');
+        Alert.alert('Error', 'Invalid trip selected.');
+        return;
+      }
+      
+      // Handle tasks and trips the same way - show detail modal for both
+      setSelectedTrip(trip);
+      setShowTripDetail(true);
+    } catch (error) {
+      console.error('❌ Error selecting trip:', error);
+      Alert.alert('Error', 'Failed to open trip details.');
+    }
+  };
+
+  // Handle trip deletion from detail modal
+  const handleDeleteTripFromDetail = () => {
+    try {
+      if (!selectedTrip || !selectedTrip.id) {
+        Alert.alert('Error', 'No trip selected for deletion.');
+        return;
+      }
+
+      Alert.alert(
+        `Delete ${selectedTrip.isTask ? 'Task' : 'Trip'}`,
+        `Are you sure you want to delete the ${selectedTrip.isTask ? 'task' : 'trip'} to ${selectedTrip.store}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              try {
+
+                setTrips(trips.filter(trip => trip.id !== selectedTrip.id));
+                setShowTripDetail(false);
+                setSelectedTrip(null);
+                Alert.alert('Success', 'Trip deleted successfully.');
+              } catch (error) {
+                console.error('❌ Error deleting trip:', error);
+                Alert.alert('Error', 'Failed to delete trip.');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('❌ Error in trip deletion handler:', error);
+      Alert.alert('Error', 'Failed to delete trip.');
+    }
+  };
+
   const addItemToTrip = (tripId: string) => {
-    const itemText = tripItemInputs[tripId] || '';
-    if (itemText.trim()) {
+    try {
+
+      const itemText = tripItemInputs[tripId] || '';
+      
+      if (!itemText.trim()) {
+        Alert.alert('Error', 'Please enter an item name.');
+        return;
+      }
+
+      if (!tripId) {
+        Alert.alert('Error', 'Invalid trip selected.');
+        return;
+      }
+
       setTrips(trips.map(trip => 
         trip.id === tripId 
           ? { ...trip, items: [...trip.items, itemText.trim()] }
           : trip
       ));
       setTripItemInputs(prev => ({ ...prev, [tripId]: '' }));
+
       Alert.alert('Item Added', `"${itemText.trim()}" added to your trip!`);
+    } catch (error) {
+      console.error('❌ Error adding item to trip:', error);
+      Alert.alert('Error', 'Failed to add item to trip.');
     }
   };
 
   const removeItemFromTrip = (tripId: string, itemIndex: number) => {
-    setTrips(trips.map(trip => 
-      trip.id === tripId 
-        ? { ...trip, items: trip.items.filter((_: any, index: number) => index !== itemIndex) }
-        : trip
-    ));
+    try {
+
+      
+      if (!tripId) {
+        Alert.alert('Error', 'Invalid trip selected.');
+        return;
+      }
+
+      if (typeof itemIndex !== 'number' || itemIndex < 0) {
+        Alert.alert('Error', 'Invalid item selected for removal.');
+        return;
+      }
+
+      setTrips(trips.map(trip => 
+        trip.id === tripId 
+          ? { ...trip, items: trip.items.filter((_: any, index: number) => index !== itemIndex) }
+          : trip
+      ));
+
+    } catch (error) {
+      console.error('❌ Error removing item from trip:', error);
+      Alert.alert('Error', 'Failed to remove item from trip.');
+    }
   };
 
   const startTrip = (tripId: string) => {
-    setTrips(trips.map(trip => 
-      trip.id === tripId 
-        ? { 
-            ...trip, 
-            status: 'started' as const,
-            date: new Date().toISOString().split('T')[0]
-          }
-        : trip
-    ));
-    Alert.alert('Trip Started', 'Your trip has been started and added to today\'s routes!');
+    try {
+
+      
+      if (!tripId) {
+        Alert.alert('Error', 'Invalid trip selected.');
+        return;
+      }
+
+      setTrips(trips.map(trip => 
+        trip.id === tripId 
+          ? { 
+              ...trip, 
+              status: 'started' as const,
+              date: new Date().toISOString().split('T')[0]
+            }
+          : trip
+      ));
+
+      Alert.alert('Trip Started', 'Your trip has been started and added to today\'s routes!');
+    } catch (error) {
+      console.error('❌ Error starting trip:', error);
+      Alert.alert('Error', 'Failed to start trip.');
+    }
   };
 
   const completeTrip = (tripId: string) => {
-    setTrips(trips.map(trip => 
-      trip.id === tripId ? { ...trip, status: 'completed' } : trip
-    ));
+    try {
+
+      
+      if (!tripId) {
+        Alert.alert('Error', 'Invalid trip selected.');
+        return;
+      }
+
+      setTrips(trips.map(trip => 
+        trip.id === tripId ? { ...trip, status: 'completed' } : trip
+      ));
+
+      Alert.alert('Trip Completed', 'Great job! Your trip has been marked as completed.');
+    } catch (error) {
+      console.error('❌ Error completing trip:', error);
+      Alert.alert('Error', 'Failed to complete trip.');
+    }
   };
 
   const deleteTrip = (tripId: string) => {
-    Alert.alert(
-      'Delete Trip',
-      'Are you sure you want to delete this trip?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => setTrips(trips.filter(trip => trip.id !== tripId))
-        }
-      ]
-    );
+    try {
+
+      
+      if (!tripId) {
+        Alert.alert('Error', 'Invalid trip selected.');
+        return;
+      }
+
+      Alert.alert(
+        'Delete Trip',
+        'Are you sure you want to delete this trip?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Delete', 
+            style: 'destructive',
+            onPress: () => {
+              try {
+                setTrips(trips.filter(trip => trip.id !== tripId));
+                
+                Alert.alert('Success', 'Trip deleted successfully.');
+              } catch (error) {
+                console.error('❌ Error deleting trip:', error);
+                Alert.alert('Error', 'Failed to delete trip.');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('❌ Error in trip deletion handler:', error);
+      Alert.alert('Error', 'Failed to delete trip.');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -375,6 +664,23 @@ export default function TripsPage() {
   // Filter trips by selected date
   const selectedDateTrips = trips.filter(trip => trip.date === selectedDate);
   const selectedDateActiveTrips = selectedDateTrips.filter(trip => trip.status === 'active' || trip.status === 'started');
+  
+  // Simple task locations for demonstration
+  const taskLocations = [
+    { id: 'task1', store: 'Buy groceries', location: 'Walmart Supercenter', isTask: true, status: 'pending', budget: '0', items: [], date: new Date().toISOString().split('T')[0] },
+    { id: 'task2', store: 'Pick up dry cleaning', location: 'Dry Clean Pro', isTask: true, status: 'pending', budget: '0', items: [], date: new Date().toISOString().split('T')[0] },
+    { id: 'task3', store: 'Get gas', location: 'Shell Station', isTask: true, status: 'pending', budget: '0', items: [], date: new Date().toISOString().split('T')[0] }
+  ];
+  
+  // Combine trips and task locations when toggle is on
+  const todayItems = includeTaskLocations 
+    ? [...selectedDateActiveTrips, ...taskLocations]
+    : selectedDateActiveTrips;
+    
+  // Combine all trips and task locations when toggle is on
+  const allItems = includeTaskLocations 
+    ? [...activeTrips, ...taskLocations]
+    : activeTrips;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -385,8 +691,8 @@ export default function TripsPage() {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.title}>Shopping Trips</Text>
-              <Text style={styles.subtitle}>Plan and manage your shopping trips</Text>
+                      <Text style={styles.title}>Trips</Text>
+        <Text style={styles.subtitle}>Plan and manage your trips</Text>
             </View>
             <TouchableOpacity 
               style={styles.helpButton}
@@ -404,7 +710,7 @@ export default function TripsPage() {
             onPress={() => setIsAddTripModalVisible(true)}
           >
             <Ionicons name="add" size={24} color="white" />
-            <Text style={styles.addTripText}>Plan New Trip</Text>
+            <Text style={styles.addTripText}>Add New Trip</Text>
           </TouchableOpacity>
         </View>
 
@@ -439,14 +745,37 @@ export default function TripsPage() {
           </TouchableOpacity>
         </View>
 
+        {/* Include Task Locations Toggle */}
+        <View style={styles.taskLocationsToggle}>
+          <Text style={styles.taskLocationsLabel}>Include task locations in routes</Text>
+          <TouchableOpacity 
+            style={[styles.toggleSwitch, includeTaskLocations && styles.toggleSwitchActive]}
+            onPress={() => {
+              const newValue = !includeTaskLocations;
+              console.log('Toggle pressed, new value:', newValue);
+              setIncludeTaskLocations(newValue);
+            }}
+          >
+            <View style={[styles.toggleKnob, includeTaskLocations && styles.toggleKnobActive]} />
+          </TouchableOpacity>
+        </View>
+
         {/* Today's Routes */}
         {activeTab === 'today' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Routes ({selectedDateActiveTrips.length})</Text>
+            <Text style={styles.sectionTitle}>
+              {selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Routes ({todayItems.length})
+              {includeTaskLocations && ` - Including ${taskLocations.length} task locations`}
+            </Text>
             
-            {selectedDateActiveTrips.length > 0 ? (
-              selectedDateActiveTrips.map(trip => (
-                <View key={trip.id} style={styles.tripCard}>
+            {todayItems.length > 0 ? (
+              todayItems.map(trip => (
+                <TouchableOpacity 
+                  key={trip.id} 
+                  style={styles.tripCard}
+                  onPress={() => handleTripSelect(trip)}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.tripHeader}>
                     <View style={styles.tripInfo}>
                       <Text style={styles.tripTitle}>{trip.store}</Text>
@@ -458,64 +787,102 @@ export default function TripsPage() {
                         {trip.status === 'started' ? 'Started today' : `Planned for: ${trip.date}`}
                       </Text>
                     </View>
-                    <View style={styles.tripStatus}>
+                    <View style={styles.tripActions}>
                       <Ionicons 
                         name={getStatusIcon(trip.status)} 
                         size={20} 
                         color={getStatusColor(trip.status)} 
                       />
+                      <Ionicons name="chevron-forward" size={16} color="#B3B3B3" style={{ marginLeft: 8 }} />
                     </View>
                   </View>
                   
-                  <View style={styles.tripDetails}>
-                    <Text style={styles.tripBudget}>Budget: ${trip.budget}</Text>
-                    <Text style={styles.tripItems}>
-                      Items: {trip.items.length > 0 ? trip.items.join(', ') : 'No items added'}
-                    </Text>
-                  </View>
-                  
-                  {/* Add Item Input */}
-                  <View style={styles.addItemRow}>
-                    <TextInput
-                      style={[styles.addItemInput, { flex: 1, marginRight: 8 }]}
-                      placeholder="Add item..."
-                      placeholderTextColor="#666"
-                      value={tripItemInputs[trip.id] || ''}
-                      onChangeText={(text) => setTripItemInputs(prev => ({ ...prev, [trip.id]: text }))}
-                    />
-                    <TouchableOpacity 
-                      style={styles.addItemButton}
-                      onPress={() => addItemToTrip(trip.id)}
-                    >
-                      <Ionicons name="add" size={20} color="white" />
-                    </TouchableOpacity>
-                  </View>
+                  {!trip.isTask ? (
+                    <>
+                      <View style={styles.tripDetails}>
+                        <Text style={styles.tripBudget}>Budget: ${trip.budget}</Text>
+                        <Text style={styles.tripItems}>
+                          Items: {trip.items.length > 0 ? trip.items.join(', ') : 'No items added'}
+                        </Text>
+                      </View>
+                      
+                      {/* Add Item Input */}
+                      <View style={styles.addItemRow}>
+                        <TextInput
+                          style={[styles.addItemInput, { flex: 1, marginRight: 8 }]}
+                          placeholder="Add item..."
+                          placeholderTextColor="#666"
+                          value={tripItemInputs[trip.id] || ''}
+                          onChangeText={(text) => setTripItemInputs(prev => ({ ...prev, [trip.id]: text }))}
+                          onFocus={(e) => e.stopPropagation()}
+                        />
+                        <TouchableOpacity 
+                          style={styles.addItemButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            addItemToTrip(trip.id);
+                          }}
+                        >
+                          <Ionicons name="add" size={20} color="white" />
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.tripDetails}>
+                      <Text style={styles.tripItems}>Task Location</Text>
+                    </View>
+                  )}
 
-                  <View style={styles.tripActions}>
-                    <TouchableOpacity 
-                      style={styles.startButton}
-                      onPress={() => startTrip(trip.id)}
-                    >
-                      <Ionicons name="play" size={16} color="white" />
-                      <Text style={styles.startButtonText}>Start Trip</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.completeButton}
-                      onPress={() => completeTrip(trip.id)}
-                    >
-                      <Ionicons name="checkmark" size={16} color="white" />
-                      <Text style={styles.completeButtonText}>Complete</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.deleteButton}
-                      onPress={() => deleteTrip(trip.id)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#F44336" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                  {!trip.isTask ? (
+                    <View style={styles.tripActions}>
+                      <TouchableOpacity 
+                        style={styles.startButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          startTrip(trip.id);
+                        }}
+                      >
+                        <Ionicons name="play" size={16} color="white" />
+                        <Text style={styles.startButtonText}>Start Trip</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.completeButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          completeTrip(trip.id);
+                        }}
+                      >
+                        <Ionicons name="checkmark" size={16} color="white" />
+                        <Text style={styles.completeButtonText}>Complete</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.deleteButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          deleteTrip(trip.id);
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#F44336" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.tripActions}>
+                      <TouchableOpacity 
+                        style={styles.completeButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          // For tasks, we could mark them as completed
+                          console.log('Task completed:', trip.title);
+                        }}
+                      >
+                        <Ionicons name="checkmark" size={16} color="white" />
+                        <Text style={styles.completeButtonText}>Complete Task</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </TouchableOpacity>
               ))
             ) : (
               <Text style={styles.noTripsText}>No routes planned for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
@@ -526,11 +893,16 @@ export default function TripsPage() {
         {/* All Active Trips */}
         {activeTab === 'all' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>All Active Trips ({activeTrips.length})</Text>
+            <Text style={styles.sectionTitle}>All Active Trips ({allItems.length})</Text>
             
-            {activeTrips.length > 0 ? (
-              activeTrips.map(trip => (
-                <View key={trip.id} style={styles.tripCard}>
+            {allItems.length > 0 ? (
+              allItems.map(trip => (
+                <TouchableOpacity 
+                  key={trip.id} 
+                  style={styles.tripCard}
+                  onPress={() => handleTripSelect(trip)}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.tripHeader}>
                     <View style={styles.tripInfo}>
                       <Text style={styles.tripTitle}>{trip.store}</Text>
@@ -542,81 +914,112 @@ export default function TripsPage() {
                         {trip.status === 'started' ? 'Started today' : `Planned for: ${trip.date}`}
                       </Text>
                     </View>
-                    <View style={styles.tripStatus}>
+                    <View style={styles.tripActions}>
                       <Ionicons 
                         name={getStatusIcon(trip.status)} 
                         size={20} 
                         color={getStatusColor(trip.status)} 
                       />
+                      <Ionicons name="chevron-forward" size={16} color="#B3B3B3" style={{ marginLeft: 8 }} />
                     </View>
                   </View>
                   
-                  <View style={styles.tripDetails}>
-                    <Text style={styles.tripBudget}>Budget: ${trip.budget}</Text>
-                    
-                    {/* Shopping List */}
-                    <View style={styles.shoppingListSection}>
-                      <Text style={styles.shoppingListTitle}>Shopping List ({trip.items.length} items):</Text>
-                      {trip.items.length > 0 ? (
-                        trip.items.map((item: any, index: number) => (
-                          <View key={index} style={styles.shoppingListItem}>
-                            <Text style={styles.shoppingItemText}>{item}</Text>
+                  {!trip.isTask ? (
+                    <>
+                      <View style={styles.tripDetails}>
+                        <Text style={styles.tripBudget}>Budget: ${trip.budget}</Text>
+                        
+                        {/* Shopping List */}
+                        <View style={styles.shoppingListSection}>
+                          <Text style={styles.shoppingListTitle}>Shopping List ({trip.items.length} items):</Text>
+                          {trip.items.length > 0 ? (
+                            trip.items.map((item: any, index: number) => (
+                              <View key={index} style={styles.shoppingListItem}>
+                                <Text style={styles.shoppingItemText}>{item}</Text>
+                                <TouchableOpacity 
+                                  style={styles.removeItemButton}
+                                  onPress={() => removeItemFromTrip(trip.id, index)}
+                                >
+                                  <Ionicons name="close-circle" size={16} color="#F44336" />
+                                </TouchableOpacity>
+                              </View>
+                            ))
+                          ) : (
+                            <Text style={styles.noItemsText}>No items added yet</Text>
+                          )}
+                          
+                          {/* Add Item Input */}
+                          <View style={styles.addItemRow}>
+                            <TextInput
+                              style={styles.addItemInput}
+                              placeholder="Add item..."
+                              placeholderTextColor="#666"
+                              value={tripItemInputs[trip.id] || ''}
+                              onChangeText={(text) => setTripItemInputs(prev => ({ ...prev, [trip.id]: text }))}
+                            />
                             <TouchableOpacity 
-                              style={styles.removeItemButton}
-                              onPress={() => removeItemFromTrip(trip.id, index)}
+                              style={styles.addItemButton}
+                              onPress={() => addItemToTrip(trip.id)}
                             >
-                              <Ionicons name="close-circle" size={16} color="#F44336" />
+                              <Ionicons name="add" size={20} color="white" />
                             </TouchableOpacity>
                           </View>
-                        ))
-                      ) : (
-                        <Text style={styles.noItemsText}>No items added yet</Text>
-                      )}
-                      
-                      {/* Add Item Input */}
-                      <View style={styles.addItemRow}>
-                        <TextInput
-                          style={[styles.addItemInput, { flex: 1, marginRight: 8 }]}
-                          placeholder="Add item..."
-                          placeholderTextColor="#666"
-                          value={tripItemInputs[trip.id] || ''}
-                          onChangeText={(text) => setTripItemInputs(prev => ({ ...prev, [trip.id]: text }))}
-                        />
-                        <TouchableOpacity 
-                          style={styles.addItemButton}
-                          onPress={() => addItemToTrip(trip.id)}
-                        >
-                          <Ionicons name="add" size={20} color="white" />
-                        </TouchableOpacity>
+                        </View>
                       </View>
+                    </>
+                  ) : (
+                    <View style={styles.tripDetails}>
+                      <Text style={styles.tripItems}>Task Location</Text>
                     </View>
-                  </View>
+                  )}
 
-                  <View style={styles.tripActions}>
-                    <TouchableOpacity 
-                      style={styles.startButton}
-                      onPress={() => startTrip(trip.id)}
-                    >
-                      <Ionicons name="play" size={16} color="white" />
-                      <Text style={styles.startButtonText}>Start Trip</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.completeButton}
-                      onPress={() => completeTrip(trip.id)}
-                    >
-                      <Ionicons name="checkmark" size={16} color="white" />
-                      <Text style={styles.completeButtonText}>Complete</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.deleteButton}
-                      onPress={() => deleteTrip(trip.id)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#F44336" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                  {!trip.isTask ? (
+                    <View style={styles.tripActions}>
+                      <TouchableOpacity 
+                        style={styles.startButton}
+                        onPress={() => startTrip(trip.id)}
+                      >
+                        <Ionicons name="play" size={16} color="white" />
+                        <Text style={styles.startButtonText}>Start Trip</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.completeButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          completeTrip(trip.id);
+                        }}
+                      >
+                        <Ionicons name="checkmark" size={16} color="white" />
+                        <Text style={styles.completeButtonText}>Complete</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.deleteButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          deleteTrip(trip.id);
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#F44336" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.tripActions}>
+                      <TouchableOpacity 
+                        style={styles.completeButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          // For tasks, we could mark them as completed
+                          console.log('Task completed:', trip.title);
+                        }}
+                      >
+                        <Ionicons name="checkmark" size={16} color="white" />
+                        <Text style={styles.completeButtonText}>Complete Task</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </TouchableOpacity>
               ))
             ) : (
               <Text style={styles.noTripsText}>No active trips planned</Text>
@@ -642,21 +1045,152 @@ export default function TripsPage() {
             >
               {/* User location is shown by showsUserLocation={true} */}
               
-              {/* Only show trip markers if there are trips for the selected date with coordinates */}
-              {selectedDateTrips.filter(trip => trip.coordinates && trip.date === selectedDate).map(trip => (
-                <Marker
-                  key={trip.id}
-                  coordinate={{
-                    latitude: trip.coordinates.lat,
-                    longitude: trip.coordinates.lng,
-                  }}
-                  title={trip.store}
-                  description={`${trip.status} • $${trip.budget}`}
-                  pinColor={trip.status === 'active' ? '#4CAF50' : trip.status === 'started' ? '#9C27B0' : '#FF9800'}
-                />
-              ))}
+              {/* Trip markers with numbers based on route optimization */}
+              {optimizedRouteList.length > 0 ? (
+                optimizedRouteList.map((trip, index) => {
+                  // Safety checks for each marker
+                  if (!trip || !trip.coordinates || !trip.id) {
+                    console.warn('Invalid trip data for marker:', trip);
+                    return null;
+                  }
+                  
+                  const lat = trip.coordinates.lat;
+                  const lng = trip.coordinates.lng;
+                  
+                  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+                    console.warn('Invalid coordinates for trip:', trip.id);
+                    return null;
+                  }
+
+                  try {
+                    const distance = trip.distanceFromUser || 0;
+                    const distanceStr = isNaN(distance) ? 'unknown' : distance.toFixed(1);
+                    
+                    return (
+                      <Marker
+                        key={trip.id}
+                        coordinate={{
+                          latitude: lat,
+                          longitude: lng,
+                        }}
+                        title={`${index + 1}. ${trip.store || 'Unknown Store'}`}
+                        description={`${trip.status || 'unknown'} • $${trip.budget || '0'} • ${distanceStr} km away`}
+                      >
+                        <View style={styles.numberMarker}>
+                          <Text style={styles.numberMarkerText}>{index + 1}</Text>
+                        </View>
+                      </Marker>
+                    );
+                  } catch (error) {
+                    console.error('Error rendering numbered marker for trip:', trip.id, error);
+                    return null;
+                  }
+                }).filter(marker => marker !== null) // Remove null markers
+              ) : (
+                selectedDateTrips.filter(trip => trip.coordinates && trip.date === selectedDate).map(trip => (
+                  <Marker
+                    key={trip.id}
+                    coordinate={{
+                      latitude: trip.coordinates.lat,
+                      longitude: trip.coordinates.lng,
+                    }}
+                    title={trip.store}
+                    description={`${trip.status} • $${trip.budget}`}
+                    pinColor={trip.status === 'active' ? '#4CAF50' : trip.status === 'started' ? '#9C27B0' : '#FF9800'}
+                  />
+                ))
+              )}
               
-              {/* Only show route path if there are actual routes */}
+              {/* MapViewDirections for road-based routing */}
+              {userLocation && optimizedRouteList.length > 0 && (() => {
+                // Get API key from environment (hardcoded for Expo since env vars don't load properly in dev)
+                const envApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
+                const apiKey = envApiKey || 'AIzaSyAB-h4_VucPyVktYcdIW5At9edXaQXRL10'; // Fallback from .env file
+                
+
+                
+                // Validate that all routes have proper coordinates
+                const validRoutes = optimizedRouteList.filter(trip => 
+                  trip.coordinates && 
+                  typeof trip.coordinates.lat === 'number' && 
+                  typeof trip.coordinates.lng === 'number'
+                );
+                
+                if (validRoutes.length === 0) {
+                  console.warn('No valid routes with coordinates found');
+                  return null;
+                }
+                
+                // Google Maps API has a limit of 23 waypoints (plus origin and destination)
+                // So we can handle up to 25 total locations
+                const maxLocations = 25;
+                const limitedRoutes = validRoutes.slice(0, maxLocations);
+                
+                if (limitedRoutes.length === 0) {
+                  console.warn('No routes after limiting');
+                  return null;
+                }
+                
+                const destination = limitedRoutes[limitedRoutes.length - 1];
+                const waypoints = limitedRoutes.length > 1 ? limitedRoutes.slice(0, -1) : [];
+                
+                // Additional safety check
+                if (!destination || !destination.coordinates) {
+                  console.warn('Invalid destination coordinates');
+                  return null;
+                }
+                
+                try {
+                  return (
+                    <MapViewDirections
+                      origin={{
+                        latitude: userLocation.latitude,
+                        longitude: userLocation.longitude,
+                      }}
+                      destination={{
+                        latitude: destination.coordinates.lat,
+                        longitude: destination.coordinates.lng,
+                      }}
+                      waypoints={waypoints.length > 0 ? waypoints.map(trip => ({
+                        latitude: trip.coordinates.lat,
+                        longitude: trip.coordinates.lng,
+                      })).filter(point => 
+                        typeof point.latitude === 'number' && 
+                        typeof point.longitude === 'number' &&
+                        !isNaN(point.latitude) && 
+                        !isNaN(point.longitude)
+                      ) : undefined}
+                      apikey={apiKey}
+                      strokeWidth={4}
+                      strokeColor="#2E8BFF"
+                      optimizeWaypoints={true}
+                      onReady={(result) => {
+                  
+                        // Store the optimized route coordinates for future use
+                        setRoutePath(result.coordinates);
+                      }}
+                      onError={(errorMessage) => {
+                        console.error('❌ MapViewDirections ERROR:', errorMessage);
+                  
+                        // Fallback to straight lines
+                        const fallbackRoute = [
+                          { latitude: userLocation.latitude, longitude: userLocation.longitude },
+                          ...validRoutes.map(trip => ({ 
+                            latitude: trip.coordinates.lat, 
+                            longitude: trip.coordinates.lng 
+                          }))
+                        ];
+                        setRoutePath(fallbackRoute);
+                      }}
+                    />
+                  );
+                } catch (error) {
+                  console.error('MapViewDirections render error:', error);
+                  return null;
+                }
+              })()}
+              
+              {/* Fallback Polyline if MapViewDirections fails or no API key */}
               {routePath.length > 1 && (
                 <Polyline
                   coordinates={routePath}
@@ -707,20 +1241,44 @@ export default function TripsPage() {
               </View>
 
               {/* Route Destinations */}
-              {optimizedRouteList.map((trip, index) => (
-                <View key={trip.id} style={styles.routeItem}>
-                  <View style={styles.routeNumber}>
-                    <Text style={styles.routeNumberText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.routeItemContent}>
-                    <Text style={styles.routeItemTitle}>{trip.store}</Text>
-                    <Text style={styles.routeItemSubtitle}>
-                      {trip.distanceFromUser.toFixed(1)} km from you • {trip.location}
-                    </Text>
-                  </View>
-                  <Ionicons name="storefront" size={20} color="#FF9800" />
-                </View>
-              ))}
+              {optimizedRouteList.map((trip, index) => {
+                // Safety checks for route list item
+                if (!trip || !trip.id) {
+                  console.warn('Invalid trip in route list:', trip);
+                  return null;
+                }
+
+                try {
+                  const distance = trip.distanceFromUser || 0;
+                  const distanceStr = isNaN(distance) ? 'unknown' : distance.toFixed(1);
+                  const storeName = trip.store || 'Unknown Store';
+                  const location = trip.location || 'Location not specified';
+
+                  // Check if this is a task or trip
+                  const isTask = trip.id && trip.id.startsWith('task');
+                  const iconName = isTask ? 'checkmark-circle' : 'storefront';
+                  const iconColor = isTask ? '#4CAF50' : '#FF9800';
+                  const typeLabel = isTask ? 'Task' : 'Trip';
+                  
+                  return (
+                    <View key={trip.id} style={styles.routeItem}>
+                      <View style={styles.routeNumber}>
+                        <Text style={styles.routeNumberText}>{index + 1}</Text>
+                      </View>
+                      <View style={styles.routeItemContent}>
+                        <Text style={styles.routeItemTitle}>{storeName}</Text>
+                        <Text style={styles.routeItemSubtitle}>
+                          {typeLabel} • {distanceStr} km from you • {location}
+                        </Text>
+                      </View>
+                      <Ionicons name={iconName} size={20} color={iconColor} />
+                    </View>
+                  );
+                } catch (error) {
+                  console.error('Error rendering route list item:', error);
+                  return null;
+                }
+              }).filter(item => item !== null)}
 
               {/* Google Maps Button */}
               <TouchableOpacity style={styles.googleMapsButton} onPress={openInGoogleMaps}>
@@ -795,6 +1353,138 @@ export default function TripsPage() {
         )}
       </ScrollView>
 
+      {/* Trip Detail Modal */}
+      <Modal
+        visible={showTripDetail}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowTripDetail(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.tripDetailModal}>
+            {selectedTrip && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={styles.modalTitle}>{selectedTrip.store || 'Task'}</Text>
+                    <Text style={styles.modalSubtitle}>{selectedTrip.location || 'No location'}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setShowTripDetail(false)}
+                  >
+                    <Ionicons name="close" size={24} color="#B3B3B3" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+                  {/* Trip/Task Info */}
+                  <View style={styles.tripDetailSection}>
+                    <Text style={styles.tripDetailLabel}>{selectedTrip.isTask ? 'Task' : 'Trip'} Information</Text>
+                    
+                    <View style={styles.tripDetailRow}>
+                      <Ionicons name="calendar" size={16} color="#2E8BFF" />
+                      <Text style={styles.tripDetailText}>
+                        Date: {selectedTrip.date ? new Date(selectedTrip.date).toLocaleDateString('en-US', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        }) : 'Not set'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.tripDetailRow}>
+                      <Ionicons name="card" size={16} color="#2E8BFF" />
+                      <Text style={styles.tripDetailText}>Budget: ${selectedTrip.budget || '0'}</Text>
+                    </View>
+
+                    <View style={styles.tripDetailRow}>
+                      <Ionicons 
+                        name={getStatusIcon(selectedTrip.status || 'pending')} 
+                        size={16} 
+                        color={getStatusColor(selectedTrip.status || 'pending')} 
+                      />
+                      <Text style={[styles.tripDetailText, { color: getStatusColor(selectedTrip.status || 'pending') }]}>
+                        Status: {selectedTrip.status ? selectedTrip.status.charAt(0).toUpperCase() + selectedTrip.status.slice(1) : 'Pending'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Shopping List */}
+                  <View style={styles.tripDetailSection}>
+                    <Text style={styles.tripDetailLabel}>Shopping List ({(selectedTrip.items || []).length} items)</Text>
+                    
+                    {(selectedTrip.items || []).length > 0 ? (
+                      (selectedTrip.items || []).map((item: string, index: number) => (
+                        <View key={index} style={styles.tripDetailItem}>
+                          <View style={styles.tripDetailItemContent}>
+                            <Ionicons name="basket" size={16} color="#FF9800" />
+                            <Text style={styles.tripDetailItemText}>{item}</Text>
+                          </View>
+                          <TouchableOpacity 
+                            style={styles.removeItemFromDetailButton}
+                            onPress={() => {
+                              const updatedTrip = {
+                                ...selectedTrip,
+                                items: (selectedTrip.items || []).filter((_: any, i: number) => i !== index)
+                              };
+                              setTrips(trips.map(t => t.id === selectedTrip.id ? updatedTrip : t));
+                              setSelectedTrip(updatedTrip);
+                            }}
+                          >
+                            <Ionicons name="close-circle" size={18} color="#F44336" />
+                          </TouchableOpacity>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={styles.emptyListText}>No items in shopping list</Text>
+                    )}
+                  </View>
+
+                  {/* Trip Actions */}
+                  <View style={styles.tripDetailActions}>
+                    {!selectedTrip.isTask && selectedTrip.status === 'planned' && (
+                      <TouchableOpacity 
+                        style={styles.modalActionButton}
+                        onPress={() => {
+                          startTrip(selectedTrip.id);
+                          setShowTripDetail(false);
+                        }}
+                      >
+                        <Ionicons name="play" size={18} color="#FFFFFF" />
+                        <Text style={styles.modalActionButtonText}>Start Trip</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {!selectedTrip.isTask && selectedTrip.status !== 'completed' && (
+                      <TouchableOpacity 
+                        style={[styles.modalActionButton, styles.completeActionButton]}
+                        onPress={() => {
+                          completeTrip(selectedTrip.id);
+                          setShowTripDetail(false);
+                        }}
+                      >
+                        <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                        <Text style={styles.modalActionButtonText}>Mark Complete</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity 
+                      style={[styles.modalActionButton, styles.deleteActionButton]}
+                      onPress={handleDeleteTripFromDetail}
+                    >
+                      <Ionicons name="trash" size={18} color="#FFFFFF" />
+                      <Text style={styles.modalActionButtonText}>Delete {selectedTrip.isTask ? 'Task' : 'Trip'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Add Trip Modal */}
       <Modal
         visible={isAddTripModalVisible}
@@ -803,8 +1493,8 @@ export default function TripsPage() {
         onRequestClose={() => setIsAddTripModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Plan New Trip</Text>
+          <View style={styles.addTripModalContent}>
+            <Text style={styles.addTripModalTitle}>Plan New Trip</Text>
             
             <TextInput
               style={styles.tripInput}
@@ -1182,6 +1872,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  numberMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#2E8BFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  numberMarkerText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   mapActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1297,14 +2002,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
+  addTripModalContent: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
     width: '90%',
     maxWidth: 400,
   },
-  modalTitle: {
+  addTripModalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
@@ -1489,5 +2194,153 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // Trip detail modal styles
+  tripDetailModal: {
+    backgroundColor: '#121212',
+    borderRadius: 20,
+    padding: 0,
+    margin: 20,
+    marginTop: 80,
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#B3B3B3',
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalContent: {
+    flex: 1,
+  },
+  tripDetailSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
+  },
+  tripDetailLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  tripDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  tripDetailText: {
+    fontSize: 16,
+    color: '#B3B3B3',
+    marginLeft: 12,
+  },
+  tripDetailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2C',
+  },
+  tripDetailItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  tripDetailItemText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    marginLeft: 12,
+  },
+  removeItemFromDetailButton: {
+    padding: 4,
+  },
+  emptyListText: {
+    fontSize: 16,
+    color: '#757575',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 20,
+  },
+  tripDetailActions: {
+    padding: 20,
+    gap: 12,
+  },
+  modalActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2E8BFF',
+    borderRadius: 8,
+    padding: 14,
+  },
+  completeActionButton: {
+    backgroundColor: '#4CAF50',
+  },
+  deleteActionButton: {
+    backgroundColor: '#F44336',
+  },
+  modalActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  // Task locations toggle styles
+  taskLocationsToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#1E1E1E',
+    marginBottom: 16,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2C2C2C',
+  },
+  taskLocationsLabel: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 28,
+    backgroundColor: '#2C2C2C',
+    borderRadius: 14,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleSwitchActive: {
+    backgroundColor: '#2E8BFF',
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  toggleKnobActive: {
+    alignSelf: 'flex-end',
   },
 });

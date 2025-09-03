@@ -1427,7 +1427,7 @@ const LedgerPage = () => {
               <Label htmlFor="category">Category (optional)</Label>
               <Select
                 value={selectedCategory}
-                onValueChange={value => setSelectedCategory(value as TransactionCategory)}
+                onValueChange={(value: any) => setSelectedCategory(value as TransactionCategory)}
               >
                 <SelectTrigger id="category" className="w-full">
                   <SelectValue placeholder="Select a category" />
